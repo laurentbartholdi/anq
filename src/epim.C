@@ -1,0 +1,43 @@
+/******************************************************************************
+**
+**                 Nilpotent Quotient for Lie Rings
+** epim.c                                                       Csaba Schneider
+**                                                           schcs@math.klte.hu
+*/
+
+#include "lienq.h"
+
+/*
+** The epimorphism maps from the Lie-algebra given by finite presentation to
+** the nilpotent factor-algebra computed by the LieNQ algorithm.
+*/
+
+/*
+** The finction Epim( n ) returns the image of the n-th generator in the
+** finite presentation under the epimorphism. We suppose the image to be
+** in collected word.
+*/
+
+gpvec Epim(gen n) {
+  return Epimorphism[n];
+}
+
+/*
+** We initialize the epimorphism from the finite presentation to the first
+** (abelian) factor. It is rather trivial at the beginning, actually a
+** one-to-one map between the two generator set.
+*/
+void InitEpim(void) {
+  Epimorphism = (gpvec *) malloc((Pres.NrGens + 1) * sizeof(gpvec));
+  for (unsigned i = 1; i <= Pres.NrGens; i++) {
+    Epimorphism[i] = GenToGpVec(i);
+    Definitions[i].g = i;
+    Definitions[i].h = 0;
+  }
+}
+
+void FreeEpim(void) {
+  for (unsigned i = 1; i <= Pres.NrGens; i++)
+    free(Epimorphism[i]);
+  free(Epimorphism);
+}
