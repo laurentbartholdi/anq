@@ -28,7 +28,7 @@ void InitMatrix(void) {
   NrRows = 0;
 }
 
-void freeVector(lvec v) {
+void FreeVector(lvec v) {
   for (unsigned i = 1; i <= NrCols; i++) {
     mpz_clear(v[i]);
   }
@@ -37,7 +37,7 @@ void freeVector(lvec v) {
 
 void FreeMatrix(void) {
   for (unsigned i = 0; i < NrRows; i++)
-    freeVector(Matrix[i]);
+    FreeVector(Matrix[i]);
   free(Matrix);
   free(Heads);
 }
@@ -68,9 +68,11 @@ gpvec *MatrixToExpVecs() {
 	perror("Exponent cannot fit in a single word");
 	exit(4);
       }
-      p->g = j + NrPcGens;
-      p->c = mpz_get_si(Matrix[i][j]);
-      p++;
+      if (mpz_sgn(Matrix[i][j])) {
+	p->g = j + NrPcGens;
+	p->c = mpz_get_si(Matrix[i][j]);
+	p++;
+      }
     }
     p->g = EOW;
   }
@@ -91,13 +93,6 @@ gpvec *MatrixToExpVecs() {
 void vNeg(lvec v, unsigned a) {
   while (a <= NrCols) {
     mpz_neg(v[a], v[a]);
-    a++;
-  }
-}
-
-void vSubOnce(lvec v, lvec w, unsigned a) {
-  while (a <= NrCols) {
-    mpz_sub(v[a], v[a], w[a]);
     a++;
   }
 }
@@ -152,36 +147,7 @@ bool VReduce(lvec &v, unsigned &head) {
   return true;
 }
 
-/* This function adds a row to Matrix, which is preserved
-   in Hermite normal form */
-bool AddRow(gpvec gv) {
-  coeffvec cv = GpVecToCoeffVec(gv);
-  lvec v;
-  unsigned head = 0;
-
-  ChangedMatrix = false;
-
-  /* Find the Head of cv */
-  for (unsigned i = 1; i <= NrCols; i++)
-    if (cv[NrPcGens + i].notzero()) {
-      head = i;
-      break;
-    }
-  /* Free cv and return if it is nullvector. */
-  if (head == 0) {
-    free(cv);
-    return false;
-  }
-  /* Copy the NrCenGens entries of cv and free it. */
-  v = (lvec)malloc((NrCols + 1) * sizeof(large));
-  if (v == NULL) {
-    perror("AddRow, v");
-    exit(2);
-  }
-  for (unsigned i = 1; i <= NrCols; i++)
-    mpz_init_set_si(v[i], cv[NrPcGens + i].data);
-  free(cv);
-
+void AddRow(lvec v, unsigned head) {
   if (VReduce(v, head)) {
     ChangedMatrix = true;
     if (NrRows % 200 == 0) {
@@ -207,12 +173,48 @@ bool AddRow(gpvec gv) {
     Heads[pos] = head;
     NrRows++;
   } else
-    freeVector(v);
+    FreeVector(v);
 
   /* Reduce all the head columns. */
   for (unsigned i = 1; i < NrRows; i++)
     for (unsigned j = 0; j < i; j++)
       vSub(Matrix[j], Matrix[i], Heads[i]);
+}
+
+/* mpz_gcdext(g,s,t,a,b) sets g,s,t with 0<g=sa+tb */
+
+/* This function adds a row to Matrix, which is preserved
+   in Hermite normal form */
+bool AddRow(gpvec gv) {
+  lvec v;
+
+  ChangedMatrix = false;
+
+  /* Find the Head of gv */
+  for (; gv->g != EOW && !gv->c.notzero(); gv++);
+  if (gv->g == EOW)
+    return false;
+
+  unsigned head = gv->g - NrPcGens;
+
+  /* Copy the NrCenGens entries of gv and free it. */
+  v = (lvec)malloc((NrCols + 1) * sizeof(large));
+  if (v == NULL) {
+    perror("AddRow, v");
+    exit(2);
+  }
+  for (unsigned i = 1; i <= NrCols; i++)
+    mpz_init (v[i]);
+  
+  for (; gv->g != EOW; gv++) {
+    if (gv->g <= NrPcGens) {
+      perror("AddRow has a coefficient not in the center");
+      exit(5);
+    }
+    mpz_set_si(v[gv->g-NrPcGens], gv->c.data);
+  }
+
+  AddRow(v, head);
 
   return ChangedMatrix;
 }

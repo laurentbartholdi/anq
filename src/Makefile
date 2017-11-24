@@ -5,8 +5,12 @@
 ##                                                           schcs@math.klte.hu
 ##
 
-CXXOPTS      = -O0 -g -Wall -Werror
-CXXFLAGS     = -std=c++11 $(CXXOPTS) -DVERSION='"1.3 1995 July"'
+CPPFLAGS = -DVERSION='"1.3 1995 July"'
+COPTS = -O0 -g -Wall -Werror
+CXXFLAGS = -std=c++11 $(COPTS)
+CFLAGS = $(COPTS)
+LDLIBS = -lgmp
+LDFLAGS = $(COPTS)
 
 ## LieNQ prefers GNU C compiler.
 
@@ -15,7 +19,7 @@ CXX = g++-7
 OBJ = presentation.o print.o readpres.o operations.o matrix.o epim.o addgen.o consistency.o tails.o auxialiary.o lienq.o
 
 lienq: $(OBJ)
-	$(CC) $^ -o $@ -lgmp
+#	$(CC) $^ -o $@ -lgmp
 
 clean:
 	rm -f $(OBJ)

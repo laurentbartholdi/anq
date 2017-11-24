@@ -40,14 +40,16 @@ static gpvec CheckZero(gen a, gen b, gen c)
   Prod(p1,p1,cvb); /* p1 = [[c,a],b] */
   Sum(p0,p1,p2); /* p0 = Jacobi(a,b,c) */
 
-  free(p1); free(p2); free(cva); free(cvb); free(cvc);
+  Collect(p1, p0);
+  
+  free(p0); free(p2); free(cva); free(cvb); free(cvc);
 
   if (Debug) {
     fprintf(OutputFile, "# consistency: [ %d, %d, %d ] = ", a, b, c);
-    PrintGpVec(p0);
+    PrintGpVec(p1);
     fprintf(OutputFile, "\n");
   }
-  return p0;
+  return p1;
 }
 
 /*
