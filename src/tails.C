@@ -28,9 +28,9 @@ static gpvec Tail_ab(gen a, gen b) {
 
   gpvec temp[3], cva = GenToGpVec(a), cvg = GenToGpVec(Definitions[b].g), cvh = GenToGpVec(Definitions[b].h);
 
-  temp[0] = NewGpVec(NrPcGens + NrCenGens);
-  temp[1] = NewGpVec(NrPcGens + NrCenGens);
-  temp[2] = NewGpVec(NrPcGens + NrCenGens);
+  temp[0] = NewGpVec(NrTotalGens);
+  temp[1] = NewGpVec(NrTotalGens);
+  temp[2] = NewGpVec(NrTotalGens);
   Prod(temp[0], cva, cvg);
   Prod(temp[1], temp[0], cvh); /* temp[1] = [a,g,h] */
   Prod(temp[0], cva, cvh);

@@ -627,8 +627,8 @@ void EvalRel(gpvec v, node *rel) {
   gpvec vl, vr;
   switch (rel->type) {
   case TSUM:
-    vl = NewGpVec(NrPcGens + NrCenGens);
-    vr = NewGpVec(NrPcGens + NrCenGens);
+    vl = NewGpVec(NrTotalGens);
+    vr = NewGpVec(NrTotalGens);
     EvalRel(vl, rel->cont.op.l);
     EvalRel(vr, rel->cont.op.r);
     Sum(v, vl, vr);
@@ -640,8 +640,8 @@ void EvalRel(gpvec v, node *rel) {
     ModProd((rel->cont.op.l)->cont.n, v);
     break;
   case TLPROD:
-    vl = NewGpVec(NrPcGens + NrCenGens);
-    vr = NewGpVec(NrPcGens + NrCenGens);
+    vl = NewGpVec(NrTotalGens);
+    vr = NewGpVec(NrTotalGens);
     EvalRel(vl, rel->cont.op.l);
     EvalRel(vr, rel->cont.op.r);
     Prod(v, vl, vr);
@@ -654,8 +654,8 @@ void EvalRel(gpvec v, node *rel) {
   case TREL:
   case TDRELL:
   case TDRELR:
-    vl = NewGpVec(NrPcGens + NrCenGens);
-    vr = NewGpVec(NrPcGens + NrCenGens);
+    vl = NewGpVec(NrTotalGens);
+    vr = NewGpVec(NrTotalGens);
     EvalRel(vl, rel->cont.op.l);
     EvalRel(vr, rel->cont.op.r);
     Sum(v, vl, -1, vr);

@@ -17,12 +17,17 @@ gpvec NewGpVec(unsigned size) {
 }
 
 coeffvec NewCoeffVec(void) {
-  coeffvec v = (coeffvec) calloc((NrPcGens + NrCenGens + 1), sizeof v[0]);
+  coeffvec v = (coeffvec) calloc((NrTotalGens + 1), sizeof v[0]);
   if (v == NULL) {
     perror("NewCoeffVec: malloc failed");
     exit(2);
   }
   return v;
+}
+
+void ClearCoeffVec(coeffvec v) {
+  for (unsigned i = 1; i <= NrTotalGens; i++)
+    v[i] = 0;
 }
 
 void CpVec(gpvec vec1, gpvec vec2) {
@@ -34,21 +39,6 @@ void CpVec(gpvec vec1, gpvec vec2) {
     i++;
   }
   vec1[i].g = EOW;
-}
-
-/* The same as the previous one but frees vec2 */
-void CpVecFree(gpvec vec1, gpvec vec2)
-
-{
-  unsigned i = 0;
-
-  while (vec2[i].g != EOW) {
-    vec1[i].g = vec2[i].g;
-    vec1[i].c = vec2[i].c;
-    i++;
-  }
-  vec1[i].g = EOW;
-  free(vec2);
 }
 
 /*
@@ -83,7 +73,7 @@ unsigned Length(gpvec vec) {
 unsigned RealLength(coeffvec cv) {
   unsigned l = 0;
 
-  for (unsigned i = 1; i <= NrPcGens + NrCenGens; i++)
+  for (unsigned i = 1; i <= NrTotalGens; i++)
     if (cv[i].notzero())
       l++;
 
@@ -98,7 +88,7 @@ unsigned RealLength(coeffvec cv) {
 void CoeffVecToGpVec(gpvec gv, coeffvec cv) {
   gpvec p = gv;
   
-  for (unsigned i = 1; i <= NrPcGens + NrCenGens; i++)
+  for (unsigned i = 1; i <= NrTotalGens; i++)
     if (cv[i].notzero()) {
       p->g = i;
       p->c = cv[i];

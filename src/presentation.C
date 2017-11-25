@@ -12,7 +12,7 @@ gpvec *Power;
 gpvec **Product;
 coeffvec Coefficients;
 
-unsigned NrCenGens, NrPcGens;
+unsigned NrCenGens, NrPcGens, NrTotalGens;
 
 unsigned *Weight;
 unsigned *Dimensions;
@@ -56,17 +56,17 @@ void InitPcPres() {
 
   Weight = (unsigned *)malloc(1 * sizeof(unsigned));
 
-  NrCenGens = Pres.NrGens;
+  NrCenGens = NrTotalGens = Pres.NrGens;
   NrPcGens = 0;
 }
 
 void FreePcPres(void) {
-  for (unsigned i = 1; i <= NrPcGens + NrCenGens; i++)
+  for (unsigned i = 1; i <= NrTotalGens; i++)
     if (Coefficients[i].notzero())
       free(Power[i]);
   free(Power);
   free(Coefficients);
-  for (unsigned i = 1; i <= NrPcGens + NrCenGens; i++) {
+  for (unsigned i = 1; i <= NrTotalGens; i++) {
     for (unsigned j = 1; j < i; j++)
       free(Product[i][j]);
     free(Product[i]);
@@ -79,7 +79,7 @@ void FreePcPres(void) {
 
 /* v -= v[g]*w */
 void ElementaryColumnOp(gpvec &oldv, gen g, gpvec w) {
-  gpvec newv = NewGpVec(NrPcGens + NrCenGens), p0, p1;
+  gpvec newv = NewGpVec(NrTotalGens), p0, p1;
 
   for (p0 = oldv, p1 = newv; p0->g != EOW; p0++, p1++) {
     if (p0->g == g) {
@@ -95,16 +95,17 @@ void ElementaryColumnOp(gpvec &oldv, gen g, gpvec w) {
 }
 
 void EvalAllRel(void) {
+  gpvec gv = NewGpVec(NrTotalGens);
+  
   for (unsigned i = 0; i <= Pres.NrRels - 1; i++) {
-    gpvec g0 = NewGpVec(NrPcGens + NrCenGens);
-    gpvec g1 = NewGpVec(NrPcGens + NrCenGens);
-    EvalRel(g0, Pres.Relators[i]);
-    Collect(g1, g0);
-    AddRow(g1);
-    free(g0);
-    free(g1);
+    EvalRel(gv, Pres.Relators[i]);
+    coeffvec cv = GpVecToCoeffVec(gv);
+    Collect(cv);
+    AddRow(cv);
+    free(cv);
   }
-
+  free(gv);
+  
   if (Debug)
     fprintf(OutputFile, "# EvalAllRel() finished\n");
 }
@@ -126,15 +127,15 @@ void UpdatePcPres(void) {
     }
   }
 
-  gen *renumber = (gen *)malloc((NrPcGens + NrCenGens + 1) * sizeof(gen));
+  gen *renumber = (gen *)malloc((NrTotalGens + 1) * sizeof(gen));
   if (renumber == NULL) {
     perror("EvalAllRel, renumber");
     exit(2);
   }
   for (unsigned i = 1; i <= NrCenGens; i++)
-    renumber[NrPcGens+i] = 0;
+    renumber[NrPcGens + i] = 0;
 
-  for (unsigned k = NrPcGens + 1, i = 0; k <= NrPcGens + NrCenGens; k++)
+  for (unsigned k = NrPcGens + 1, i = 0; k <= NrTotalGens; k++)
     if (i >= NrRows || k != ExpMat[i]->g) { /* no relation for k, remains infinite */
       renumber[k] = k - trivialgens;
     } else if (ExpMat[i]->c.notone()) { /* k is torsion */
@@ -205,7 +206,7 @@ void UpdatePcPres(void) {
 
   /* Let us eleminate the generators from the power relations. */
 
-  for (unsigned i = 1; i <= NrPcGens + NrCenGens; i++)
+  for (unsigned i = 1; i <= NrTotalGens; i++)
     if (Coefficients[i].notzero()) {
       unsigned j = 0;
       unsigned pos = 0;
@@ -223,9 +224,9 @@ void UpdatePcPres(void) {
     }
 
   /* Collect the Torsions */
-  for (unsigned i = NrPcGens + NrCenGens; i >= 1; i--)
+  for (unsigned i = NrTotalGens; i >= 1; i--)
     if (Coefficients[i].notzero()) {
-      gpvec gv = NewGpVec(NrPcGens + NrCenGens);
+      gpvec gv = NewGpVec(NrTotalGens);
       Collect(gv, Power[i]);
   
       free(Power[i]);
@@ -236,7 +237,7 @@ void UpdatePcPres(void) {
   /* Collect the Products */
   for (unsigned i = 1; i <= NrPcGens; i++)
     for (unsigned j = 1; j < i; j++) {
-      gpvec gv = NewGpVec(NrPcGens + NrCenGens);
+      gpvec gv = NewGpVec(NrTotalGens);
       Collect(gv, Product[i][j]);
       free(Product[i][j]);
       Product[i][j] = ShrinkGpVec(gv);
@@ -244,16 +245,17 @@ void UpdatePcPres(void) {
 
   /* Let us alter the Definitions as well. Recall that dead generator cannot
   have definition at all. It is only the right of the living ones. */
-  for (unsigned i = NrPcGens + 1; i <= NrPcGens + NrCenGens; i++)
+  for (unsigned i = NrPcGens + 1; i <= NrTotalGens; i++)
     if (renumber[i] != 0) {
       Definitions[renumber[i]].g = Definitions[i].g;
       Definitions[renumber[i]].h = Definitions[i].h;
     }
 
-  free((void *)renumber);
+  free(renumber);
 
   NrCenGens -= trivialgens;
-    
+  NrTotalGens -= trivialgens;
+  
   if (Debug)
     fprintf(OutputFile, "# UpdatePcPres() finished\n");
 }
@@ -262,19 +264,19 @@ void ExtendPcPres(void) {
   if (NrCenGens == 0)
     ZeroCenGens = true;
 
-  Dimensions = (unsigned *)realloc(Dimensions, (Class + 1) * sizeof(unsigned));
+  Dimensions = (unsigned *) realloc(Dimensions, (Class + 1) * sizeof(unsigned));
   if (Dimensions == NULL) {
     perror("EvalAllRel, Dimensions");
     exit(2);
   }
   Dimensions[Class] = NrCenGens;
 
-  Weight = (unsigned *)realloc(Weight, (NrPcGens + NrCenGens + 1) * sizeof(unsigned));
+  Weight = (unsigned *) realloc(Weight, (NrTotalGens + 1) * sizeof(unsigned));
   if (Weight == NULL) {
     perror("EvalAllRel, Weight");
     exit(2);
   }
-  for (unsigned i = NrPcGens + 1; i <= NrPcGens + NrCenGens; i++)
+  for (unsigned i = NrPcGens + 1; i <= NrTotalGens; i++)
     Weight[i] = Class;
 
   /*
@@ -285,12 +287,12 @@ void ExtendPcPres(void) {
   ** be of length i-1.
   */
 
-  Product = (gpvec **)realloc(Product, (NrPcGens + NrCenGens + 1) * sizeof(gpvec *));
+  Product = (gpvec **)realloc(Product, (NrTotalGens + 1) * sizeof(gpvec *));
   if (Product == NULL) {
     perror("EvalAllRel, Product");
     exit(2);
   }
-  for (unsigned i = NrPcGens + 1; i <= NrPcGens + NrCenGens; i++) {
+  for (unsigned i = NrPcGens + 1; i <= NrTotalGens; i++) {
     Product[i] = (gpvec *)malloc(i * sizeof(gpvec));
     for (unsigned j = 1; j < i; j++) {
       Product[i][j] = NewGpVec(0);

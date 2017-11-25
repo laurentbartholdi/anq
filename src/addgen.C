@@ -14,7 +14,6 @@
 */
 
 void AddGen() {
-
   int *IsDefIm;
   int shift, sign, lwbd;
   int **IsDefRel;
@@ -32,10 +31,12 @@ void AddGen() {
     NrCenGens = Pres.NrGens + (Dimensions[1] * (Dimensions[1] - 1)) / 2 +
                 Dimensions[1] * (NrPcGens - Dimensions[1]) - NrPcGens;
 
+  NrTotalGens += NrCenGens;
+  
   if (!Graded)
     for (unsigned i = 1; i <= NrPcGens; i++)
       if (Coefficients[i].notzero())
-        NrCenGens++;
+        NrCenGens++, NrTotalGens++;
 
   /*
   **  In this step we sign the epimorphic images which are definitions.
@@ -78,7 +79,7 @@ void AddGen() {
 
   /* Allocate space for the Definitions. */
   Definitions = (deftype *)realloc(
-      (void *)Definitions, (NrPcGens + NrCenGens + 1) * sizeof(deftype));
+      (void *)Definitions, (NrTotalGens + 1) * sizeof(deftype));
 
   shift = NrPcGens + 1; /* points to the place of the new/pseudo generator. */
   if (!Graded) {
@@ -157,23 +158,21 @@ void AddGen() {
   **  have coefficients 0.
   */
 
-  Coefficients = (coeffvec)realloc(Coefficients,
-                                   (NrPcGens + NrCenGens + 1) * sizeof(coeff));
-  for (unsigned i = NrPcGens + 1; i <= NrPcGens + NrCenGens; i++)
+  Coefficients = (coeffvec) realloc(Coefficients, (NrTotalGens + 1) * sizeof(coeff));
+  for (unsigned i = NrPcGens + 1; i <= NrTotalGens; i++)
     Coefficients[i] = 0;
 
-  Power = (gpvec *)realloc((void *)Power,
-                           (NrPcGens + NrCenGens + 1) * sizeof(gpvec));
+  Power = (gpvec *) realloc(Power, (NrTotalGens + 1) * sizeof(gpvec));
 
   /* The Product arrays will be modify later. */
 
   /* free the local structures. */
   if (!Graded)
-    free((void *)IsDefIm);
+    free(IsDefIm);
 
   for (unsigned i = 1; i <= NrPcGens; i++)
-    free((void *)IsDefRel[i]);
-  free((void *)IsDefRel);
+    free(IsDefRel[i]);
+  free(IsDefRel);
 
   if (Debug)
     fprintf(OutputFile, "# AddGen() finished\n");

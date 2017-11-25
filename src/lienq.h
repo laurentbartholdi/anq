@@ -32,7 +32,7 @@ extern unsigned *Dimensions;
 
 extern deftype *Definitions;
 
-extern unsigned NrPcGens, NrCenGens;
+extern unsigned NrPcGens, NrCenGens, NrTotalGens;
 extern unsigned Class;
 extern PresStruct Pres;
 
@@ -50,6 +50,7 @@ extern char *OutputFileName;
 /* auxialiary functions */
 gpvec NewGpVec(unsigned);
 coeffvec NewCoeffVec(void);
+void ClearCoeffVec(coeffvec);
 void CpVec(gpvec, gpvec);
 void CpVecFree(gpvec, gpvec);
 coeffvec GenToCoeffVec(gen);
@@ -73,6 +74,7 @@ void GradedConsistency(void);
 void PrintPcPres(void);
 void PrintEpim(void);
 void PrintGpVec(gpvec);
+void PrintCoeffVec(coeffvec);
 void PrintMat(coeffvec *);
 void PrintDefinitions(void);
 
@@ -87,11 +89,13 @@ void ExtendPcPres(void);
 /* operation functions */
 void Sum(gpvec, gpvec, gpvec);
 void Sum(gpvec, gpvec, coeff, gpvec);
+void Sum(coeffvec, coeff, gpvec);
+void Sum(coeffvec, gpvec);
 void Prod(gpvec, gpvec, gpvec);
 void ModProd(coeff, gpvec);
 void ModNeg(gpvec);
 gpvec Collect(gpvec);
-void CollectCoeffVec(coeffvec);
+void Collect(coeffvec);
 void Collect(gpvec, gpvec);
 
 /* epim functions */
@@ -110,6 +114,6 @@ void AddGen(void);
 /* matrix functions */
 extern unsigned NrRows, NrCols, *Heads;
 gpvec *MatrixToExpVecs(void);
-bool AddRow(gpvec);
+bool AddRow(coeffvec);
 void InitMatrix(void);
 void FreeMatrix(void);

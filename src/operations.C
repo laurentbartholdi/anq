@@ -22,8 +22,8 @@
 **  result remains in <ev>.
 */
 
-void CollectCoeffVec(coeffvec ev) {
-  for (unsigned i = 1; i <= NrPcGens + NrCenGens; i++) {
+void Collect(coeffvec ev) {
+  for (unsigned i = 1; i <= NrTotalGens; i++) {
     coeff mp = ev[i].reduce(Coefficients[i]);
     if (mp.notzero()) {
       ev[i] -= mp * Coefficients[i];
@@ -37,7 +37,7 @@ void Collect(gpvec v0, gpvec gv) {
   coeffvec cv;
 
   cv = GpVecToCoeffVec(gv);
-  CollectCoeffVec(cv);
+  Collect(cv);
   CoeffVecToGpVec(v0,cv);
   free(cv);
 }
@@ -48,7 +48,7 @@ gpvec Collect(gpvec gv) {
   gpvec gv1;
 
   cv = GpVecToCoeffVec(gv);
-  CollectCoeffVec(cv);
+  Collect(cv);
   gv1 = CoeffVecToGpVec(cv);
 
   free(cv);
@@ -69,6 +69,18 @@ gpvec Collect(gpvec gv) {
   return result;
 }
 #endif
+
+/* v += x*w */
+void Sum(coeffvec v, coeff x, gpvec w) {
+  for (; w->g != EOW; w++)
+    v[w->g] += x*w->c;
+}
+
+/* v += w */
+void Sum(coeffvec v, gpvec w) {
+  for (; w->g != EOW; w++)
+    v[w->g] += w->c;
+}
 
 /* vec0 = vec1 + vec2 */
 void Sum(gpvec vec0, gpvec vec1, gpvec vec2) {
@@ -151,8 +163,8 @@ void ModNeg(gpvec vec) {
 void Prod(gpvec vec0, gpvec vec1, gpvec vec2) {
   gpvec temp[2];
   bool parity = 0;
-  temp[0] = NewGpVec(NrCenGens + NrPcGens);
-  temp[1] = NewGpVec(NrCenGens + NrPcGens);
+  temp[0] = NewGpVec(NrTotalGens);
+  temp[1] = NewGpVec(NrTotalGens);
   temp[0][0].g = EOW;
   
   for (gpvec p1 = vec1; p1->g != EOW; p1++)
@@ -166,4 +178,16 @@ void Prod(gpvec vec0, gpvec vec1, gpvec vec2) {
   CpVec(vec0, temp[parity]);
   free(temp[0]);
   free(temp[1]);
+}
+
+/* vec0 += [ vec1, vec2 ] */
+void Prod(coeffvec vec0, gpvec vec1, gpvec vec2) {
+  for (gpvec p1 = vec1; p1->g != EOW; p1++)
+    for (gpvec p2 = vec2; p2->g != EOW; p2++)
+      if (p1->g <= NrPcGens && p2->g <= NrPcGens && Weight[p1->g] + Weight[p2->g] <= Class) {
+        if (p1->g > p2->g)
+	  Sum(vec0, p1->c*p2->c, Product[p1->g][p2->g]);
+	else if (p2->g > p1->g)
+	  Sum(vec0, -p1->c*p2->c, Product[p2->g][p1->g]);
+      }
 }

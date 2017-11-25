@@ -13,78 +13,74 @@
 */
 
 /*
-**  CheckZero( a, b, c ) checks whether the Jacobi holds for
-**  the triple ( a, b, c ) and returns its value.
+**  CheckJacobi( a, b, c ) checks whether the Jacobi holds for
+**  the triple ( a, b, c ) and returns its value in cv.
 */
 
-static gpvec CheckZero(gen a, gen b, gen c)
+/* cv += [[a,b],c] */
+static void TripleProduct(coeffvec cv, gen a, gen b, gen c) {
+  coeff sign;
+  gpvec p;
+  if (a < b)
+    p = Product[b][a], sign = -1;
+  else
+    p = Product[a][b], sign = 1;
 
-{
+  for (; p->g != EOW && p->g <= NrPcGens; p++) {
+    if (p->g > c)
+      Sum(cv, sign*p->c, Product[p->g][c]);
+    else if (p->g < c)
+      Sum(cv, -sign*p->c, Product[c][p->g]);
+  }
+}
+
+static void CheckJacobi(coeffvec cv, gen a, gen b, gen c) {
   if (Weight[a] + Weight[b] + Weight[c] > Class)
-    return (gpvec) 0;
+    return;
 
-  gpvec cva = GenToGpVec(a), cvb = GenToGpVec(b), cvc = GenToGpVec(c);
+  ClearCoeffVec(cv);	
 
-  gpvec p0 = NewGpVec(NrPcGens + NrCenGens);
-  Prod(p0,cva,cvb);
-  Prod(p0,p0,cvc); /* p0 = [[a,b],c] */
+  TripleProduct(cv, a, b, c);
+  TripleProduct(cv, b, c, a);
+  TripleProduct(cv, c, a, b);
 
-  gpvec p1 = NewGpVec(NrPcGens + NrCenGens);
-  Prod(p1,cvb,cvc);
-  Prod(p1,p1,cva); /* p1 = [[b,c],a] */
-
-  gpvec p2 = NewGpVec(NrPcGens + NrCenGens);
-  Sum(p2,p0,p1); /* p2 = [[a,b],c] + [[b,c],a] */
-
-  Prod(p1,cvc,cva);
-  Prod(p1,p1,cvb); /* p1 = [[c,a],b] */
-  Sum(p0,p1,p2); /* p0 = Jacobi(a,b,c) */
-
-  Collect(p1, p0);
-  
-  free(p0); free(p2); free(cva); free(cvb); free(cvc);
+  Collect(cv);
 
   if (Debug) {
     fprintf(OutputFile, "# consistency: [ %d, %d, %d ] = ", a, b, c);
-    PrintGpVec(p1);
+    PrintCoeffVec(cv);
     fprintf(OutputFile, "\n");
   }
-  return p1;
 }
 
 /*
 **  The following function checks the consistency relation for
 **  o_i[ a, b ] = [ (( o_ia )), b ] where (()) means the substitution
 **  of the argument with its relation.
+**
 */
-static gpvec CheckPower(gen a, gen b) {
-  gpvec temp[2];
-  temp[0] = NewGpVec(NrPcGens + NrCenGens);
-  temp[1] = NewGpVec(NrPcGens + NrCenGens);
-  bool parity = 0;
-  temp[0]->g = EOW;
+static void CheckPower(coeffvec cv, gen a, gen b) {
+  ClearCoeffVec(cv);
 
   for (gpvec p = Power[a]; p->g <= NrPcGens && p->g != EOW; p++) {
     gen g = p->g;
     if (g > b)
-      Sum(temp[!parity], temp[parity], -p->c, Product[g][b]), parity = !parity;
+      Sum(cv, -p->c, Product[g][b]);
     else if (g < b)
-      Sum(temp[!parity], temp[parity], p->c, Product[b][g]), parity = !parity;
+      Sum(cv, p->c, Product[b][g]);
   }
 
   if (a > b)
-    Sum(temp[!parity], temp[parity], Coefficients[a], Product[a][b]), parity = !parity;
+    Sum(cv, Coefficients[a], Product[a][b]);
   else if (a < b)
-    Sum(temp[!parity], temp[parity], -Coefficients[a], Product[b][a]), parity = !parity;
+    Sum(cv, -Coefficients[a], Product[b][a]);
 
-  Collect(temp[!parity], temp[parity]), parity = !parity;
-  free (temp[!parity]);
+  Collect(cv);
   if (Debug) {
     fprintf(OutputFile, "# consistency %d %d: ", a, b);
-    PrintGpVec(temp[parity]);
+    PrintCoeffVec(cv);
     fprintf(OutputFile, "\n");
   }
-  return temp[parity];
 }
 
 /*
@@ -95,58 +91,58 @@ static gpvec CheckPower(gen a, gen b) {
 */
 
 void Consistency() {
-  gpvec gv;
+  coeffvec cv = NewCoeffVec();
 
   for (unsigned i = 1; i <= Dimensions[1]; i++)
     for (unsigned j = i + 1; j <= NrPcGens; j++)
-      for (unsigned k = j + 1; k <= NrPcGens; k++)
-        if ((gv = CheckZero(i, j, k)) != (gpvec)0) {
-          AddRow(gv);
-	  free(gv);
-        }
+      for (unsigned k = j + 1; k <= NrPcGens; k++) {
+        CheckJacobi(cv, i, j, k);
+	AddRow(cv);
+      }
 
   for (unsigned i = 1; i <= NrPcGens; i++)
     if (Coefficients[i].notzero())
       for (unsigned j = 1; j <= NrPcGens; j++) {
-        gv = CheckPower(i, j);
-        AddRow(gv);
-	free(gv);
+        CheckPower(cv, i, j);
+        AddRow(cv);
       }
+  free(cv);
+
   if (Debug)
     fprintf(OutputFile, "# Consistency() finished\n");
 }
 
 void GradedConsistency() {
-  unsigned lwbda, lwbdb, lwbdc;
-  gpvec gv;
+  coeffvec cv = NewCoeffVec();
 
   for (unsigned a = 1; a <= Dimensions[1]; a++)  /* a is of weight 1 */
     for (unsigned bw = 1; bw <= Class / 2; bw++) /* bw is the weight of b */
     {
-      unsigned cw = Class - 1 - bw; /* the weight of c */
+      unsigned lwbdb, cw = Class - 1 - bw; /* the weight of c */
       SUM(Dimensions, bw - 1, lwbdb);
       for (unsigned b = MAX(a + 1, lwbdb + 1); b <= lwbdb + Dimensions[bw]; b++) {
+	unsigned lwbdc;
         SUM(Dimensions, cw - 1, lwbdc);
         for (unsigned c = MAX(b + 1, lwbdc + 1); c <= lwbdc + Dimensions[cw]; c++) {
-          gv = CheckZero(a, b, c);
-          AddRow(gv);
+	  CheckJacobi(cv, a, b, c);
+	  AddRow(cv);
         }
       }
     }
 
   for (unsigned aw = 1; aw <= Class - 1; aw++) /* the grade of a */
   {
-    unsigned bw = Class - aw; /* that of b */
+    unsigned lwbda, lwbdb, bw = Class - aw; /* that of b */
     SUM(Dimensions, aw - 1, lwbda);
     SUM(Dimensions, bw - 1, lwbdb);
     for (unsigned a = lwbda + 1; a <= lwbda + Dimensions[aw]; a++)
       if (Coefficients[a].notzero())
         for (unsigned b = lwbdb + 1; b <= lwbdb + Dimensions[bw]; b++) {
-          gv = CheckPower(a, b);
-          AddRow(gv);
-	  free(gv);
+	  CheckPower(cv, a, b);
+	  AddRow(cv);
         }
   }
+  free(cv);
 
   if (Debug)
     fprintf(OutputFile, "# GradedConsistency() finished.\n");

@@ -14,6 +14,7 @@ typedef mpz_t large;
 #define large_clear mpz_clear
 #define large_set mpz_set
 #define large_set_si mpz_set_si
+#define large_init_set_si mpz_init_set_si
 #define large_get_si mpz_get_si
 #define large_fits_slong_p mpz_fits_slong_p
 
@@ -32,6 +33,7 @@ typedef long large;
 #define large_clear(z)
 #define large_set(z,v) {z=v;}
 #define large_set_si(z,v) {z=v;}
+#define large_init_set_si(z,v) {z=v;}
 #define large_get_si(z) z
 #define large_fits_slong_p(z) true
 
@@ -73,11 +75,11 @@ large **Matrix;
 
 void InitMatrix(void) {
   if ((Matrix = (lvec *)malloc(200 * sizeof(lvec))) == NULL) {
-    perror("AddRow, Matrix ");
+    perror("InitMatrix, Matrix ");
     exit(2);
   }
   if ((Heads = (unsigned *)malloc(200 * sizeof(unsigned))) == NULL) {
-    perror("AddRow, Heads ");
+    perror("InitMatrix, Heads ");
     exit(2);
   }
   NrCols = NrCenGens;
@@ -234,36 +236,33 @@ void AddRow(lvec v, unsigned head) {
   NrRows++;  
 }
 
-bool AddRow(gpvec gv) {
+bool AddRow(coeffvec cv) {
   lvec v;
-
+  unsigned head;
+  
   ChangedMatrix = false;
 
   /* Find the Head of gv */
-  for (; gv->g != EOW && !gv->c.notzero(); gv++);
-  if (gv->g == EOW)
-    return false;
+  for (head = 1; ; head++) {
+    if (head > NrTotalGens) return false;
+    if (cv[head].notzero()) break;
+  }
+      
+  if (head <= NrPcGens) {
+    perror("AddRow has a coefficient not in the center");
+    exit(5);
+    }
 
-  unsigned head = gv->g - NrPcGens;
-
-  /* Copy the NrCenGens entries of gv and free it. */
+  /* Copy the NrCenGens entries of gv */
   v = (lvec)malloc((NrCols + 1) * sizeof(large));
   if (v == NULL) {
     perror("AddRow, v");
     exit(2);
   }
   for (unsigned i = 1; i <= NrCols; i++)
-    large_init (v[i]);
-  
-  for (; gv->g != EOW; gv++) {
-    if (gv->g <= NrPcGens) {
-      perror("AddRow has a coefficient not in the center");
-      exit(5);
-    }
-    large_set_si(v[gv->g-NrPcGens], gv->c.data);
-  }
+    large_init_set_si(v[i], cv[i + NrPcGens].data);
 
-  AddRow(v, head);
+  AddRow(v, head - NrPcGens);
 
   return ChangedMatrix;
 }

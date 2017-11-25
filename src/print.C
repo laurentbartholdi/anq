@@ -12,11 +12,14 @@
 ** print the result in a nice format.
 */
 
-void PrintGpVec(gpvec gv)
-
-{
+void PrintGpVec(gpvec gv) {
   for (unsigned i = 0; gv[i].g != EOW; i++)
     fprintf(OutputFile, "%s%ld*a%d", i ? " + " : "", gv[i].c.data, gv[i].g);
+}
+
+void PrintCoeffVec(coeffvec cv) {
+  for (unsigned i = 1; i <= NrTotalGens; i++)
+    fprintf(OutputFile, " %ld", cv[i].data);
 }
 
 static void Indent(int n)
@@ -111,9 +114,7 @@ void PrintPcPres() {
   fprintf(OutputFile, "   >\n");
 }
 
-void PrintMat(coeffvec *M)
-
-{
+void PrintMat(coeffvec *M) {
   for (unsigned i = 0; i <= NrRows - 1; i++) {
     fprintf(OutputFile, "# ");
     for (unsigned j = 1; j <= NrCenGens; j++)
@@ -132,7 +133,7 @@ void PrintDef() {
 }
 
 void PrintDefinitions() {
-  for (unsigned i = 1; i <= NrPcGens + NrCenGens; i++)
+  for (unsigned i = 1; i <= NrTotalGens; i++)
     if (Definitions[i].h > 0) {
       gen *cv = (gen *)malloc((Weight[i] + 1) * sizeof(gen));
       ComputePcGen(i, cv, 1);
