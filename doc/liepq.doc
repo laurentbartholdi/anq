@@ -1,0 +1,130 @@
+			  The LiePQ Program
+			  =================
+
+
+
+The LiePQ program can be seen as the little brother of the LieNQ. This
+is a GAP code (see [GAP]) written for computing product presentation for
+graded Lie algebras of prime characteristic.
+
+The documentation contains three main parts i.e.
+	
+	  I. What is the LiePQ program?
+	 II. How to use the LiePQ program?
+	III. More literature on LiePQ algorithm.
+
+
+
+		    I. What is the LiePQ program?
+		    =============================
+
+
+The LiePQ program computes the so-called product presentation for a graded
+Lie ring of prime characteristic. The algorithm is due to Havas, Newman &
+Vaughan-Lee [HNV-L].
+
+The product presentation consists of a basis for the Lie algebra and the 
+multiplication laws among the basis elements. Besides that data it returns 
+the dimensions of the factors of the lower central series and the weight 
+of the basis elements according to the grading.
+
+The program itself is based on the GAP implementation of the Canberra 
+p-Quotient program. See [CEL] for its detailed description.
+
+
+
+
+		   II. How to use the LiePQ program?
+		   =================================
+
+
+The LiePQ contains several functions to handle the product presentation.
+
+LieInitPQp( d, p )---returns the product presentation for an Abelian Lie
+algebra over over GF(<p>) of dimension <d>.
+
+LiePQuotient( L, prime, class )---returns the LiePQ record for <class>th
+factor of the Lie algebra of characteristic <p> presented by the record <L> 
+(see finite presentation record below).
+
+LiePQp( L )---reads the LiePQ record for the Lie algebra <L>.
+
+SaveLiePQ( file, L, N )---saves LiePQ record <L> in file <file> under name
+<N>.
+
+The finite presentation record. It has to contain two entries, <generators> 
+and <relators>. The record entry <generators> is simply a list of abstract 
+generators, while the <relators> entry has a more complicated structure. It 
+is actually a list of relators. A relator is a list of summands and a summand
+is a list of abstract generators. A summand list is understood as right normed
+Lie product among its elements.
+
+For example the finitely presented Lie ring 
+
+		< x, y | [ y, x, y ], [ y, x, x, x, x, x ] >
+can be fed as 
+
+gap> x:=AbstractGenerator("x");;
+gap> y:=AbstractGenerator("y");;
+gap> L := rec(
+> generators := [ x, y ],
+> relators := [[[ y, x, y ]], [[ y, x, x, x, x, x ]]]);
+
+While in an other example:
+
+  < x, y | [ y, x, x, y ], [ y, x, y, x ], [ y, x, x, x ] + [ y, x, y, y ] >  
+
+the presentation record looks as follows
+
+gap> x:=AbstractGenerator("x");;
+gap> y:=AbstractGenerator("y");;
+gap> L := rec(                  
+> generators := [ x, y ],    
+> relators := [[[ y, x, x, y ]], [[ y, x, y, x ]],                             
+> [[ y, x, x, x ], [ y, x, y, y ]]] );   
+
+The result of the computation is a LiePQ record. It has the following entries.
+
+	generators:       a basis for the nilpotent factor;
+	weight:		  the weights for the basis elements;
+	definedby:        definitions of the basis elements;
+	prime: 		  characteristic of the ring;
+	dimensions:       dimensions of the lower central factors;
+	productRelators:  multiplication table with respect to the basis;
+	definingProducts: list of definitions;
+
+If you have any problem, comment, question or find any bug please report it.
+If you have any use of the program feel free to contact me and let me know
+first. If you get any reasonable result and write a paper please quote it as
+if it was a theoretic paper. Thanks.
+
+
+
+
+		  III. More literature on the LiePQ.
+		  ==================================
+
+
+See:
+
+[HNV-L] G. Havas M.F. Newman M.R. Vaughan-Lee. A Nilpotent Quotient
+Algorithm for Graded Lie Rings. J. Symb. Comput. 1990. (9) pp. 653-664
+
+[GAP] M. Sch\"onert et al. GAP---Groups, Algorithms and Programming. 
+Lehrstuhl D f\"ur Mathematik RWTH Aachen, Germany.
+
+[CEL] F. Celler	et al. An Algotithm for Computing Quotients of Prime Power
+Order for Finitely Presented Groups and its Implementation in GAP. Technical
+Report No. 9327 1993. ANU, Canberra, Australia.
+Have fun,
+cheers					Csaba
+
+
+Csaba Schneider
+H-4032 Debrecen 
+Hatvani u. 21/b
+Hungary
+
+schcs@galois.math.klte.hu
+
+

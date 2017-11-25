@@ -1,0 +1,208 @@
+			  The LieNQ Package
+			  =================
+	
+
+This is a brief documentation of the LieNQ Program. It splits into
+three main parts i.e.
+
+	I. What is the LieNQ Program?
+       II. How to install the LieNQ?
+      III. How to use the LieNQ?
+       IV. Where can you find more about LieNQ?
+
+
+
+
+
+		    I. What is the LieNQ Program?
+		    =============================
+
+
+The LieNQ Program has been written to compute the so-called nilpotent
+presentation of a finitely Presented Lie ring over the integer
+numbers. It is, actually, based on the Nilpotent Quotient Program of
+W. Nickel [NI] and the Nilpotent Quotient Program for Graded Lie Rings
+of Prime Characteristic due to G. Havas, M.F. Newman & M. Voughan-Lee
+[HNV-L]. 
+
+The nilpotent presentation consists of a generator set for the
+underlying Abelian group, 'torsion relations' determining the Abelian
+group structure and product relations' determining the multiplicative
+structure of the Lie ring. 
+
+My program differs from the above mentioned implementation of Havas
+et. al. at two main points. One is that it works over the ring of the
+rational integers, the other is that it doesn't suppose the Lie ring
+to be graded. 
+
+
+
+	
+		   
+		    II. How to install the LieNQ?
+		    =============================
+
+
+It is very simple. Jump to the directory 'src' and have a look at the
+Makefile. You might need to change some of the variables. First of all
+you need the GNU MP library for using arbitrarily precision integer
+operations. 
+
+The most important variables you might need to change:
+
+		MPLIB: the place of the libmp.a file
+		LIB  : the directory where the compiler can find the
+		       standard library files.
+		BIN  : where to put the executable.
+		CC   : C compiler (preferebly GNU gcc).
+			
+
+If you convinced yourself that you are ready to install the LieNQ, type
+simply 'make' and wait for the result.	
+
+There are some examples in the 'exs' and you can find the corresponding 
+.log files in 'tst'. Try to run the program on those examples first and
+compare the outputs. In case of any bug please let me know. You can suppose
+that my results are correct (you have a good reason for it).
+ 
+
+
+
+
+
+		  III. How to use the LieNQ program?
+		  ==================================
+
+
+The syntax of the lienq command is:
+
+lienq [-Z] [-G] [-A] [-F <outputfile>] <inputfile> [<class>].
+
+The brief explanations of the optional flags and the arguments.
+	
+		-Z: Displays the relations that equal to zero. The
+		    default is to display the relations that are
+                    different from zero.
+
+		-D: Displays more information about the computational
+		    details. 
+  
+		-G: For graded Lie rings.
+
+		-P: Expresses the PC generators in the term of the old ones.
+		
+		-F <outputfile>: put the output into <outputfile>.
+		
+		<inputfile>: the file which contains the finite
+                             presentation.   
+
+		<class>: the nilpotency class of the nilpotent
+                         factor. 
+
+		
+The input file contains the finite presentation. The syntax of the
+finite presentation you have to respect is the following. The
+characters you have to type are enclosed between quotation signs. The
+sign | means the logical operation 'or'. @ means concatenation,
+brackets mean optionality.
+
+presentation = '<' genlist '|' rellist '>'
+
+genlist = gen | gen ',' genlist
+
+gen = letter | letter@alphanum
+
+letter = 'a' | ... | 'z' | 'A' | ... | 'Z'
+
+alphanum = letter | '0' | ... | '9'
+ 
+rellist = rel | rel ',' rellist
+
+rel = Lie_word | Lie_word ':=' Lie_word | Lie_word '=' Lie_word 
+	       | Lie_word '=:' Lie_word
+
+Lie_word = gen | '[' Lie_word_list ']' | Lie_word '+' Lie_word | 
+	       | num '*' Lie_word | '(' Lie_word ')'
+
+Lie_word_list = Lie_word | Lie_word_list ',' Lie_word
+
+num = [-]digs
+
+digs = dig | digs@dig
+
+dig = '0' | ... | '9'
+
+The lines beginning with the character '#' are ignored. As you can
+see, a valid presentation is e.g.
+
+	< x, y | [ y, x, y ], [ y, x, x, x, x, x ] >
+
+The Lie product [ y, x, y ] is meant as [ [ y, x ], y ] as usual.
+
+You can optionally give the nilpotency class <c>. In that case the program
+computes the nilpotent presentation for the <c>th factor of the lower
+central series. Otherwise the program runs until something wrong does
+not happen (e.g. your computer falls down to the floor).
+
+The output you obtain consists of the
+
+		1.) list of the generators for the nilpotent
+                    presentation, 
+		2.) epimorphism from the Lie ring onto the
+                    factor ring,
+		3.) torsion relations, 
+		4.) product relations.
+
+To obtain all relations needed for the complete presentation switch
+the flag -Z on.
+
+If you find any bugs, please do not hesitate to contact me by e-mail
+on the address given below.
+
+If you find it useful and use it to obtain some theoretic result
+please let me know and quote it as if it was a theoretic paper or so. 
+
+
+
+
+	       IV. Where can you find more about LieNQ?
+	       ========================================
+	
+
+The possible sources are:
+
+[HNV-L] G. Havas M.F. Newman M.R. Vaughan-Lee. A Nilpotent Quotient
+Algorithm for Graded Lie Rings. J. Symb. Comput. 1990. (9) pp. 653-664
+
+[NI] W. Nickel. Computing Nilpotent Quotients of Finitely Presented
+Groups. to appear in DIMACS Series in Disc. Math. and Th. Comp. Sci.
+
+[SCH95] Cs. Schneider. Computing Nilpotent Quotient in Finitely Presented
+Lie Rings. Technical Report No. 1995/148 Dept. Math. Kossuth Univ. Debrecen, 
+Hungary 1995.
+
+[SCH96] Cs. Schneider. Computations in Finitely Presented Lie
+Rings. Diploma thesis to appear at Kossuth University Debrecen,
+Hungary.
+
+Have fun,
+cheers
+					Csaba
+
+Csaba Schneider 
+H-4032 Debrecen
+Hatvani u. 21/b
+Hungary
+
+schcs@galois.math.klte.hu
+
+
+
+
+
+
+
+
+
+
+

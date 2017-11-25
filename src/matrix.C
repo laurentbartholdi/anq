@@ -6,9 +6,65 @@
 */
 
 #include "lienq.h"
-#include<gmp.h>
 
+#if 0
+#include<gmp.h>
 typedef mpz_t large;
+#define large_init mpz_init
+#define large_clear mpz_clear
+#define large_set mpz_set
+#define large_set_si mpz_set_si
+#define large_get_si mpz_get_si
+#define large_fits_slong_p mpz_fits_slong_p
+
+#define large_neg mpz_neg
+#define large_sgn mpz_sgn
+#define large_mul mpz_mul
+#define large_divexact mpz_divexact
+#define large_submul mpz_submul
+#define large_addmul mpz_addmul
+#define large_gcdext mpz_gcdext
+#define large_fdiv_q mpz_fdiv_q
+#else
+typedef long large;
+#define large_swap(v,w) {large z; z=v; v=w; w=z;}
+#define large_init(z) {z=0;}
+#define large_clear(z)
+#define large_set(z,v) {z=v;}
+#define large_set_si(z,v) {z=v;}
+#define large_get_si(z) z
+#define large_fits_slong_p(z) true
+
+#define large_neg(z,v) {z=-v;}
+#define large_sgn(z) ((z>0)-(z<0))
+#define large_mul(z,v,w) {z=v*w;}
+#define large_divexact(z,v,w) {z=v/w;}
+#define large_submul(z,v,w) {z -= v*w;}
+#define large_addmul(z,v,w) {z += v*w;}
+#define large_fdiv_q(z,v,w) {z=v/w; if(v-z*w<0) z--;}
+/* this code works only if b>0 */
+void large_gcdext(large &gcd, large &s, large &t, large a, large b) {
+  large new_s, new_t, new_gcd, q;
+  large_init(new_s);
+  large_init(new_t);
+  large_init(new_gcd);  
+  large_init(q);  
+  large_set_si(new_s, 0); large_set_si(s, 1);
+  large_set_si(new_t, 1); large_set_si(t, 0);
+  large_set(new_gcd, b); large_set(gcd, a);
+  while (large_sgn(new_gcd)) {
+    large_fdiv_q(q, gcd, new_gcd);
+    large_submul(s, q, new_s); large_swap(s, new_s);
+    large_submul(t, q, new_t); large_swap(t, new_t);
+    large_submul(gcd, q, new_gcd); large_swap(gcd, new_gcd);
+  }
+  large_clear(new_s);
+  large_clear(new_t);
+  large_clear(new_gcd);
+  large_clear(q);
+}
+#endif
+
 typedef large *lvec;
 
 unsigned NrRows, NrCols, *Heads;
@@ -30,7 +86,7 @@ void InitMatrix(void) {
 
 void FreeVector(lvec v) {
   for (unsigned i = 1; i <= NrCols; i++) {
-    mpz_clear(v[i]);
+    large_clear(v[i]);
   }
   free(v);
 }
@@ -40,6 +96,16 @@ void FreeMatrix(void) {
     FreeVector(Matrix[i]);
   free(Matrix);
   free(Heads);
+}
+
+void ReduceRow(lvec v, lvec w, unsigned head) {
+  large q;
+  large_init (q);
+  large_fdiv_q(q, v[head], w[head]);
+  if (large_sgn(q))
+    for (unsigned k = head; k <= NrCols; k++)
+      large_submul(v[k], q, w[k]);
+  large_clear(q);
 }
 
 /*
@@ -52,6 +118,11 @@ gpvec *MatrixToExpVecs() {
   if (NrRows == 0)
     return (gpvec *)0;
 
+  /* first reduce all the head columns, to achieve Hermite normal form. */
+  for (unsigned i = 1; i < NrRows; i++)
+    for (unsigned j = 0; j < i; j++)
+      ReduceRow(Matrix[j], Matrix[i], Heads[i]);
+  
   gpvec *M = (gpvec *) malloc(NrRows * sizeof(gpvec));
   if (M == NULL) {
     perror("MatrixToExpVecs(), M");
@@ -64,13 +135,13 @@ gpvec *MatrixToExpVecs() {
 
     gpvec p = M[i];
     for (unsigned j = Heads[i]; j <= NrCols; j++) {
-      if (!mpz_fits_slong_p(Matrix[i][j])) {
+      if (!large_fits_slong_p(Matrix[i][j])) {
 	perror("Exponent cannot fit in a single word");
 	exit(4);
       }
-      if (mpz_sgn(Matrix[i][j])) {
+      if (large_sgn(Matrix[i][j])) {
 	p->g = j + NrPcGens;
-	p->c = mpz_get_si(Matrix[i][j]);
+	p->c = large_get_si(Matrix[i][j]);
 	p++;
       }
     }
@@ -80,111 +151,89 @@ gpvec *MatrixToExpVecs() {
   return M;
 }
 
-/*
-**    The following routines perform operations with vectors :
-**
-**    vNeg()  negates each entry of the vector v starting at v[a].
-**    vSub()  subtracts a multiple of the vector w from the vector v.
-**            The scalar w is multiplied with is v[a]/w[a], so that
-**            the entry v[a] after the subtraction is smaller than
-**            w[a].
-**    vSubOnce()  subtracts the vector w from the vector v.
-*/
-void vNeg(lvec v, unsigned a) {
-  while (a <= NrCols) {
-    mpz_neg(v[a], v[a]);
-    a++;
-  }
-}
-
-void vSub(lvec v, lvec w, unsigned a) {
-  large quotient;
-
-  if (!mpz_sgn(v[a]))
-    return;
-  
-  mpz_init(quotient);
-  mpz_fdiv_q(quotient, v[a], w[a]);
-  if (mpz_sgn(quotient))
-    while (a <= NrCols) {
-      mpz_submul(v[a], quotient, w[a]);
-      a++;
-    }
-  
-  mpz_clear(quotient);
-}
-
 static bool ChangedMatrix;
 
-/*
-**    VReduce() reduces the vector v against the vectors in Matrix[].
-*/
-bool VReduce(lvec &v, unsigned &head) {
-  for (unsigned i = 0; i < NrRows && Heads[i] <= head; i++) {
-    if (Heads[i] == head) {
-      while (mpz_sgn(v[head]) && mpz_sgn(Matrix[i][head])) {
-        vSub(v, Matrix[i], head);
-        if (mpz_sgn(v[head])) {
-          ChangedMatrix = true;
-          vSub(Matrix[i], v, head);
-        }
+/* add row v to Matrix, making sure it remains in Hermite normal form */
+void AddRow(lvec v, unsigned head) {
+#if 0
+  large g, s, t;
+  large_gcdext(g, s, t, 11, 4); printf("%ld = 11*%ld + 4*%ld\n", g, s, t);
+  large_gcdext(g, s, t, -11, 4); printf("%ld = -11*%ld + 4*%ld\n", g, s, t);
+  large_gcdext(g, s, t, 11, -4); printf("%ld = 11*%ld + -4*%ld\n", g, s, t);
+  large_gcdext(g, s, t, -11, -4); printf("%ld = -11*%ld + -4*%ld\n", g, s, t);
+  exit(1);
+#endif
+  
+  unsigned row;
+  for (row = 0; row < NrRows && Heads[row] <= head; row++)
+    if (Heads[row] == head) {
+      large a, b, c, d, x, y;
+      large_init(a);
+      large_init(b);
+      large_init(d);
+      large_gcdext(d, a, b, v[head], Matrix[row][head]); /* d = a*v[head]+b*Matrix[row][head] */
+      if (!large_sgn(a)) { /* likely case: Matrix[row][head]=d, b=1, a=0 */
+	large_divexact(d,v[head],d);
+	for (unsigned i = head; i <= NrCols; i++)
+	  large_submul(v[i],d,Matrix[row][i]);
+      } else {
+	ChangedMatrix = true;
+	large_init(c);
+	large_init(x);
+	large_init(y);
+	large_divexact(c,v[head],d);
+	large_divexact(d,Matrix[row][head],d);
+	for (unsigned i = head; i <= NrCols; i++) {
+	  large_mul(x,a,v[i]);
+	  large_addmul(x,b,Matrix[row][i]);
+	  large_mul(y,c,Matrix[row][i]);
+	  large_submul(y,d,v[i]);
+	  large_set(Matrix[row][i],x);
+	  large_set(v[i],y);
+	}
+	large_clear(c);
+	large_clear(x);
+	large_clear(y);
       }
-      if (mpz_sgn(v[head])) { /* v replaces the i-th row. */
-        if (mpz_sgn(v[head]) < 0)
-          vNeg(v, head);
-        lvec w = Matrix[i];
-        Matrix[i] = v;
-        v = w;
-      }
-      while (head <= NrCols && !mpz_sgn(v[head]))
-        head++;
-      if (head > NrCols)
-	return false;
+      large_clear(a);
+      large_clear(b);
+      large_clear(d);
+
+      while (!large_sgn(v[head]))
+	if (++head > NrCols) {
+	  FreeVector(v);
+	  return;
+	}
+    }
+
+  /* we have a new row to insert. put v in Matrix at row */
+  if (large_sgn(v[head]) < 0)
+    for (unsigned i = head; i <= NrCols; i++)
+      large_neg(v[i], v[i]);
+    
+  ChangedMatrix = true;
+  if (NrRows % 200 == 0) {
+    Matrix = (lvec *)realloc(Matrix, (NrRows + 200) * sizeof(lvec));
+    if (Matrix == NULL) {
+      perror("AddRow, Matrix ");
+      exit(2);
+    }
+    Heads = (unsigned *)realloc(Heads, (NrRows + 200) * sizeof(unsigned));
+    if (Heads == NULL) {
+      perror("AddRow, Heads ");
+      exit(2);
     }
   }
-  if (head <= NrCols && mpz_sgn(v[head]) < 0)
-    vNeg(v, head);
-  return true;
+
+  for (unsigned i = NrRows; i > row; i--) {
+    Matrix[i] = Matrix[i-1];
+    Heads[i] = Heads[i-1];
+  }
+  Matrix[row] = v;
+  Heads[row] = head;
+  NrRows++;  
 }
 
-void AddRow(lvec v, unsigned head) {
-  if (VReduce(v, head)) {
-    ChangedMatrix = true;
-    if (NrRows % 200 == 0) {
-      Matrix = (lvec *)realloc(Matrix, (NrRows + 200) * sizeof(lvec));
-      if (Matrix == NULL) {
-        perror("AddRow, Matrix ");
-        exit(2);
-      }
-      Heads = (unsigned *)realloc(Heads, (NrRows + 200) * sizeof(unsigned));
-      if (Heads == NULL) {
-        perror("AddRow, Heads ");
-        exit(2);
-      }
-    }
-    /* Insert v such that Heads[] is in increasing order */
-    unsigned pos = NrRows;
-    for (; pos > 0; pos--)
-      if (Heads[pos-1] > head) {
-	Matrix[pos] = Matrix[pos - 1];
-	Heads[pos] = Heads[pos - 1];
-      } else break;
-    Matrix[pos] = v;
-    Heads[pos] = head;
-    NrRows++;
-  } else
-    FreeVector(v);
-
-  /* Reduce all the head columns. */
-  for (unsigned i = 1; i < NrRows; i++)
-    for (unsigned j = 0; j < i; j++)
-      vSub(Matrix[j], Matrix[i], Heads[i]);
-}
-
-/* mpz_gcdext(g,s,t,a,b) sets g,s,t with 0<g=sa+tb */
-
-/* This function adds a row to Matrix, which is preserved
-   in Hermite normal form */
 bool AddRow(gpvec gv) {
   lvec v;
 
@@ -204,14 +253,14 @@ bool AddRow(gpvec gv) {
     exit(2);
   }
   for (unsigned i = 1; i <= NrCols; i++)
-    mpz_init (v[i]);
+    large_init (v[i]);
   
   for (; gv->g != EOW; gv++) {
     if (gv->g <= NrPcGens) {
       perror("AddRow has a coefficient not in the center");
       exit(5);
     }
-    mpz_set_si(v[gv->g-NrPcGens], gv->c.data);
+    large_set_si(v[gv->g-NrPcGens], gv->c.data);
   }
 
   AddRow(v, head);

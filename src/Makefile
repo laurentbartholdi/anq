@@ -5,7 +5,7 @@
 ##                                                           schcs@math.klte.hu
 ##
 
-CPPFLAGS = -DVERSION='"1.3 1995 July"'
+CPPFLAGS = -DVERSION='"3.0 2017-11-24"'
 COPTS = -O0 -g -Wall -Werror
 CXXFLAGS = -std=c++11 $(COPTS)
 CFLAGS = $(COPTS)
