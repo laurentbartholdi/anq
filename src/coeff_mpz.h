@@ -5,6 +5,8 @@
 ** defines coefficients as arbitrary-precision integers
 */
 
+#error broken
+
 #include<gmp.h>
 typedef mpz_t coeff;
 
@@ -23,6 +25,7 @@ inline bool coeff_nz(const coeff a) {
 
 #define coeff_add mpz_add
 #define coeff_addmul mpz_addmul
+#define coeff_cmp mpz_cmp
 #define coeff_cmp_si mpz_cmp_si
 #define coeff_divexact mpz_divexact
 #define coeff_fdiv_q mpz_fdiv_q

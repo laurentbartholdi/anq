@@ -10,12 +10,6 @@
 #include <stdlib.h>
 
 /****************************************************************
- * generators
- ****************************************************************/
-typedef unsigned gen;
-const gen EOW = (gen) 0;
-
-/****************************************************************
  * coefficients.
  * they can be of various types, with varying performance:
  * - signed long int
@@ -39,6 +33,12 @@ const gen EOW = (gen) 0;
 #include </> // force stop
 #endif
 typedef coeff *coeffvec;
+
+/****************************************************************
+ * generators
+ ****************************************************************/
+typedef unsigned gen;
+const gen EOW = (gen) 0;
 
 /****************************************************************
  * generator-coefficient pairs and vectors.

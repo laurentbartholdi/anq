@@ -48,6 +48,10 @@ inline void coeff_addmul(coeff &result, const coeff &a, const coeff &b) {
   result.data += a.data * b.data;
 }
 
+inline int coeff_cmp(const coeff &a, const coeff &b) {
+  return (a.data > b.data) - (a.data < b.data);
+}
+
 inline int coeff_cmp_si(const coeff &a, long b) {
   return (a.data > b) - (a.data < b);
 }

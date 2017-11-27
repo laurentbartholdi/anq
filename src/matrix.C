@@ -99,7 +99,7 @@ void AddRow(coeffvec v, unsigned head) {
       coeff_init(b);
       coeff_init(d);
       coeff_gcdext(d, a, b, v[head], Matrix[row][head]); /* d = a*v[head]+b*Matrix[row][head] */
-      if (!coeff_nz(a)) { /* likely case: Matrix[row][head]=d, b=1, a=0 */
+      if (!coeff_cmp(d, Matrix[row][head])) { /* likely case: Matrix[row][head]=d, b=1, a=0 */
 	coeff_divexact(d,v[head],d);
 	for (unsigned i = head; i <= NrCols; i++)
 	  coeff_submul(v[i], d, Matrix[row][i]);

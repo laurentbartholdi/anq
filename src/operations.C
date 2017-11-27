@@ -95,7 +95,7 @@ void Diff(coeffvec v, const coeff x, constgpvec w) {
 
 /* v -= w */
 void Diff(coeffvec v, constgpvec w) {
-  for (constgpvec p; p->g != EOW; p++)
+  for (constgpvec p = w; p->g != EOW; p++)
     coeff_sub(v[p->g], v[p->g], p->c);
 }
 
