@@ -15,8 +15,14 @@ LDFLAGS = $(COPTS)
 
 ## LieNQ prefers GNU C compiler.
 
-CC = g++-7
-CXX = g++-7
+ifeq ($(UNAME),Darwin)
+    CC = g++-7
+    CXX = g++-7
+else
+    CC = g++
+    CXX = g++
+endif
+
 OBJ = presentation.o print.o readpres.o operations.o matrix.o epim.o addgen.o consistency.o tails.o auxiliary.o lienq.o
 
 lienq: $(OBJ)
