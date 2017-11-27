@@ -14,12 +14,16 @@
 
 void PrintGpVec(gpvec gv) {
   for (unsigned i = 0; gv[i].g != EOW; i++)
-    fprintf(OutputFile, "%s%ld*a%d", i ? " + " : "", gv[i].c.data, gv[i].g);
+    fprintf(OutputFile, "%s%ld*a%d", i ? " + " : "", coeff_get_si(gv[i].c), gv[i].g);
 }
 
 void PrintCoeffVec(coeffvec cv) {
+  bool first = true;
   for (unsigned i = 1; i <= NrTotalGens; i++)
-    fprintf(OutputFile, " %ld", cv[i].data);
+    if (coeff_nz(cv[i])) {
+      fprintf(OutputFile, "%s%ld*a%d", first ? "" : " + ", coeff_get_si(cv[i]), i);
+      first = false;
+    }
 }
 
 static void Indent(int n)
@@ -66,10 +70,10 @@ void PrintPcPres() {
   fprintf(OutputFile, "# The torsion relations:\n");
 
   for (unsigned i = 1; i <= NrPcGens; i++) {
-    if (Coefficients[i].notzero()) {
+    if (coeff_nz(Coefficients[i])) {
 
       Indent(10);
-      fprintf(OutputFile, "%ld*a%d", Coefficients[i].data, i);
+      fprintf(OutputFile, "%ld*a%d", coeff_get_si(Coefficients[i]), i);
       if (Power[i][0].g != EOW) {
         fprintf(OutputFile, " = ");
         PrintGpVec(Power[i]);
@@ -118,7 +122,7 @@ void PrintMat(coeffvec *M) {
   for (unsigned i = 0; i <= NrRows - 1; i++) {
     fprintf(OutputFile, "# ");
     for (unsigned j = 1; j <= NrCenGens; j++)
-      fprintf(OutputFile, "%ld  ", M[i][j].data);
+      fprintf(OutputFile, "%ld  ", coeff_get_si(M[i][j]));
     fprintf(OutputFile, "\n");
   }
 }

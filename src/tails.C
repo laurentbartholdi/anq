@@ -15,11 +15,11 @@
 
 /*
 **  The following function is for computing the tail of the
-**  product [ a, b ] where <a> > <b> and <b> is of weight > 1. We
+**  product [ a, b ] where "a" > "b" and "b" is of weight > 1. We
 **  suppose that the tails for [ d, c ] are already computed where
-**  <d> > <c> and <c> < <b> for all <d>.
-**  Hence [ a, b ] = [ a, g, h ] - [ a, h, g ] where <a> := [ g, h ]
-**  is the definition of <b>.
+**  "d" > "c" and "c" < "b" for all "d".
+**  Hence [ a, b ] = [ a, g, h ] - [ a, h, g ] where "b" := [ g, h ]
+**  is the definition of "b".
 */
 
 static gpvec Tail_ab(gen a, gen b) {
@@ -35,7 +35,7 @@ static gpvec Tail_ab(gen a, gen b) {
   Prod(temp[1], temp[0], cvh); /* temp[1] = [a,g,h] */
   Prod(temp[0], cva, cvh);
   Prod(temp[2], temp[0], cvg); /* temp[2] = [a,h,g] */
-  Sum(temp[0], temp[1], -1, temp[2]); /* temp[0] = [a,g,h] - [a,h,g] */
+  Diff(temp[0], temp[1], temp[2]); /* temp[0] = [a,g,h] - [a,h,g] */
 
   if (Debug) {
     fprintf(OutputFile, "# tail: [ %d, %d ] = ", a, b);
@@ -61,18 +61,17 @@ void Tails() {
     for (unsigned j = i + 1; j <= NrPcGens; j++)
       if ((tail = Tail_ab(j, i)) != (gpvec)0) {
         unsigned l = Length(Product[j][i]);
-        Product[j][i] = (gpvec)realloc(Product[j][i],
-                                       (l + Length(tail) + 1) * sizeof(gpower));
+        Product[j][i] = (gpvec) realloc(Product[j][i], (l + Length(tail) + 1) * sizeof(gpower));
         unsigned kk, k = 0;
         while (tail[k].g <= NrPcGens && tail[k].g != EOW)
           k++;
 
         for (kk = 0; tail[k + kk].g != EOW; kk++) {
           Product[j][i][l + kk].g = tail[k + kk].g;
-          Product[j][i][l + kk].c = tail[k + kk].c;
+          coeff_set(Product[j][i][l + kk].c, tail[k + kk].c);
         }
         Product[j][i][l + kk].g = EOW;
-        free((void *)tail);
+        free(tail);
       }
 
   if (Debug)
@@ -92,11 +91,10 @@ void GradedTails() {
       for (unsigned j = MAX(i + 1, lwbd1 + 1); j <= upbd1; j++) {
         unsigned l = Length(Product[j][i]);
         tail = Tail_ab(j, i);
-        Product[j][i] = (gpvec)realloc(Product[j][i],
-                                       (l + Length(tail) + 1) * sizeof(gpower));
+        Product[j][i] = (gpvec) realloc(Product[j][i], (l + Length(tail) + 1) * sizeof(gpower));
         for (unsigned m = 0; tail[m].g != EOW; m++) {
           Product[j][i][l + m].g = tail[m].g;
-          Product[j][i][l + m].c = tail[m].c;
+          coeff_set(Product[j][i][l + m].c, tail[m].c);
         }
         Product[j][i][l + Length(tail)].g = EOW;
         free(tail);

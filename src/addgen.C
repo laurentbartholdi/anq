@@ -14,9 +14,9 @@
 */
 
 void AddGen() {
-  int *IsDefIm;
+  bool *IsDefIm;
   int shift, sign, lwbd;
-  int **IsDefRel;
+  bool **IsDefRel;
 
   /*
   **  We want t know in advance the number of the newly introduced generators.
@@ -35,7 +35,7 @@ void AddGen() {
   
   if (!Graded)
     for (unsigned i = 1; i <= NrPcGens; i++)
-      if (Coefficients[i].notzero())
+      if (coeff_nz(Coefficients[i]))
         NrCenGens++, NrTotalGens++;
 
   /*
@@ -45,36 +45,36 @@ void AddGen() {
   **  do it.
   */
   if (!Graded) {
-    IsDefIm = (int *)malloc((Pres.NrGens + 1) * sizeof(int));
+    IsDefIm = (bool *) malloc((Pres.NrGens + 1) * sizeof(bool));
     for (unsigned i = 1; i <= Pres.NrGens; i++)
-      IsDefIm[i] = 0;
+      IsDefIm[i] = false;
 
     for (unsigned i = 1; i <= NrPcGens; i++)
       if (Definitions[i].h == 0)
-        IsDefIm[Definitions[i].g] = 1;
+        IsDefIm[Definitions[i].g] = true;
   }
 
   /*
   **  We have to sign the defining product relators as well in order to
   **  not get them wrong introducing new generators.
   */
-  IsDefRel = (int **)malloc((NrPcGens + 1) * sizeof(int *));
+  IsDefRel = (bool **) malloc((NrPcGens + 1) * sizeof(bool *));
   if (IsDefRel == NULL) {
     perror("AddGen, IsDefRel");
     exit(2);
   }
   for (unsigned i = 1; i <= NrPcGens; i++) {
-    IsDefRel[i] = (int *)malloc((Dimensions[1] + 1) * sizeof(int));
+    IsDefRel[i] = (bool *) malloc((Dimensions[1] + 1) * sizeof(bool));
     if (IsDefRel[i] == NULL) {
       perror("AddGen, IsDefRel[ i ]");
       exit(2);
     }
 
     for (unsigned j = 1; j <= Dimensions[1]; j++)
-      IsDefRel[i][j] = 0;
+      IsDefRel[i][j] = false;
 
-    if (Definitions[i].h != (gen)0 && Definitions[i].h <= Dimensions[1])
-      IsDefRel[Definitions[i].g][Definitions[i].h] = 1;
+    if (Definitions[i].h != (gen) 0 && Definitions[i].h <= Dimensions[1])
+      IsDefRel[Definitions[i].g][Definitions[i].h] = true;
   }
 
   /* Allocate space for the Definitions. */
@@ -87,10 +87,10 @@ void AddGen() {
     for (unsigned i = 1; i <= Pres.NrGens; i++)
       if (!IsDefIm[i]) {
         unsigned l = Length(Epimorphism[i]);
-        Epimorphism[i] = (gpvec)realloc(Epimorphism[i], (l + 2) * sizeof(gpower));
+        Epimorphism[i] = (gpvec) realloc(Epimorphism[i], (l + 2) * sizeof(gpower));
 
         Epimorphism[i][l].g = shift;
-        Epimorphism[i][l].c = 1;
+        coeff_init_set_si(Epimorphism[i][l].c, 1);
         Epimorphism[i][l+1].g = EOW;
 	Definitions[shift].g = 0;
 	Definitions[shift++].h = -i;
@@ -101,12 +101,12 @@ void AddGen() {
     /*  Could you guess what to do now? Right! Modify the power relations.
         But of course only in the not graded case.*/
     for (unsigned i = 1; i <= NrPcGens; i++)
-      if (Coefficients[i].notzero()) {
+      if (coeff_nz(Coefficients[i])) {
         unsigned l = Length(Power[i]);
         Power[i] = (gpvec)realloc(Power[i], (l + 2) * sizeof(gpower));
 
         Power[i][l].g = shift;
-        Power[i][l].c = 1;
+        coeff_init_set_si(Power[i][l].c, 1);
         Power[i][l+1].g = EOW;
 	Definitions[shift].g = 0;
 	Definitions[shift++].h = i;
@@ -128,7 +128,7 @@ void AddGen() {
           }
 
           Product[i][j][l].g = shift;
-          Product[i][j][l].c = 1;
+          coeff_init_set_si(Product[i][j][l].c, 1);
           Product[i][j][l+1].g = EOW;
           Definitions[shift].g = i;
           Definitions[shift++].h = j;
@@ -144,7 +144,7 @@ void AddGen() {
           exit(2);
         }
         Product[i][j][l].g = shift;
-        Product[i][j][l].c = 1;
+        coeff_init_set_si(Product[i][j][l].c, 1);
         Product[i][j][l+1].g = EOW;
         Definitions[shift].g = i;
         Definitions[shift++].h = j;
@@ -160,7 +160,7 @@ void AddGen() {
 
   Coefficients = (coeffvec) realloc(Coefficients, (NrTotalGens + 1) * sizeof(coeff));
   for (unsigned i = NrPcGens + 1; i <= NrTotalGens; i++)
-    Coefficients[i] = 0;
+    coeff_init_set_si(Coefficients[i], 0);
 
   Power = (gpvec *) realloc(Power, (NrTotalGens + 1) * sizeof(gpvec));
 

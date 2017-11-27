@@ -13,7 +13,22 @@ gpvec NewGpVec(unsigned size) {
     perror("NewGpVec: malloc failed");
     exit(2);
   }
+  for (unsigned i = 0; i < size; i++)
+    coeff_init(v[i].c);
+  
   return v;
+}
+
+void FreeGpVec(gpvec v, unsigned size) {
+  for (unsigned i = 0; i < size; i++)
+    coeff_clear(v[i].c);
+  free(v);
+}
+
+void FreeGpVec(gpvec v) {
+  for (gpvec p = v; p->g != EOW; p++)
+    coeff_clear(p->c);
+  free(v);
 }
 
 coeffvec NewCoeffVec(void) {
@@ -22,20 +37,29 @@ coeffvec NewCoeffVec(void) {
     perror("NewCoeffVec: malloc failed");
     exit(2);
   }
+  for (unsigned i = 1; i <= NrTotalGens; i++)
+    coeff_init(v[i]);
+  
   return v;
 }
 
-void ClearCoeffVec(coeffvec v) {
+void ZeroCoeffVec(coeffvec v) {
   for (unsigned i = 1; i <= NrTotalGens; i++)
-    v[i] = 0;
+    coeff_set_si(v[i], 0);
 }
 
-void CpVec(gpvec vec1, gpvec vec2) {
+void FreeCoeffVec(coeffvec v) {
+  for (unsigned i = 1; i <= NrTotalGens; i++)
+    coeff_clear(v[i]);
+  free(v);
+}
+
+void CpVec(gpvec vec1, constgpvec vec2) {
   unsigned i = 0;
 
   while (vec2[i].g != EOW) {
     vec1[i].g = vec2[i].g;
-    vec1[i].c = vec2[i].c;
+    coeff_set(vec1[i].c, vec2[i].c);
     i++;
   }
   vec1[i].g = EOW;
@@ -50,7 +74,7 @@ void CpVec(gpvec vec1, gpvec vec2) {
 gpvec GenToGpVec(gen n) {
   gpvec gv = NewGpVec(1);
   gv[0].g = n;
-  gv[0].c = 1;
+  coeff_init_set_si(gv[0].c, 1);
   gv[1].g = EOW;
 
   return gv;
@@ -74,7 +98,7 @@ unsigned RealLength(coeffvec cv) {
   unsigned l = 0;
 
   for (unsigned i = 1; i <= NrTotalGens; i++)
-    if (cv[i].notzero())
+    if (coeff_nz(cv[i]))
       l++;
 
   return l;
@@ -89,9 +113,9 @@ void CoeffVecToGpVec(gpvec gv, coeffvec cv) {
   gpvec p = gv;
   
   for (unsigned i = 1; i <= NrTotalGens; i++)
-    if (cv[i].notzero()) {
+    if (coeff_nz(cv[i])) {
       p->g = i;
-      p->c = cv[i];
+      coeff_set(p->c, cv[i]);
       p++;
     }
   p->g = EOW;
@@ -103,12 +127,12 @@ gpvec CoeffVecToGpVec(coeffvec cv) {
   return gv;
 }
 
-coeffvec GpVecToCoeffVec(gpvec gv) {
+coeffvec GpVecToCoeffVec(constgpvec gv) {
   coeffvec cv;
 
   cv = NewCoeffVec();
-  for (int i = 0; gv[i].g != EOW; i++)
-    cv[gv[i].g] = gv[i].c;
+  for (constgpvec p = gv; p->g != EOW; p++)
+    coeff_set(cv[p->g], p->c);
 
   return cv;
 }

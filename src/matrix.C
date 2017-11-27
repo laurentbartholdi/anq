@@ -7,78 +7,16 @@
 
 #include "lienq.h"
 
-#if 0
-#include<gmp.h>
-typedef mpz_t large;
-#define large_init mpz_init
-#define large_clear mpz_clear
-#define large_set mpz_set
-#define large_set_si mpz_set_si
-#define large_init_set_si mpz_init_set_si
-#define large_get_si mpz_get_si
-#define large_fits_slong_p mpz_fits_slong_p
-
-#define large_neg mpz_neg
-#define large_sgn mpz_sgn
-#define large_mul mpz_mul
-#define large_divexact mpz_divexact
-#define large_submul mpz_submul
-#define large_addmul mpz_addmul
-#define large_gcdext mpz_gcdext
-#define large_fdiv_q mpz_fdiv_q
-#else
-typedef long large;
-#define large_swap(v,w) {large z; z=v; v=w; w=z;}
-#define large_init(z) {z=0;}
-#define large_clear(z)
-#define large_set(z,v) {z=v;}
-#define large_set_si(z,v) {z=v;}
-#define large_init_set_si(z,v) {z=v;}
-#define large_get_si(z) z
-#define large_fits_slong_p(z) true
-
-#define large_neg(z,v) {z=-v;}
-#define large_sgn(z) ((z>0)-(z<0))
-#define large_mul(z,v,w) {z=v*w;}
-#define large_divexact(z,v,w) {z=v/w;}
-#define large_submul(z,v,w) {z -= v*w;}
-#define large_addmul(z,v,w) {z += v*w;}
-#define large_fdiv_q(z,v,w) {z=v/w; if(v-z*w<0) z--;}
-/* this code works only if b>0 */
-void large_gcdext(large &gcd, large &s, large &t, large a, large b) {
-  large new_s, new_t, new_gcd, q;
-  large_init(new_s);
-  large_init(new_t);
-  large_init(new_gcd);  
-  large_init(q);  
-  large_set_si(new_s, 0); large_set_si(s, 1);
-  large_set_si(new_t, 1); large_set_si(t, 0);
-  large_set(new_gcd, b); large_set(gcd, a);
-  while (large_sgn(new_gcd)) {
-    large_fdiv_q(q, gcd, new_gcd);
-    large_submul(s, q, new_s); large_swap(s, new_s);
-    large_submul(t, q, new_t); large_swap(t, new_t);
-    large_submul(gcd, q, new_gcd); large_swap(gcd, new_gcd);
-  }
-  large_clear(new_s);
-  large_clear(new_t);
-  large_clear(new_gcd);
-  large_clear(q);
-}
-#endif
-
-typedef large *lvec;
-
 unsigned NrRows, NrCols, *Heads;
 
-large **Matrix;
+coeffvec *Matrix;
 
 void InitMatrix(void) {
-  if ((Matrix = (lvec *)malloc(200 * sizeof(lvec))) == NULL) {
+  if ((Matrix = (coeffvec *) malloc(200 * sizeof(coeffvec))) == NULL) {
     perror("InitMatrix, Matrix ");
     exit(2);
   }
-  if ((Heads = (unsigned *)malloc(200 * sizeof(unsigned))) == NULL) {
+  if ((Heads = (unsigned *) malloc(200 * sizeof(unsigned))) == NULL) {
     perror("InitMatrix, Heads ");
     exit(2);
   }
@@ -86,9 +24,9 @@ void InitMatrix(void) {
   NrRows = 0;
 }
 
-void FreeVector(lvec v) {
+void FreeVector(coeffvec v) {
   for (unsigned i = 1; i <= NrCols; i++) {
-    large_clear(v[i]);
+    coeff_clear(v[i]);
   }
   free(v);
 }
@@ -100,14 +38,14 @@ void FreeMatrix(void) {
   free(Heads);
 }
 
-void ReduceRow(lvec v, lvec w, unsigned head) {
-  large q;
-  large_init (q);
-  large_fdiv_q(q, v[head], w[head]);
-  if (large_sgn(q))
+void ReduceRow(coeffvec v, coeffvec w, unsigned head) {
+  coeff q;
+  coeff_init (q);
+  coeff_fdiv_q(q, v[head], w[head]);
+  if (coeff_nz(q))
     for (unsigned k = head; k <= NrCols; k++)
-      large_submul(v[k], q, w[k]);
-  large_clear(q);
+      coeff_submul(v[k], q, w[k]);
+  coeff_clear(q);
 }
 
 /*
@@ -137,13 +75,9 @@ gpvec *MatrixToExpVecs() {
 
     gpvec p = M[i];
     for (unsigned j = Heads[i]; j <= NrCols; j++) {
-      if (!large_fits_slong_p(Matrix[i][j])) {
-	perror("Exponent cannot fit in a single word");
-	exit(4);
-      }
-      if (large_sgn(Matrix[i][j])) {
+      if (coeff_nz(Matrix[i][j])) {
 	p->g = j + NrPcGens;
-	p->c = large_get_si(Matrix[i][j]);
+	coeff_init_set(p->c, Matrix[i][j]);
 	p++;
       }
     }
@@ -156,52 +90,43 @@ gpvec *MatrixToExpVecs() {
 static bool ChangedMatrix;
 
 /* add row v to Matrix, making sure it remains in Hermite normal form */
-void AddRow(lvec v, unsigned head) {
-#if 0
-  large g, s, t;
-  large_gcdext(g, s, t, 11, 4); printf("%ld = 11*%ld + 4*%ld\n", g, s, t);
-  large_gcdext(g, s, t, -11, 4); printf("%ld = -11*%ld + 4*%ld\n", g, s, t);
-  large_gcdext(g, s, t, 11, -4); printf("%ld = 11*%ld + -4*%ld\n", g, s, t);
-  large_gcdext(g, s, t, -11, -4); printf("%ld = -11*%ld + -4*%ld\n", g, s, t);
-  exit(1);
-#endif
-  
+void AddRow(coeffvec v, unsigned head) {
   unsigned row;
   for (row = 0; row < NrRows && Heads[row] <= head; row++)
     if (Heads[row] == head) {
-      large a, b, c, d, x, y;
-      large_init(a);
-      large_init(b);
-      large_init(d);
-      large_gcdext(d, a, b, v[head], Matrix[row][head]); /* d = a*v[head]+b*Matrix[row][head] */
-      if (!large_sgn(a)) { /* likely case: Matrix[row][head]=d, b=1, a=0 */
-	large_divexact(d,v[head],d);
+      coeff a, b, c, d, x, y;
+      coeff_init(a);
+      coeff_init(b);
+      coeff_init(d);
+      coeff_gcdext(d, a, b, v[head], Matrix[row][head]); /* d = a*v[head]+b*Matrix[row][head] */
+      if (!coeff_nz(a)) { /* likely case: Matrix[row][head]=d, b=1, a=0 */
+	coeff_divexact(d,v[head],d);
 	for (unsigned i = head; i <= NrCols; i++)
-	  large_submul(v[i],d,Matrix[row][i]);
+	  coeff_submul(v[i], d, Matrix[row][i]);
       } else {
 	ChangedMatrix = true;
-	large_init(c);
-	large_init(x);
-	large_init(y);
-	large_divexact(c,v[head],d);
-	large_divexact(d,Matrix[row][head],d);
+	coeff_init(c);
+	coeff_init(x);
+	coeff_init(y);
+	coeff_divexact(c,v[head],d);
+	coeff_divexact(d,Matrix[row][head],d);
 	for (unsigned i = head; i <= NrCols; i++) {
-	  large_mul(x,a,v[i]);
-	  large_addmul(x,b,Matrix[row][i]);
-	  large_mul(y,c,Matrix[row][i]);
-	  large_submul(y,d,v[i]);
-	  large_set(Matrix[row][i],x);
-	  large_set(v[i],y);
+	  coeff_mul(x, b, Matrix[row][i]);
+	  coeff_mul(y, c, Matrix[row][i]);
+	  coeff_mul(Matrix[row][i], a, v[i]);
+	  coeff_mul(v[i], d, v[i]);
+	  coeff_add(Matrix[row][i], Matrix[row][i], x);
+	  coeff_sub(v[i], y, v[i]);
 	}
-	large_clear(c);
-	large_clear(x);
-	large_clear(y);
+	coeff_clear(c);
+	coeff_clear(x);
+	coeff_clear(y);
       }
-      large_clear(a);
-      large_clear(b);
-      large_clear(d);
+      coeff_clear(a);
+      coeff_clear(b);
+      coeff_clear(d);
 
-      while (!large_sgn(v[head]))
+      while (!coeff_nz(v[head]))
 	if (++head > NrCols) {
 	  FreeVector(v);
 	  return;
@@ -209,13 +134,13 @@ void AddRow(lvec v, unsigned head) {
     }
 
   /* we have a new row to insert. put v in Matrix at row */
-  if (large_sgn(v[head]) < 0)
+  if (coeff_sgn(v[head]) < 0)
     for (unsigned i = head; i <= NrCols; i++)
-      large_neg(v[i], v[i]);
+      coeff_neg(v[i], v[i]);
     
   ChangedMatrix = true;
   if (NrRows % 200 == 0) {
-    Matrix = (lvec *)realloc(Matrix, (NrRows + 200) * sizeof(lvec));
+    Matrix = (coeffvec *)realloc(Matrix, (NrRows + 200) * sizeof(coeffvec));
     if (Matrix == NULL) {
       perror("AddRow, Matrix ");
       exit(2);
@@ -237,7 +162,7 @@ void AddRow(lvec v, unsigned head) {
 }
 
 bool AddRow(coeffvec cv) {
-  lvec v;
+  coeffvec v;
   unsigned head;
   
   ChangedMatrix = false;
@@ -245,7 +170,7 @@ bool AddRow(coeffvec cv) {
   /* Find the Head of gv */
   for (head = 1; ; head++) {
     if (head > NrTotalGens) return false;
-    if (cv[head].notzero()) break;
+    if (coeff_nz(cv[head])) break;
   }
       
   if (head <= NrPcGens) {
@@ -254,13 +179,13 @@ bool AddRow(coeffvec cv) {
     }
 
   /* Copy the NrCenGens entries of gv */
-  v = (lvec)malloc((NrCols + 1) * sizeof(large));
+  v = (coeffvec) malloc((NrCols + 1) * sizeof(coeff));
   if (v == NULL) {
     perror("AddRow, v");
     exit(2);
   }
   for (unsigned i = 1; i <= NrCols; i++)
-    large_init_set_si(v[i], cv[i + NrPcGens].data);
+    coeff_init_set(v[i], cv[i + NrPcGens]);
 
   AddRow(v, head - NrPcGens);
 

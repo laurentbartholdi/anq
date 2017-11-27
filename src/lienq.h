@@ -5,10 +5,85 @@
 **                                                           schcs@math.klte.hu
 */
 
-#include "lietype.h"
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+/****************************************************************
+ * generators
+ ****************************************************************/
+typedef unsigned gen;
+const gen EOW = (gen) 0;
+
+/****************************************************************
+ * coefficients.
+ * they can be of various types, with varying performance:
+ * - signed long int
+ * - multiprecision gmpz_t
+ * - hybrid 63-bit signed long / gmpz_t
+ * - mod-2^64 arithmetic (unsigned long int)
+ * - mod-p^k arithmetic (unsigned long int)
+ ****************************************************************/
+#ifdef COEFF_IS_LONG
+#include "coeff_long.h"
+#elif defined(COEFF_IS_MPZ)
+#include "coeff_mpz.h"
+#elif defined(COEFF_IS_Z)
+#include "coeff_z.h"
+#elif defined(COEFF_IS_MOD2_64)
+#include "coeff_2_64.h"
+#elif defined(COEFF_IS_MODp_k)
+#include "coeff_p_k.h"
+#else
+#error you must specify a coefficient type: COEFF_IS_LONG, ...
+#include </> // force stop
+#endif
+typedef coeff *coeffvec;
+
+/****************************************************************
+ * generator-coefficient pairs and vectors.
+ * Used for sparse matrix rows.
+ ****************************************************************/
+struct gpower {
+  gen g;
+  coeff c;
+};
+typedef gpower *gpvec;
+typedef const gpower *constgpvec;
+
+/*
+** An element in a lie-algebra is a sum of several multiplications. Hence it
+** will be represented as a expresson-tree. For simplicity (from the user's
+** point of view) wi allow four binary operations, i.e.: multiplying two
+** generators (lie-product), adding two generators (w. r. t. the module),
+** multiplying an integer and a generator (w. r. t. the module) and wi also
+** allow the power of a generator to an integer exponent (lie-product).
+*/
+struct node {
+  int type;
+  union {
+    coeff n;
+    gen g;
+    struct {
+      node *l, *r;
+    } op;
+  } cont;
+};
+
+struct PresStruct {
+  unsigned NrGens, NrRels, NrExtraRels;
+  char **Generators;
+  node **Relators;
+  node **ExtraRelators;
+};
+
+/****************************************************************
+ * a definition of a generator is as a commutator [g,h]
+ ****************************************************************/
+struct deftype {
+  gen g;
+  gen h;
+};
 
 /* useful macros */
 #define MIN(x, y) ((x) > (y) ? (y) : (x))
@@ -36,6 +111,9 @@ extern unsigned NrPcGens, NrCenGens, NrTotalGens;
 extern unsigned Class;
 extern PresStruct Pres;
 
+/****************************************************************
+ * global variables dictating the behaviour of lienq
+ ****************************************************************/
 extern bool Debug;
 extern bool ZeroCenGens;
 extern bool Graded;
@@ -49,15 +127,17 @@ extern char *OutputFileName;
 
 /* auxialiary functions */
 gpvec NewGpVec(unsigned);
+void FreeGpVec(gpvec, unsigned);
+void FreeGpVec(gpvec);
 coeffvec NewCoeffVec(void);
-void ClearCoeffVec(coeffvec);
-void CpVec(gpvec, gpvec);
-void CpVecFree(gpvec, gpvec);
+void ZeroCoeffVec(coeffvec);
+void FreeCoeffVec(coeffvec);
+void CpVec(gpvec, constgpvec);
 coeffvec GenToCoeffVec(gen);
 gpvec GenToGpVec(gen);
 unsigned Length(gpvec);
 unsigned RealLength(coeffvec);
-coeffvec GpVecToCoeffVec(gpvec);
+coeffvec GpVecToCoeffVec(constgpvec);
 gpvec CoeffVecToGpVec(coeffvec);
 void CoeffVecToGpVec(gpvec, coeffvec);
 gpvec ShrinkGpVec(gpvec);
@@ -87,16 +167,20 @@ void UpdatePcPres(void);
 void ExtendPcPres(void);
 
 /* operation functions */
-void Sum(gpvec, gpvec, gpvec);
-void Sum(gpvec, gpvec, coeff, gpvec);
-void Sum(coeffvec, coeff, gpvec);
-void Sum(coeffvec, gpvec);
-void Prod(gpvec, gpvec, gpvec);
-void ModProd(coeff, gpvec);
+void Sum(gpvec, constgpvec, constgpvec);
+unsigned Sum(gpvec, constgpvec, const coeff, constgpvec);
+void Sum(coeffvec, const coeff, constgpvec);
+void Sum(coeffvec, constgpvec);
+void Diff(gpvec, constgpvec, constgpvec);
+unsigned Diff(gpvec, constgpvec, const coeff, constgpvec);
+void Diff(coeffvec, const coeff, constgpvec);
+void Diff(coeffvec, constgpvec);
+void Prod(gpvec, constgpvec, constgpvec);
+void ModProd(const coeff, gpvec);
 void ModNeg(gpvec);
-gpvec Collect(gpvec);
 void Collect(coeffvec);
-void Collect(gpvec, gpvec);
+void Collect(gpvec, constgpvec);
+void ShrinkCollect(gpvec &);
 
 /* epim functions */
 void InitEpim(void);

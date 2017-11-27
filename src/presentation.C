@@ -62,7 +62,7 @@ void InitPcPres() {
 
 void FreePcPres(void) {
   for (unsigned i = 1; i <= NrTotalGens; i++)
-    if (Coefficients[i].notzero())
+    if (coeff_nz(Coefficients[i]))
       free(Power[i]);
   free(Power);
   free(Coefficients);
@@ -78,20 +78,15 @@ void FreePcPres(void) {
 }
 
 /* v -= v[g]*w */
-void ElementaryColumnOp(gpvec &oldv, gen g, gpvec w) {
-  gpvec newv = NewGpVec(NrTotalGens), p0, p1;
-
-  for (p0 = oldv, p1 = newv; p0->g != EOW; p0++, p1++) {
-    if (p0->g == g) {
-      Sum(p1, p0, -p0->c, w);
-      goto done;
+void ElementaryColumnOp(gpvec &v, gen g, gpvec w) {
+  for (unsigned i = 0; v[i].g != EOW; i++)
+    if (v[i].g == g) {
+      gpvec newv = NewGpVec(NrTotalGens); //Length(w)+Length(v+i));
+      Diff(newv, v, v[i].c, w);
+      FreeGpVec(v);
+      v = ShrinkGpVec(newv);
+      break;
     }
-    *p1 = *p0;
-  }
-  p1->g = EOW;
- done:
-  free(oldv);
-  oldv = ShrinkGpVec(newv);
 }
 
 void EvalAllRel(void) {
@@ -138,15 +133,15 @@ void UpdatePcPres(void) {
   for (unsigned k = NrPcGens + 1, i = 0; k <= NrTotalGens; k++)
     if (i >= NrRows || k != ExpMat[i]->g) { /* no relation for k, remains infinite */
       renumber[k] = k - trivialgens;
-    } else if (ExpMat[i]->c.notone()) { /* k is torsion */
+    } else if (coeff_cmp_si(ExpMat[i]->c, 1)) { /* k is torsion, nontrivial */
       int newk = renumber[k] = k - trivialgens;
-      Coefficients[newk] = ExpMat[i]->c;
+      coeff_set(Coefficients[newk], ExpMat[i]->c);
       
       Power[newk] = NewGpVec(Length(ExpMat[i])-1);
       unsigned pos = 0;
       for (gpvec p = ExpMat[i]+1; p->g != EOW; p++) {
 	Power[newk][pos].g = p->g;
-	Power[newk][pos++].c = -p->c;
+	coeff_neg(Power[newk][pos++].c, p->c);
       }
       Power[newk][pos].g = EOW;
       i++;
@@ -162,7 +157,7 @@ void UpdatePcPres(void) {
 
       /* The Torsions:  */
       for (unsigned j = 1; j <= NrPcGens; j++)
-        if (Coefficients[j].notzero())
+        if (coeff_nz(Coefficients[j]))
 	  ElementaryColumnOp(Power[j], k, ExpMat[i]);
       trivialgens++;
       i++;
@@ -207,7 +202,7 @@ void UpdatePcPres(void) {
   /* Let us eleminate the generators from the power relations. */
 
   for (unsigned i = 1; i <= NrTotalGens; i++)
-    if (Coefficients[i].notzero()) {
+    if (coeff_nz(Coefficients[i])) {
       unsigned j = 0;
       unsigned pos = 0;
       while (Power[i][j].g <= NrPcGens && Power[i][j].g != EOW)
@@ -225,23 +220,13 @@ void UpdatePcPres(void) {
 
   /* Collect the Torsions */
   for (unsigned i = NrTotalGens; i >= 1; i--)
-    if (Coefficients[i].notzero()) {
-      gpvec gv = NewGpVec(NrTotalGens);
-      Collect(gv, Power[i]);
-  
-      free(Power[i]);
-      Power[i] = ShrinkGpVec(gv);
-    }
-
+    if (coeff_nz(Coefficients[i]))
+      ShrinkCollect(Power[i]);
 
   /* Collect the Products */
   for (unsigned i = 1; i <= NrPcGens; i++)
-    for (unsigned j = 1; j < i; j++) {
-      gpvec gv = NewGpVec(NrTotalGens);
-      Collect(gv, Product[i][j]);
-      free(Product[i][j]);
-      Product[i][j] = ShrinkGpVec(gv);
-    }
+    for (unsigned j = 1; j < i; j++)
+      ShrinkCollect(Product[i][j]);
 
   /* Let us alter the Definitions as well. Recall that dead generator cannot
   have definition at all. It is only the right of the living ones. */

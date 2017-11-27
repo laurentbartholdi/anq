@@ -19,18 +19,18 @@
 
 /* cv += [[a,b],c] */
 static void TripleProduct(coeffvec cv, gen a, gen b, gen c) {
-  coeff sign;
-  gpvec p;
-  if (a < b)
-    p = Product[b][a], sign = -1;
-  else
-    p = Product[a][b], sign = 1;
-
-  for (; p->g != EOW && p->g <= NrPcGens; p++) {
-    if (p->g > c)
-      Sum(cv, sign*p->c, Product[p->g][c]);
-    else if (p->g < c)
-      Sum(cv, -sign*p->c, Product[c][p->g]);
+  if (a < b) {
+    for (gpvec p = Product[b][a]; p->g != EOW && p->g <= NrPcGens; p++)
+      if (p->g > c)
+	Diff(cv, p->c, Product[p->g][c]);
+      else if (p->g < c)
+	Sum(cv, p->c, Product[c][p->g]);
+  } else {
+    for (gpvec p = Product[a][b]; p->g != EOW && p->g <= NrPcGens; p++)
+      if (p->g > c)
+	Sum(cv, p->c, Product[p->g][c]);
+      else if (p->g < c)
+	Diff(cv, p->c, Product[c][p->g]);
   }
 }
 
@@ -38,7 +38,7 @@ static void CheckJacobi(coeffvec cv, gen a, gen b, gen c) {
   if (Weight[a] + Weight[b] + Weight[c] > Class)
     return;
 
-  ClearCoeffVec(cv);	
+  ZeroCoeffVec(cv);	
 
   TripleProduct(cv, a, b, c);
   TripleProduct(cv, b, c, a);
@@ -60,12 +60,12 @@ static void CheckJacobi(coeffvec cv, gen a, gen b, gen c) {
 **
 */
 static void CheckPower(coeffvec cv, gen a, gen b) {
-  ClearCoeffVec(cv);
+  ZeroCoeffVec(cv);
 
   for (gpvec p = Power[a]; p->g <= NrPcGens && p->g != EOW; p++) {
     gen g = p->g;
     if (g > b)
-      Sum(cv, -p->c, Product[g][b]);
+      Diff(cv, p->c, Product[g][b]);
     else if (g < b)
       Sum(cv, p->c, Product[b][g]);
   }
@@ -73,7 +73,7 @@ static void CheckPower(coeffvec cv, gen a, gen b) {
   if (a > b)
     Sum(cv, Coefficients[a], Product[a][b]);
   else if (a < b)
-    Sum(cv, -Coefficients[a], Product[b][a]);
+    Diff(cv, Coefficients[a], Product[b][a]);
 
   Collect(cv);
   if (Debug) {
@@ -101,12 +101,12 @@ void Consistency() {
       }
 
   for (unsigned i = 1; i <= NrPcGens; i++)
-    if (Coefficients[i].notzero())
+    if (coeff_nz(Coefficients[i]))
       for (unsigned j = 1; j <= NrPcGens; j++) {
         CheckPower(cv, i, j);
         AddRow(cv);
       }
-  free(cv);
+  FreeCoeffVec(cv);
 
   if (Debug)
     fprintf(OutputFile, "# Consistency() finished\n");
@@ -136,13 +136,13 @@ void GradedConsistency() {
     SUM(Dimensions, aw - 1, lwbda);
     SUM(Dimensions, bw - 1, lwbdb);
     for (unsigned a = lwbda + 1; a <= lwbda + Dimensions[aw]; a++)
-      if (Coefficients[a].notzero())
+      if (coeff_nz(Coefficients[a]))
         for (unsigned b = lwbdb + 1; b <= lwbdb + Dimensions[bw]; b++) {
 	  CheckPower(cv, a, b);
 	  AddRow(cv);
         }
   }
-  free(cv);
+  FreeCoeffVec(cv);
 
   if (Debug)
     fprintf(OutputFile, "# GradedConsistency() finished.\n");

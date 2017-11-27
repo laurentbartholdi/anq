@@ -6,41 +6,97 @@
 */
 
 #include "lienq.h"
-#include "readpres.h"
 #include <string.h>
 #include <ctype.h>
 #include <stdio.h>
 
-#define TRUE 1
-#define FALSE 0
+/*
+** The following date structure will represent a node in the expression tree.
+** A node has a type entry and a content. The content can be integer (ring-
+** element), generator (lie-ring-element), or binary operation depending on
+** the type.
+
+
+struct _node {
+  int type;
+  union {
+      int n;
+      int g;
+      struct { struct _node *l, *r; } op;
+    } cont;
+};
+
+
+typedef struct _node node;
+*/
+
+/*
+** The following macros define the type of a node. It can be number, generator
+** or binary operation.
+*/
+
+#define TNUM 1
+#define TGEN 2
+
+#define TMPROD 3
+#define TLPROD 4
+#define TSUM 5
+#define TREL 6
+#define TDRELL 7
+#define TDRELR 8
+#define TLAST 9
+
+static int Ch;            /* Contains the next char on the input. */
+static int Token;         /* Contains the current token. */
+static int Line;          /* Current line number. */
+static int TLine;         /* Line number where token starts. */
+static int Char;          /* Current character number. */
+static int TChar;         /* Character number where token starts. */
+static char *InFileName;  /* Current input file name. */
+static FILE *InFp;        /* Current input file pointer. */
+static long long N;       /* Contains the integer just read. */
+static char Gen[128];     /* Contains the generator name. */
+#if 0
+static const char *TokenName[] = {
+    "",       "LParen", "RParen", "LBrack",  "RBrack",  "LBrace", "RBrace",
+    "Mult",   "Power",  "Equal",  "DEqualL", "DEqualR", "Plus",   "Minus",
+    "LAngle", "RAngle", "Pipe",   "Comma",   "Number",  "Gen"};
+#endif
+/*
+**    The following macros define tokens.
+*/
+#define LPAREN 1
+#define RPAREN 2
+#define LBRACK 3
+#define RBRACK 4
+#define LBRACE 5
+#define RBRACE 6
+
+#define MULT 7
+#define POWER 8
+#define EQUAL 9
+#define DEQUALL 10
+#define DEQUALR 11
+
+#define PLUS 12
+#define MINUS 13
+
+#define LANGLE 14
+#define RANGLE 15
+
+#define PIPE 16
+#define COMMA 17
+#define SEMICOLON 18
+#define NUMBER 19
+#define GEN 20
+
+/* The following structure will carry the presentation given by the user. */
+
+PresStruct Pres;
 
 static char **Generators;
 
-/* This fuction copies str1 to str2. */
-static void CpStr(char *str1, char *str2)
-
-{
-  int i = 0;
-  while ((str2[i] = str1[i]) != '\0')
-    i++;
-}
-
-/* We need a function to compare two arbitrary strings. */
-static bool CmpStr(char *str1, char *str2)
-
-{
-  int i = 0;
-  while (str1[i] == str2[i] && str1[i] != '\0' && str2[i] != '\0')
-    i++;
-  if ((str1[i] == str2[i]) == '\0')
-    return (TRUE);
-  else
-    return (FALSE);
-}
-
-void FreeNode(node *n)
-
-{
+void FreeNode(node *n) {
   if (n->type != TGEN && n->type != TNUM) {
     FreeNode(n->cont.op.l);
     FreeNode(n->cont.op.r);
@@ -48,9 +104,7 @@ void FreeNode(node *n)
   free(n);
 }
 
-static node *NewNode(int type)
-
-{
+static node *NewNode(int type) {
   node *n;
   n = (node *) malloc(sizeof(node));
   n->type = type;
@@ -60,41 +114,35 @@ static node *NewNode(int type)
 #define NOCREATE 0
 #define CREATE 1
 
-static gen GenNumber(char *gname, int status)
-
-{
+static gen GenNumber(char *gname, int status) {
   unsigned i;
-  if (status == CREATE && NrGens == 0)
+  if (status == CREATE && Pres.NrGens == 0)
     Pres.Generators = (char **)malloc(2 * sizeof(char *));
-  for (i = 1; i <= NrGens; i++) {
-    if (!CmpStr(gname, Pres.Generators[i])) {
+  for (i = 1; i <= Pres.NrGens; i++) {
+    if (!strcmp(gname, Pres.Generators[i])) {
       if (status == CREATE)
-        return (gen)0;
-      return (gen)i;
+        return (gen) 0;
+      return (gen) i;
     }
   }
   if (status == NOCREATE)
-    return (gen)0;
-  NrGens++;
-  Pres.Generators = (char **)realloc(Pres.Generators, (NrGens + 1) * sizeof(char *));
+    return (gen) 0;
+  Pres.NrGens++;
+  Pres.Generators = (char **)realloc(Pres.Generators, (Pres.NrGens + 1) * sizeof(char *));
   i = strlen(gname);
-  Pres.Generators[NrGens] = (char *)malloc((i + 1) * sizeof(char));
-  CpStr(gname, Pres.Generators[NrGens]);
+  Pres.Generators[Pres.NrGens] = (char *)malloc((i + 1) * sizeof(char));
+  strcpy(Pres.Generators[Pres.NrGens], gname);
 
-  return NrGens;
+  return Pres.NrGens;
 }
 
-char *GenName(gen g)
-
-{
-  if (g > NrGens)
+char *GenName(gen g) {
+  if (g > Pres.NrGens)
     return ((char *)NULL);
   return Generators[g];
 }
 
-static void SyntaxError(const char *str)
-
-{
+static void SyntaxError(const char *str) {
   fprintf(stderr, "%s, line %d, char %d: %s.\n", InFileName, TLine, TChar, str);
   exit(1);
 }
@@ -131,19 +179,15 @@ static void SkipBlanks() {
 }
 
 static void Number() {
-
-  long long n = 0;
+  N = 0;
 
   while (isdigit(Ch)) {
-    n = 10 * n + (Ch - '0');
+    N = 10 * N + (Ch - '0');
     ReadCh();
   }
-
-  N = n;
 }
 
 static void Generator() {
-
   int i;
 
   for (i = 0; i < 127 && (isalnum(Ch) || Ch == '_' || Ch == '.'); i++) {
@@ -279,7 +323,7 @@ static void NextToken() {
       Generator();
       break;
     } else
-      SyntaxError("illegal character");
+      SyntaxError("Illegal character");
   }
 }
 
@@ -295,26 +339,25 @@ static void InitParser() {
 }
 
 static node *SNumber() {
-
   node *n;
 
   if (Token == NUMBER) {
     n = NewNode(TNUM);
-    n->cont.n = N;
+    coeff_init_set_si(n->cont.n, N);
     NextToken();
   } else if (Token == PLUS) {
     NextToken();
     if (Token != NUMBER)
       SyntaxError("Number expected");
     n = NewNode(TNUM);
-    n->cont.n = N;
+    coeff_init_set_si(n->cont.n, N);
     NextToken();
   } else if (Token == MINUS) {
     NextToken();
     if (Token != NUMBER)
       SyntaxError("Number expected");
     n = NewNode(TNUM);
-    n->cont.n = -N;
+    coeff_init_set_si(n->cont.n, -N);
     NextToken();
   } else {
     SyntaxError("Number expected");
@@ -325,7 +368,6 @@ static node *SNumber() {
 }
 
 static node *LieProduct() {
-
   node *n, *o;
   extern node *Elem();
 
@@ -355,7 +397,6 @@ static node *LieProduct() {
 }
 
 static node *Atom() {
-
   node *n;
   extern node *Elem();
 
@@ -381,7 +422,6 @@ static node *Atom() {
 }
 
 static node *ModProduct() {
-
   node *n, *o;
 
   if (Token != PLUS && Token != MINUS && Token != NUMBER)
@@ -410,7 +450,6 @@ static node *ModProduct() {
 **    or with integer number (ring-element).
 */
 node *Elem() {
-
   node *n, *o;
 
   if (Token == PLUS || Token == MINUS || Token == NUMBER)
@@ -445,11 +484,10 @@ node *Elem() {
 **    with integer (ring-element).
 */
 static node *Relation() {
-
   node *n, *o;
 
   if (Token != GEN && Token != LPAREN && Token != LBRACK && Token != NUMBER)
-    SyntaxError("relation expected");
+    SyntaxError("Relation expected");
 
   o = Elem();
   if (Token == EQUAL) {
@@ -485,27 +523,20 @@ static node *Relation() {
 **    or with an integer (ring-element).
 */
 
-static node **RelList() {
-
-  node **rellist;
+static int RelList(node **&rellist) {
   unsigned n = 0;
 
   rellist = (node **) malloc(sizeof(node *));
-  rellist[0] = (node *)NULL;
-  if (Token != GEN && Token != LPAREN && Token != LBRACK && Token != NUMBER)
-
-    return rellist;
-
-  rellist = (node **) realloc((void *)rellist, 2 * sizeof(node *));
-  rellist[n++] = Relation();
-  while (Token == COMMA) {
-    NextToken();
-    rellist = (node **) realloc((void *)rellist, (n + 2) * sizeof(node *));
+  if (Token == GEN || Token == LPAREN || Token == LBRACK || Token == NUMBER) {
+    rellist = (node **) realloc(rellist, 2 * sizeof(node *));
     rellist[n++] = Relation();
+    while (Token == COMMA) {
+      NextToken();
+      rellist = (node **) realloc(rellist, (n + 2) * sizeof(node *));
+      rellist[n++] = Relation();
+    }
   }
-  rellist[n] = (node *)0;
-
-  return rellist;
+  return n;
 }
 
 /*
@@ -514,50 +545,50 @@ static node **RelList() {
 **    genlist:         generator | genseq
 **    genseq:          'empty' | generator ',' genseq
 */
-static int GenList() {
-
-  if (Token != GEN) {
-    perror("Do calculate by yourself your presentation without generators!");
-    exit(2);
-  }
-
-  if (GenNumber(Gen, CREATE) == (gen)0)
-    fprintf(stderr, "Warning: Duplicate generator: %s\n", Gen);
-  NextToken();
-  while (Token == COMMA) {
-    NextToken();
+static void GenList() {
+  for (;;) {
     if (Token != GEN)
       SyntaxError("Generator expected");
-    if (GenNumber(Gen, CREATE) == (gen)0)
-      fprintf(stderr, "Warning: Duplicate generator: %s\n", Gen);
+    
+    if (GenNumber(Gen, CREATE) == (gen) 0) {
+      char s[1000];
+      sprintf(s, "Duplicate generator: %s", Gen);
+      SyntaxError(s);
+    }
+    NextToken();
+
+    if (Token != COMMA) break;
+
     NextToken();
   }
-
-  return NrGens;
 }
 
 void ReadPresentation() {
   InitParser();
-
+  Pres.NrGens = Pres.NrRels = Pres.NrExtraRels = 0;
+  
   if (Token != LANGLE)
-    SyntaxError("presentation expected");
+    SyntaxError("Presentation expected");
   NextToken();
 
   if (Token != GEN)
-    SyntaxError("generator expected");
+    SyntaxError("Generator expected");
 
-  Pres.NrGens = GenList();
+  GenList();
 
   if (Token != PIPE)
-    SyntaxError("vertical bar expected");
+    SyntaxError("Vertical bar expected");
   NextToken();
 
-  Pres.Relators = RelList();
-  Pres.NrRels = 0;
-  while (Pres.Relators[Pres.NrRels])
-    Pres.NrRels++;
+  Pres.NrRels = RelList(Pres.Relators);
+
+  if (Token == PIPE) {
+    NextToken();
+    Pres.NrExtraRels = RelList(Pres.ExtraRelators);
+  }
+
   if (Token != RANGLE)
-    SyntaxError("presentation has to be closed by '>'");
+    SyntaxError("Presentation has to be closed by '>'");
 }
 
 void FreePresentation(void) {
@@ -571,7 +602,7 @@ void FreePresentation(void) {
 
 void PrintNode(node *n) {
   if (n->type == TNUM)
-    fprintf(OutputFile, "%ld  ", n->cont.n.data);
+    fprintf(OutputFile, "%ld  ", coeff_get_si(n->cont.n));
   if (n->type == TGEN)
     fprintf(OutputFile, "%s  ", Generators[n->cont.g]);
   switch (n->type) {
@@ -658,7 +689,7 @@ void EvalRel(gpvec v, node *rel) {
     vr = NewGpVec(NrTotalGens);
     EvalRel(vl, rel->cont.op.l);
     EvalRel(vr, rel->cont.op.r);
-    Sum(v, vl, -1, vr);
+    Diff(v, vl, vr);
     free(vl);
     free(vr);
     break;
