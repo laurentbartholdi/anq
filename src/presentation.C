@@ -105,12 +105,6 @@ void EvalAllRel(void) {
     fprintf(OutputFile, "# EvalAllRel() finished\n");
 }
 
-static void freeExpVecs(gpvec *M) {
-  for (unsigned i = 0; i < NrRows; i++)
-    free(M[i]);
-  free(M);
-}
-
 void UpdatePcPres(void) {
   unsigned trivialgens = 0;
 
@@ -162,7 +156,6 @@ void UpdatePcPres(void) {
       trivialgens++;
       i++;
     }
-  freeExpVecs(ExpMat);
 
   /* First we eliminate the generators from the epimorphism */
   for (unsigned i = 1; i <= Pres.NrGens; i++) {
