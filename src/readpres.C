@@ -668,7 +668,7 @@ void EvalRel(gpvec v, node *rel) {
     break;
   case TMPROD:
     EvalRel(v, rel->cont.op.r);
-    ModProd((rel->cont.op.l)->cont.n, v);
+    ModProd(v, (rel->cont.op.l)->cont.n, v);
     break;
   case TLPROD:
     vl = NewGpVec(NrTotalGens);

@@ -1,12 +1,12 @@
 /******************************************************************************
 **
 **               Nilpotent Quotient for Lie Algebras
-** coeff_long.h
+** coeff_2_64.h
 ** defines coefficients as signed 64-bit integers
 */
 
 struct coeff {
-  unsigned long data;
+  uint64_t data;
 };
 
 /* addition */

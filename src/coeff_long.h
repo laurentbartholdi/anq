@@ -6,7 +6,7 @@
 */
 
 struct coeff {
-  signed long data;
+  int64_t data;
 };
 
 /* addition, it seems that GCC does not optimize as well if(coeff_sgn(x)) as if(coeff_nz(x)) */

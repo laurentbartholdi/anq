@@ -15,6 +15,7 @@ gpvec NewGpVec(unsigned size) {
   }
   for (unsigned i = 0; i < size; i++)
     coeff_init(v[i].c);
+  v->g = EOW;
   
   return v;
 }

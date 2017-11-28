@@ -145,7 +145,7 @@ unsigned Sum(gpvec vec0, constgpvec vec1, const coeff x, constgpvec vec2) {
   unsigned len = 0;
   if (!coeff_nz(x)) {
     for (constgpvec p1 = vec1; p1->g != EOW; p1++) {
-      coeff_set(vec0[len].c, p1->c), vec0->g = p1->g;
+      coeff_set(vec0[len].c, p1->c), vec0[len].g = p1->g;
       len++;
     }
     goto done;    
@@ -153,18 +153,17 @@ unsigned Sum(gpvec vec0, constgpvec vec1, const coeff x, constgpvec vec2) {
   
   for (constgpvec p1 = vec1, p2 = vec2;;) {
     if (p1->g == EOW) {
-      while (p2->g != EOW) {
-	coeff_mul(vec0[len].c, x, p2->c), vec0[len].g = p2->g;
-	len++;
-	p2++;
+      for (; p2->g != EOW; p2++) {
+	coeff_mul(vec0[len].c, x, p2->c);
+	if (coeff_nz(vec0[len].c))
+	  vec0[len].g = p2->g, len++;
       }
       goto done;
     }
     if (p2->g == EOW) {
-      while (p1->g != EOW) {
+      for (; p1->g != EOW; p1++) {
 	coeff_set(vec0[len].c, p1->c), vec0[len].g = p1->g;
 	len++;
-	p1++;
       }
       goto done;
     }
@@ -173,16 +172,15 @@ unsigned Sum(gpvec vec0, constgpvec vec1, const coeff x, constgpvec vec2) {
       len++;
       p1++;
     } else if (p1->g > p2->g) {
-      coeff_mul(vec0[len].c, x, p2->c), vec0[len].g = p2->g;
-      len++;
+      coeff_mul(vec0[len].c, x, p2->c);
+      if (coeff_nz(vec0[len].c))
+	vec0[len].g = p2->g, len++;
       p2++;
     } else {
-      coeff c;
-      coeff_init_set(c, p1->c);
-      coeff_addmul(c, x, p2->c);
-      if (coeff_nz(c))
-	coeff_set(vec0[len].c, c), vec0[len].g = p1->g, len++;
-      coeff_clear(c);
+      coeff_set(vec0[len].c, p1->c);
+      coeff_addmul(vec0[len].c, x, p2->c);
+      if (coeff_nz(vec0[len].c))
+	vec0[len].g = p1->g, len++;
       p1++;
       p2++;
     }
@@ -252,16 +250,24 @@ unsigned Diff(gpvec vec0, constgpvec vec1, const coeff x, constgpvec vec2) {
   return len;
 }
 
-/* puts n * vec into vec */
-void ModProd(const coeff n, gpvec vec) {
-  for (; vec->g != EOW; vec++)
-    coeff_mul(vec->c, vec->c, n);
+/* puts n * vec into vec0 */
+void ModProd(gpvec vec0, const coeff n, constgpvec vec) {
+  for (constgpvec p = vec; p->g != EOW; p++) {
+    coeff_mul(vec0->c, p->c, n);
+    if (coeff_nz(vec0->c))
+      vec0->g = p->g, vec0++;
+  }
+  vec0->g = EOW;
 }
 
-/* puts -vec into vec */
-void ModNeg(gpvec vec) {
-  for(; vec->g != EOW; vec++)
-    coeff_neg(vec->c, vec->c);
+/* puts -vec into vec0 */
+void ModNeg(gpvec vec0, constgpvec vec) {
+  for(constgpvec p = vec; p->g != EOW; p++) {
+    coeff_neg(vec0->c, p->c);
+    vec0->g = p->g;
+    vec0++;
+  }
+  vec0->g = EOW;
 }
 
 /* vec0 = [ vec1, vec2 ] */

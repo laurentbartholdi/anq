@@ -8,7 +8,7 @@
 # CPPFLAGS = -DVERSION='"3.0 2017-11-24"' -DCOEFF_IS_MPZ
 # CPPFLAGS = -DVERSION='"3.0 2017-11-27"' -DCOEFF_IS_MOD2_64
 CPPFLAGS = -DVERSION='"3.0 2017-11-27"' -DCOEFF_IS_LONG
-COPTS = -O0 -g -Wall -Werror
+COPTS = -O0 -g -ggdb -Wall -Werror
 CXXFLAGS = -std=c++11 $(COPTS)
 CFLAGS = $(COPTS)
 LDLIBS = -lgmp
@@ -16,7 +16,9 @@ LDFLAGS = $(COPTS)
 
 ## LieNQ prefers GNU C compiler.
 
-ifeq ($(UNAME),Darwin)
+MACHTYPE = $(shell echo $$MACHTYPE)
+
+ifeq ($(MACHTYPE),x86_64-apple-darwin15)
     CC = g++-7
     CXX = g++-7
 else
