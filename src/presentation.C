@@ -92,12 +92,17 @@ void ElementaryColumnOp(gpvec &v, gen g, gpvec w) {
 void EvalAllRel(void) {
   gpvec gv = NewGpVec(NrTotalGens);
   
-  for (unsigned i = 0; i <= Pres.NrRels - 1; i++) {
+  for (unsigned i = 0; i < Pres.NrRels; i++) {
     EvalRel(gv, Pres.Relators[i]);
     coeffvec cv = GpVecToCoeffVec(gv);
     Collect(cv);
+    if (Debug) {
+      fprintf(OutputFile, "# relation: ");
+      PrintCoeffVec(cv);
+      fprintf(OutputFile, "\n");
+    }
     AddRow(cv);
-    free(cv);
+    FreeCoeffVec(cv);
   }
   free(gv);
   
@@ -239,9 +244,6 @@ void UpdatePcPres(void) {
 }
 
 void ExtendPcPres(void) {
-  if (NrCenGens == 0)
-    ZeroCenGens = true;
-
   Dimensions = (unsigned *) realloc(Dimensions, (Class + 1) * sizeof(unsigned));
   if (Dimensions == NULL) {
     perror("EvalAllRel, Dimensions");

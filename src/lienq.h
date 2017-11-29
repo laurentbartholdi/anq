@@ -188,7 +188,7 @@ void FreeEpim(void);
 gpvec Epim(gen);
 
 /* readpres functions */
-void ReadPresentation(void);
+void ReadPresentation(const char *);
 void FreePresentation(void);
 void EvalRel(gpvec, node *);
 

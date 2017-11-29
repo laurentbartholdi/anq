@@ -44,6 +44,9 @@ inline void coeff_add(coeff &result, const coeff &a, const coeff &b) {
   result.data = a.data + b.data;
 }
 
+inline void coeff_add_si(coeff &result, const coeff &a, long b) {
+  result.data = a.data + b;
+}
 inline void coeff_addmul(coeff &result, const coeff &a, const coeff &b) {
   result.data += a.data * b.data;
 }
@@ -52,8 +55,9 @@ inline int coeff_cmp(const coeff &a, const coeff &b) {
   return (a.data > b.data) - (a.data < b.data);
 }
 
+/* I don't know how to implement a meaningful compare on residue classes. Let's return 0 or 1 */
 inline int coeff_cmp_si(const coeff &a, long b) {
-  return (a.data > b) - (a.data < b);
+  return a.data != (unsigned long) b; 
 }
 
 inline void coeff_divexact(coeff &result, const coeff &a, const coeff &b) {
@@ -68,10 +72,15 @@ inline void coeff_mul(coeff &result, const coeff &a, const coeff &b) {
   result.data = a.data * b.data;
 }
 
+inline void coeff_mul_si(coeff &result, const coeff &a, long b) {
+  result.data = a.data * b;
+}
+
 inline void coeff_neg(coeff &result, const coeff &a) {
   result.data = -a.data;
 }
 
+/* unused */
 inline int coeff_sgn(const coeff &a) {
   return a.data > 0;
 }
@@ -100,7 +109,7 @@ inline unsigned long inverse_mod_2(unsigned long a) {
 
 inline void coeff_gcdext(coeff &gcd, coeff &s, coeff &t, const coeff &a, const coeff &b) {
   unsigned long aval = a.data & -a.data, bval = b.data & -b.data;
-  if (aval > bval) {
+  if (a.data == 0 || aval >= bval) {
     gcd.data = bval;
     s.data = 0;
     t.data = inverse_mod_2(b.data >> __builtin_ctzl(bval)); // b.data / bval
@@ -112,6 +121,15 @@ inline void coeff_gcdext(coeff &gcd, coeff &s, coeff &t, const coeff &a, const c
 }
 
 /* addition, returns true if a in [0,b) or b=0 */
-inline bool coeff_reduced_p(coeff &a, coeff &b) {
+inline bool coeff_reduced_p(const coeff &a, const coeff &b) {
   return b.data == 0 || a.data < b.data;
+}
+
+/* addition, returns unit and generator of annihilator ideal:
+   a*unit is canonical (2^n) and a*annihilator=0 */
+inline void coeff_unit_annihilator(coeff &unit, coeff &annihilator, const coeff &a) {
+  int shift = __builtin_ctzl(a.data);
+  unit.data = inverse_mod_2(a.data >> shift);
+  int shift0 = shift >> 1; /* beware, shifting by 64 is a no-op */
+  annihilator.data = (1ULL << (32-shift0)) << (32+shift0-shift);
 }

@@ -252,21 +252,12 @@ unsigned Diff(gpvec vec0, constgpvec vec1, const coeff x, constgpvec vec2) {
 
 /* puts n * vec into vec0 */
 void ModProd(gpvec vec0, const coeff n, constgpvec vec) {
-  for (constgpvec p = vec; p->g != EOW; p++) {
-    coeff_mul(vec0->c, p->c, n);
-    if (coeff_nz(vec0->c))
-      vec0->g = p->g, vec0++;
-  }
-  vec0->g = EOW;
-}
-
-/* puts -vec into vec0 */
-void ModNeg(gpvec vec0, constgpvec vec) {
-  for(constgpvec p = vec; p->g != EOW; p++) {
-    coeff_neg(vec0->c, p->c);
-    vec0->g = p->g;
-    vec0++;
-  }
+  if (coeff_nz(n))
+    for (constgpvec p = vec; p->g != EOW; p++) {
+      coeff_mul(vec0->c, p->c, n);
+      if (coeff_nz(vec0->c))
+	vec0->g = p->g, vec0++;
+    }
   vec0->g = EOW;
 }
 

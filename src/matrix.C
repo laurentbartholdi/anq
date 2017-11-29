@@ -73,12 +73,44 @@ gpvec *MatrixToExpVecs(void) {
 
 static bool ChangedMatrix;
 
-/* add row temp5 to Matrix, making sure it remains in Hermite normal form */
-void AddRow(void) {
-  unsigned row;
+bool AddRow(coeffvec cv) {
+  ChangedMatrix = false;
+
+  { gpvec gv1 = CoeffVecToGpVec(cv); CpVec(temp5, gv1); FreeGpVec(gv1); }
+
+  if (temp5->g == EOW) // trivial relation
+    return false;
+
+  if (temp5->g <= NrPcGens) {
+    perror("AddRow has a coefficient not in the center");
+    exit(5);
+  }
+
+/* add row temp5 to Matrix, making sure it remains in triangular form */
   gpvec p = temp5;
-  for (row = 0; row < NrRows && Matrix[row]->g <= p->g; row++) /* relies on EOW being the minimal generator */
-    if (Matrix[row]->g == p->g) {
+
+  for (unsigned row = 0; p->g != EOW; row++) {
+    if (row >= NrRows || Matrix[row]->g > p->g) {
+      /* Insert v in Matrix at position row */
+      ChangedMatrix = true;
+
+      gpvec newgv = NewGpVec(NrTotalGens);
+      coeff unit, annihilator;
+      coeff_init(unit);
+      coeff_init(annihilator);
+      coeff_unit_annihilator(unit, annihilator, p->c);
+
+      ModProd(newgv, unit, p);
+      //      printf("ADD ROW %d: ",row); PrintGpVec(newgv); printf("\n");
+      for (unsigned i = NrRows; i > row; i--)
+	Matrix[i] = Matrix[i-1];
+      Matrix[row] = newgv;
+      NrRows++;
+
+      ModProd(p, annihilator, p);
+      coeff_clear(unit);
+      coeff_clear(annihilator);
+    } else if (Matrix[row]->g == p->g) { /* two rows with same pivot. Merge them */
       coeff a, b, c, d;
       coeff_init(a);
       coeff_init(b);
@@ -106,38 +138,7 @@ void AddRow(void) {
       coeff_clear(c);
       coeff_clear(d);
     }
-
-  if (p->g == EOW)
-    return;
-  
-  /* we have a new row to insert. put v in Matrix at row */
-  gpvec newgv = NewGpVec(NrTotalGens);
-  if (coeff_sgn(p->c) < 0)
-    ModNeg(newgv, p);
-  else
-    CpVec(newgv, p);
-  ChangedMatrix = true;
-  //  printf("ADD ROW %d: ",row); PrintGpVec(newgv); printf("\n");
-  for (unsigned i = NrRows; i > row; i--)
-    Matrix[i] = Matrix[i-1];
-  Matrix[row] = newgv;
-  NrRows++;  
-}
-
-bool AddRow(coeffvec cv) {
-  ChangedMatrix = false;
-
-  { gpvec gv1 = CoeffVecToGpVec(cv); CpVec(temp5, gv1); FreeGpVec(gv1); }
-
-  if (temp5->g == EOW) // trivial relation
-    return false;
-
-  if (temp5->g <= NrPcGens) {
-    perror("AddRow has a coefficient not in the center");
-    exit(5);
   }
-
-  AddRow();
 
   return ChangedMatrix;
 }

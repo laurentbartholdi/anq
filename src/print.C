@@ -26,96 +26,68 @@ void PrintCoeffVec(coeffvec cv) {
     }
 }
 
-static void Indent(int n)
+void PrintPcPres(void) {
+  fprintf(OutputFile, "<");
 
-{
-  while (n-- > 0)
-    fprintf(OutputFile, " ");
-}
-
-void Filline() {
-  int i;
-  putc(' ', OutputFile);
-  for (i = 1; i <= 78; i++)
-    putc('_', OutputFile);
-  putc('\n', OutputFile);
-}
-
-void PrintEpim() {
-  Indent(2);
+  for (unsigned i = 1; i <= NrPcGens; i++)
+    fprintf(OutputFile, " a%d%s", i, i < NrPcGens ? "," : "");
+  fprintf(OutputFile, " |\n");
+  
   fprintf(OutputFile, "# The epimorphism:\n");
   for (unsigned i = 1; i <= Pres.NrGens; i++) {
-    Indent(10);
-    fprintf(OutputFile, "# %s |--> ", Pres.Generators[i]);
+    fprintf(OutputFile, "# %10s |--> ", Pres.Generators[i]);
     PrintGpVec(Epimorphism[i]);
     fprintf(OutputFile, "\n");
   }
-  fprintf(OutputFile, "\n");
-}
 
-static void PrintGens() {
-  Indent(3);
-  for (unsigned i = 1; i <= NrPcGens; i++)
-    fprintf(OutputFile, "a%d%s", i, i < NrPcGens ? ", " : "");
-}
-
-void PrintPcPres() {
-  unsigned i, j, products;
-
-  fprintf(OutputFile, "  <");
-  PrintGens();
-  fprintf(OutputFile, "  |\n");
-  PrintEpim();
-  Indent(2);
+  bool first = true;
   fprintf(OutputFile, "# The torsion relations:\n");
-
   for (unsigned i = 1; i <= NrPcGens; i++) {
     if (coeff_nz(Coefficients[i])) {
-
-      Indent(10);
-      fprintf(OutputFile, "%ld*a%d", coeff_get_si(Coefficients[i]), i);
+      if (!first)
+	  fprintf(OutputFile, ",\n");
+      fprintf(OutputFile, "%10s%ld*a%d", "", coeff_get_si(Coefficients[i]), i);
       if (Power[i][0].g != EOW) {
         fprintf(OutputFile, " = ");
         PrintGpVec(Power[i]);
       }
-      fprintf(OutputFile, ",\n");
+      first = false;
     }
   }
 
-  fprintf(OutputFile, "\n\n");
-  Indent(2);
-  fprintf(OutputFile, "# The product relations:\n");
-
-  if (PrintZeros)
-    products = NrPcGens * (NrPcGens - 1) / 2;
-  else
-    for (products = 0, i = 1; i <= NrPcGens; i++)
-      for (j = 1; j < i; j++)
-        if (Product[i][j][0].g != EOW)
-          products++;
-
-  for (j = 1; j <= NrPcGens; j++)
-    for (i = 1; i < MIN(NrPcGens - 1, j); i++)
+  first = true;
+  for (unsigned j = 1; j <= NrPcGens; j++)
+    for (unsigned i = 1; i < j; i++)
       if (PrintZeros || Product[j][i][0].g != EOW) {
-        Indent(10);
-        fprintf(OutputFile, "[  a%d,  a%d ]", j, i);
+	fprintf(OutputFile, ",\n");
+	if (first)
+	  fprintf(OutputFile, "# The product relations:\n");
+        fprintf(OutputFile, "%10s[ a%d, a%d ]", "", j, i);
         if (Product[j][i][0].g != EOW) {
           fprintf(OutputFile, " = ");
           PrintGpVec(Product[j][i]);
         }
-        if (--products > 0)
-          fprintf(OutputFile, ",\n");
-      }
-  if (PrintZeros ||
-      (NrPcGens > 1 && Product[NrPcGens][NrPcGens - 1][0].g != EOW)) {
-    Indent(10);
-    fprintf(OutputFile, "[  a%d,  a%d ]", NrPcGens, NrPcGens - 1);
-    if (Product[NrPcGens][NrPcGens - 1][0].g != EOW) {
-      fprintf(OutputFile, " = ");
-      PrintGpVec(Product[NrPcGens][NrPcGens - 1]);
+	first = false;
+      }    
+
+  if (Pres.NrExtraRels > 0) {
+    fprintf(OutputFile, " |\n# The extra elements:\n");
+    first = true;
+    for (unsigned i = 0; i < Pres.NrExtraRels; i++) {
+      gpvec gv = NewGpVec(NrTotalGens);
+      EvalRel(gv, Pres.ExtraRelators[i]);
+      coeffvec cv = GpVecToCoeffVec(gv);
+      Collect(cv);
+      if (!first)
+	fprintf(OutputFile, ",\n");
+      fprintf(OutputFile, "%10s", ""); PrintCoeffVec(cv);
+      if (RealLength(cv) == 0) fprintf(OutputFile, "0*a1");
+      FreeCoeffVec(cv);
+      FreeGpVec(gv);
+      first = false;
     }
   }
-  fprintf(OutputFile, "   >\n");
+  fprintf(OutputFile, " >\n");
 }
 
 void PrintMat(coeffvec *M) {
@@ -141,7 +113,6 @@ void PrintDefinitions() {
     if (Definitions[i].h > 0) {
       gen *cv = (gen *)malloc((Weight[i] + 1) * sizeof(gen));
       ComputePcGen(i, cv, 1);
-      Indent(2);
       fprintf(OutputFile, "# a%d = [ ", i);
       for (unsigned j = 1; j <= Weight[i] - 1; j++)
         fprintf(OutputFile, "%s, ", Pres.Generators[cv[j]]);

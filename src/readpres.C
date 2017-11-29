@@ -52,9 +52,9 @@ static int Line;          /* Current line number. */
 static int TLine;         /* Line number where token starts. */
 static int Char;          /* Current character number. */
 static int TChar;         /* Character number where token starts. */
-static char *InFileName;  /* Current input file name. */
+static const char *InFileName;  /* Current input file name. */
 static FILE *InFp;        /* Current input file pointer. */
-static long long N;       /* Contains the integer just read. */
+static coeff N;           /* Contains the integer just read. */
 static char Gen[128];     /* Contains the generator name. */
 #if 0
 static const char *TokenName[] = {
@@ -117,7 +117,7 @@ static node *NewNode(int type) {
 static gen GenNumber(char *gname, int status) {
   unsigned i;
   if (status == CREATE && Pres.NrGens == 0)
-    Pres.Generators = (char **)malloc(2 * sizeof(char *));
+    Pres.Generators = (char **) malloc(2 * sizeof(char *));
   for (i = 1; i <= Pres.NrGens; i++) {
     if (!strcmp(gname, Pres.Generators[i])) {
       if (status == CREATE)
@@ -128,9 +128,9 @@ static gen GenNumber(char *gname, int status) {
   if (status == NOCREATE)
     return (gen) 0;
   Pres.NrGens++;
-  Pres.Generators = (char **)realloc(Pres.Generators, (Pres.NrGens + 1) * sizeof(char *));
+  Pres.Generators = (char **) realloc(Pres.Generators, (Pres.NrGens + 1) * sizeof(char *));
   i = strlen(gname);
-  Pres.Generators[Pres.NrGens] = (char *)malloc((i + 1) * sizeof(char));
+  Pres.Generators[Pres.NrGens] = (char *) malloc((i + 1) * sizeof(char));
   strcpy(Pres.Generators[Pres.NrGens], gname);
 
   return Pres.NrGens;
@@ -138,7 +138,7 @@ static gen GenNumber(char *gname, int status) {
 
 char *GenName(gen g) {
   if (g > Pres.NrGens)
-    return ((char *)NULL);
+    return (char *) NULL;
   return Generators[g];
 }
 
@@ -179,10 +179,11 @@ static void SkipBlanks() {
 }
 
 static void Number() {
-  N = 0;
+  coeff_set_si(N, 0);
 
   while (isdigit(Ch)) {
-    N = 10 * N + (Ch - '0');
+    coeff_mul_si(N, N, 10);
+    coeff_add_si(N, N, Ch - '0');
     ReadCh();
   }
 }
@@ -327,15 +328,23 @@ static void NextToken() {
   }
 }
 
-static void InitParser() {
-  InFp = InputFile;
+static void InitParser(const char *InputFileName) {
+  InFp = fopen(InputFileName, "r");
+  if (InFp == NULL)
+    SyntaxError("Can't open input file");
   InFileName = InputFileName;
 
   Ch = '\0';
   Char = 0;
   Line = 1;
 
+  coeff_init(N);
+  
   NextToken();
+}
+
+static void CloseParser(void) {
+  fclose(InFp);
 }
 
 static node *SNumber() {
@@ -343,21 +352,22 @@ static node *SNumber() {
 
   if (Token == NUMBER) {
     n = NewNode(TNUM);
-    coeff_init_set_si(n->cont.n, N);
+    coeff_init_set(n->cont.n, N);
     NextToken();
   } else if (Token == PLUS) {
     NextToken();
     if (Token != NUMBER)
       SyntaxError("Number expected");
     n = NewNode(TNUM);
-    coeff_init_set_si(n->cont.n, N);
+    coeff_init_set(n->cont.n, N);
     NextToken();
   } else if (Token == MINUS) {
     NextToken();
     if (Token != NUMBER)
       SyntaxError("Number expected");
     n = NewNode(TNUM);
-    coeff_init_set_si(n->cont.n, -N);
+    coeff_init(n->cont.n);
+    coeff_neg(n->cont.n, N);
     NextToken();
   } else {
     SyntaxError("Number expected");
@@ -563,8 +573,8 @@ static void GenList() {
   }
 }
 
-void ReadPresentation() {
-  InitParser();
+void ReadPresentation(const char *InputFileName) {
+  InitParser(InputFileName);
   Pres.NrGens = Pres.NrRels = Pres.NrExtraRels = 0;
   
   if (Token != LANGLE)
@@ -589,6 +599,8 @@ void ReadPresentation() {
 
   if (Token != RANGLE)
     SyntaxError("Presentation has to be closed by '>'");
+
+  CloseParser();
 }
 
 void FreePresentation(void) {

@@ -44,6 +44,10 @@ inline void coeff_add(coeff &result, const coeff &a, const coeff &b) {
   result.data = a.data + b.data;
 }
 
+inline void coeff_add_si(coeff &result, const coeff &a, long b) {
+  result.data = a.data + b;
+}
+
 inline void coeff_addmul(coeff &result, const coeff &a, const coeff &b) {
   result.data += a.data * b.data;
 }
@@ -68,6 +72,10 @@ inline void coeff_fdiv_q(coeff &result, const coeff &a, const coeff &b) {
 
 inline void coeff_mul(coeff &result, const coeff &a, const coeff &b) {
   result.data = a.data * b.data;
+}
+
+inline void coeff_mul_si(coeff &result, const coeff &a, long b) {
+  result.data = a.data * b;
 }
 
 inline void coeff_neg(coeff &result, const coeff &a) {
@@ -117,4 +125,11 @@ inline void coeff_gcdext(coeff &gcd, coeff &s, coeff &t, const coeff &a, const c
 /* addition, returns true if a in [0,b) or b=0 */
 inline bool coeff_reduced_p(coeff &a, coeff &b) {
   return b.data == 0 || (a.data >= 0 && a.data < b.data);
+}
+
+/* addition, returns unit and generator of annihilator ideal:
+   a*unit is canonical (2^n) and a*annihilator=0 */
+inline void coeff_unit_annihilator(coeff &unit, coeff &annihilator, const coeff &a) {
+  unit.data = coeff_sgn(a);
+  annihilator.data = 0;
 }

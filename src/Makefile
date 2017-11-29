@@ -6,19 +6,17 @@
 ##
 
 # CPPFLAGS = -DVERSION='"3.0 2017-11-24"' -DCOEFF_IS_MPZ
-# CPPFLAGS = -DVERSION='"3.0 2017-11-27"' -DCOEFF_IS_MOD2_64
-CPPFLAGS = -DVERSION='"3.0 2017-11-27"' -DCOEFF_IS_LONG
+CPPFLAGS = -DVERSION='"3.0 2017-11-27"' -DCOEFF_IS_MOD2_64
+# CPPFLAGS = -DVERSION='"3.0 2017-11-27"' -DCOEFF_IS_LONG
 COPTS = -O0 -g -ggdb -Wall -Werror
 CXXFLAGS = -std=c++11 $(COPTS)
 CFLAGS = $(COPTS)
 LDLIBS = -lgmp
-LDFLAGS = $(COPTS)
+LDFLAGS = -g -ggdb
 
 ## LieNQ prefers GNU C compiler.
 
-MACHTYPE = $(shell echo $$MACHTYPE)
-
-ifeq ($(MACHTYPE),x86_64-apple-darwin15)
+ifeq ($(shell uname -s),Darwin)
     CC = g++-7
     CXX = g++-7
 else
@@ -26,33 +24,35 @@ else
     CXX = g++
 endif
 
-OBJ = presentation.o print.o readpres.o operations.o matrix.o epim.o addgen.o consistency.o tails.o auxiliary.o lienq.o
+LIENQ_OBJ = presentation.o print.o readpres.o operations.o matrix.o epim.o addgen.o consistency.o tails.o auxiliary.o lienq.o
 
-lienq: $(OBJ)
+LIENQ_INCLUDES = lienq.h coeff_long.h coeff_z.h coeff_mpz.h coeff_2_64.h coeff_p_k.h
+
+lienq: $(LIENQ_OBJ)
 
 clean:
-	rm -f $(OBJ) lienq
+	rm -f $(LIENQ_OBJ) lienq
 
-addgen.o: addgen.C lienq.h  
+addgen.o: addgen.C $(LIENQ_INCLUDES)  
 
-auxiliary.o: auxiliary.C lienq.h  
+auxiliary.o: auxiliary.C $(LIENQ_INCLUDES)  
 
-consistency.o: consistency.C lienq.h
+consistency.o: consistency.C $(LIENQ_INCLUDES)
 
-epim.o: epim.C lienq.h
+epim.o: epim.C $(LIENQ_INCLUDES)
 
-lienq.o: lienq.C lienq.h
+lienq.o: lienq.C $(LIENQ_INCLUDES)
 
-matrix.o: matrix.C lienq.h
+matrix.o: matrix.C $(LIENQ_INCLUDES)
 
-operations.o: operations.C lienq.h  
+operations.o: operations.C $(LIENQ_INCLUDES)  
 
-presentation.o: presentation.C lienq.h
+presentation.o: presentation.C $(LIENQ_INCLUDES)
 
-print.o: print.C lienq.h  
+print.o: print.C $(LIENQ_INCLUDES)  
 
-readpres.o: readpres.C lienq.h
+readpres.o: readpres.C $(LIENQ_INCLUDES)
 
-tails.o: tails.C lienq.h
+tails.o: tails.C $(LIENQ_INCLUDES)
 
 test: test.C
