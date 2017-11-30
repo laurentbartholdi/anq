@@ -10,42 +10,6 @@
 #include <ctype.h>
 #include <stdio.h>
 
-/*
-** The following date structure will represent a node in the expression tree.
-** A node has a type entry and a content. The content can be integer (ring-
-** element), generator (lie-ring-element), or binary operation depending on
-** the type.
-
-
-struct _node {
-  int type;
-  union {
-      int n;
-      int g;
-      struct { struct _node *l, *r; } op;
-    } cont;
-};
-
-
-typedef struct _node node;
-*/
-
-/*
-** The following macros define the type of a node. It can be number, generator
-** or binary operation.
-*/
-
-#define TNUM 1
-#define TGEN 2
-
-#define TMPROD 3
-#define TLPROD 4
-#define TSUM 5
-#define TREL 6
-#define TDRELL 7
-#define TDRELR 8
-#define TLAST 9
-
 static int Ch;            /* Contains the next char on the input. */
 static int Token;         /* Contains the current token. */
 static int Line;          /* Current line number. */
@@ -92,7 +56,7 @@ static const char *TokenName[] = {
 
 /* The following structure will carry the presentation given by the user. */
 
-PresStruct Pres;
+presentation Pres;
 
 static char **Generators;
 
@@ -104,7 +68,7 @@ void FreeNode(node *n) {
   free(n);
 }
 
-static node *NewNode(int type) {
+static node *NewNode(nodetype type) {
   node *n;
   n = (node *) malloc(sizeof(node));
   n->type = type;
@@ -147,7 +111,7 @@ static void SyntaxError(const char *str) {
   exit(1);
 }
 
-static void ReadCh() {
+static void ReadCh(void) {
   Ch = getc(InFp);
   Char++;
   if (Ch == '\\') {
@@ -163,7 +127,7 @@ static void ReadCh() {
   }
 }
 
-static void SkipBlanks() {
+static void SkipBlanks(void) {
   if (Ch == '\0')
     ReadCh();
   while (Ch == ' ' || Ch == '\t' || Ch == '\n' || Ch == '#') {
@@ -178,7 +142,7 @@ static void SkipBlanks() {
   }
 }
 
-static void Number() {
+static void Number(void) {
   coeff_set_si(N, 0);
 
   while (isdigit(Ch)) {
@@ -188,7 +152,7 @@ static void Number() {
   }
 }
 
-static void Generator() {
+static void Generator(void) {
   int i;
 
   for (i = 0; i < 127 && (isalnum(Ch) || Ch == '_' || Ch == '.'); i++) {
@@ -201,7 +165,7 @@ static void Generator() {
     ReadCh();
 }
 
-static void NextToken() {
+static void NextToken(void) {
   SkipBlanks();
   TChar = Char;
   TLine = Line;
@@ -347,7 +311,7 @@ static void CloseParser(void) {
   fclose(InFp);
 }
 
-static node *SNumber() {
+static node *SNumber(void) {
   node *n;
 
   if (Token == NUMBER) {
@@ -377,9 +341,9 @@ static node *SNumber() {
   return n;
 }
 
-static node *LieProduct() {
+static node *LieProduct(void) {
   node *n, *o;
-  extern node *Elem();
+  extern node *Elem(void);
 
   if (Token != LBRACK)
     SyntaxError("Left square bracket expected");
@@ -406,9 +370,9 @@ static node *LieProduct() {
   return n;
 }
 
-static node *Atom() {
+static node *Atom(void) {
   node *n;
-  extern node *Elem();
+  extern node *Elem(void);
 
   if (Token == GEN) {
     n = NewNode(TGEN);
@@ -431,7 +395,7 @@ static node *Atom() {
   return n;
 }
 
-static node *ModProduct() {
+static node *ModuleProduct(void) {
   node *n, *o;
 
   if (Token != PLUS && Token != MINUS && Token != NUMBER)
@@ -459,11 +423,11 @@ static node *ModProduct() {
 **    A word starts either with 'generator', with '(', with '['
 **    or with integer number (ring-element).
 */
-node *Elem() {
+node *Elem(void) {
   node *n, *o;
 
   if (Token == PLUS || Token == MINUS || Token == NUMBER)
-    o = ModProduct();
+    o = ModuleProduct();
   else if (Token == GEN || Token == LPAREN || Token == LBRACK)
     o = Atom();
   else
@@ -474,7 +438,7 @@ node *Elem() {
     o = NewNode(TSUM);
     o->cont.op.l = n;
     if (Token == NUMBER || Token == PLUS || Token == MINUS)
-      o->cont.op.r = ModProduct();
+      o->cont.op.r = ModuleProduct();
     else if (Token == GEN || Token == LPAREN || Token == LBRACK)
       o->cont.op.r = Atom();
     else
@@ -493,7 +457,7 @@ node *Elem() {
 **    A relation starts either with 'generator', with '(', with '[' or
 **    with integer (ring-element).
 */
-static node *Relation() {
+static node *Relation(void) {
   node *n, *o;
 
   if (Token != GEN && Token != LPAREN && Token != LBRACK && Token != NUMBER)
@@ -575,7 +539,7 @@ static void GenList() {
 
 void ReadPresentation(const char *InputFileName) {
   InitParser(InputFileName);
-  Pres.NrGens = Pres.NrRels = Pres.NrExtraRels = 0;
+  Pres.NrGens = 0;
   
   if (Token != LANGLE)
     SyntaxError("Presentation expected");
@@ -595,7 +559,8 @@ void ReadPresentation(const char *InputFileName) {
   if (Token == PIPE) {
     NextToken();
     Pres.NrExtraRels = RelList(Pres.ExtraRelators);
-  }
+  } else
+    Pres.NrExtraRels = 0, Pres.ExtraRelators = NULL;
 
   if (Token != RANGLE)
     SyntaxError("Presentation has to be closed by '>'");
@@ -610,50 +575,51 @@ void FreePresentation(void) {
   for (unsigned i = 0; i < Pres.NrRels; i++)
     FreeNode(Pres.Relators[i]);
   free(Pres.Relators);
+  if (Pres.ExtraRelators != NULL) {
+    for (unsigned i = 0; i < Pres.NrExtraRels; i++)
+      FreeNode(Pres.ExtraRelators[i]);
+    free(Pres.ExtraRelators);
+  }
 }
 
 void PrintNode(node *n) {
-  if (n->type == TNUM)
-    fprintf(OutputFile, "%ld  ", coeff_get_si(n->cont.n));
-  if (n->type == TGEN)
-    fprintf(OutputFile, "%s  ", Generators[n->cont.g]);
   switch (n->type) {
-  case TSUM: {
+  case TNUM:
+    fprintf(OutputFile, "%ld  ", coeff_get_si(n->cont.n));
+    break;
+  case TGEN:
+    fprintf(OutputFile, "%s  ", Generators[n->cont.g]);
+    break;
+  case TSUM:
     PrintNode(n->cont.op.l);
     PrintNode(n->cont.op.r);
     fprintf(OutputFile, "+  ");
     break;
-  }
-  case TMPROD: {
+  case TMPROD:
     PrintNode(n->cont.op.l);
     PrintNode(n->cont.op.r);
     fprintf(OutputFile, "*  ");
     break;
-  }
-  case TLPROD: {
+  case TLPROD:
     PrintNode(n->cont.op.l);
     PrintNode(n->cont.op.r);
     fprintf(OutputFile, "[]  ");
     break;
-  }
-  case TREL: {
+  case TREL:
     PrintNode(n->cont.op.l);
     PrintNode(n->cont.op.r);
     fprintf(OutputFile, "=  ");
     break;
-  }
-  case TDRELL: {
+  case TDRELL:
     PrintNode(n->cont.op.l);
     PrintNode(n->cont.op.r);
     fprintf(OutputFile, ":=  ");
     break;
-  }
-  case TDRELR: {
+  case TDRELR:
     PrintNode(n->cont.op.l);
     PrintNode(n->cont.op.r);
     fprintf(OutputFile, "=:  ");
     break;
-  }
   }
 }
 
@@ -670,40 +636,40 @@ void EvalRel(gpvec v, node *rel) {
   gpvec vl, vr;
   switch (rel->type) {
   case TSUM:
-    vl = NewGpVec(NrTotalGens);
-    vr = NewGpVec(NrTotalGens);
+    vl = FreshVec();
+    vr = FreshVec();
     EvalRel(vl, rel->cont.op.l);
     EvalRel(vr, rel->cont.op.r);
     Sum(v, vl, vr);
-    free(vl);
-    free(vr);
+    PopVec();
+    PopVec();
     break;
   case TMPROD:
     EvalRel(v, rel->cont.op.r);
-    ModProd(v, (rel->cont.op.l)->cont.n, v);
+    Prod(v, (rel->cont.op.l)->cont.n, v);
     break;
   case TLPROD:
-    vl = NewGpVec(NrTotalGens);
-    vr = NewGpVec(NrTotalGens);
+    vl = FreshVec();
+    vr = FreshVec();
     EvalRel(vl, rel->cont.op.l);
     EvalRel(vr, rel->cont.op.r);
     Prod(v, vl, vr);
-    free(vl);
-    free(vr);
+    PopVec();
+    PopVec();
     break;
   case TGEN:
-    CpVec(v, Epim(rel->cont.g));
+    Copy(v, Epim(rel->cont.g));
     break;
   case TREL:
   case TDRELL:
   case TDRELR:
-    vl = NewGpVec(NrTotalGens);
-    vr = NewGpVec(NrTotalGens);
+    vl = FreshVec();
+    vr = FreshVec();
     EvalRel(vl, rel->cont.op.l);
     EvalRel(vr, rel->cont.op.r);
     Diff(v, vl, vr);
-    free(vl);
-    free(vr);
+    PopVec();
+    PopVec();
     break;
   default:
     perror("Shouldn't happen");

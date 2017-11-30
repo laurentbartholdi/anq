@@ -13,7 +13,7 @@
 **  of the generators of the finite presentation which are not definitions.
 */
 
-void AddGen() {
+void AddGen(void) {
   bool *IsDefIm;
   int shift, sign, lwbd;
   bool **IsDefRel;
@@ -158,7 +158,7 @@ void AddGen() {
   **  have coefficients 0.
   */
 
-  Coefficients = (coeffvec) realloc(Coefficients, (NrTotalGens + 1) * sizeof(coeff));
+  Coefficients = (coeff *) realloc(Coefficients, (NrTotalGens + 1) * sizeof(coeff));
   for (unsigned i = NrPcGens + 1; i <= NrTotalGens; i++)
     coeff_init_set_si(Coefficients[i], 0);
 

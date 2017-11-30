@@ -22,65 +22,54 @@
 **  is the definition of "b".
 */
 
-static gpvec Tail_ab(gen a, gen b) {
+static void Tail_ab(gpvec v, gen a, gen b) {
   if (Weight[a] + Weight[b] > Class)
-    return (gpvec)0;
+    return;
 
-  gpvec temp[3], cva = GenToGpVec(a), cvg = GenToGpVec(Definitions[b].g), cvh = GenToGpVec(Definitions[b].h);
-
-  temp[0] = NewGpVec(NrTotalGens);
-  temp[1] = NewGpVec(NrTotalGens);
-  temp[2] = NewGpVec(NrTotalGens);
-  Prod(temp[0], cva, cvg);
-  Prod(temp[1], temp[0], cvh); /* temp[1] = [a,g,h] */
-  Prod(temp[0], cva, cvh);
-  Prod(temp[2], temp[0], cvg); /* temp[2] = [a,h,g] */
-  Diff(temp[0], temp[1], temp[2]); /* temp[0] = [a,g,h] - [a,h,g] */
+  gen g = Definitions[b].g, h = Definitions[b].h;
+  
+  gpvec agh = FreshVec();
+  TripleProduct(agh, a, g, h);
+  gpvec ahg = FreshVec();
+  TripleProduct(ahg, a, h, g);
+  gpvec tail = FreshVec();
+  Diff(tail, agh, ahg);
+  Collect(v, tail);
+  PopVec();
+  PopVec();
+  PopVec();
 
   if (Debug) {
     fprintf(OutputFile, "# tail: [ %d, %d ] = ", a, b);
-    PrintGpVec(temp[0]);
+    PrintVec(v);
     fprintf(OutputFile, "\n");
   }
-
-  Collect(temp[1], temp[0]);
-  
-  free(temp[0]);
-  free(temp[2]);
-  free(cva);
-  free(cvg);
-  free(cvh);
-  
-  return temp[1];
 }
 
-void Tails() {
-  gpvec tail;
-
+void Tails(void) {
   for (unsigned i = Dimensions[1] + 1; i <= NrPcGens; i++)
-    for (unsigned j = i + 1; j <= NrPcGens; j++)
-      if ((tail = Tail_ab(j, i)) != (gpvec)0) {
-        unsigned l = Length(Product[j][i]);
-        Product[j][i] = (gpvec) realloc(Product[j][i], (l + Length(tail) + 1) * sizeof(gpower));
-        unsigned kk, k = 0;
-        while (tail[k].g <= NrPcGens && tail[k].g != EOW)
-          k++;
-
-        for (kk = 0; tail[k + kk].g != EOW; kk++) {
-          Product[j][i][l + kk].g = tail[k + kk].g;
-          coeff_set(Product[j][i][l + kk].c, tail[k + kk].c);
-        }
-        Product[j][i][l + kk].g = EOW;
-        free(tail);
+    for (unsigned j = i + 1; j <= NrPcGens; j++) {
+      gpvec tail = FreshVec();
+      Tail_ab(tail, j, i);
+      unsigned k;
+      for (k = 0; Product[j][i][k].g != EOW; k++)
+	if (Product[j][i][k].g != tail[k].g || coeff_cmp(Product[j][i][k].c,tail[k].c)) {
+	  perror("Tail [a,g,h]-[a,h,g]-[a,[g,h]] doesn't lie in centre");
+	  exit(5);
+	}
+      if (tail[k].g != EOW) {
+	Product[j][i] = ResizeVec(Product[j][i], Length(tail));
+	Copy(Product[j][i]+k, tail+k);
       }
+      PopVec();
+    }
 
   if (Debug)
     fprintf(OutputFile, "# Tails() finished\n");
 }
 
-void GradedTails() {
+void GradedTails(void) {
   unsigned lwbd, lwbd1, upbd, upbd1;
-  gpvec tail;
 
   for (unsigned k = 2; k <= Class / 2; k++) {
     SUM(Dimensions, k - 1, lwbd);
@@ -89,15 +78,19 @@ void GradedTails() {
       SUM(Dimensions, Class - k - 1, lwbd1);
       SUM(Dimensions, Class - k, upbd1);
       for (unsigned j = MAX(i + 1, lwbd1 + 1); j <= upbd1; j++) {
-        unsigned l = Length(Product[j][i]);
-        tail = Tail_ab(j, i);
-        Product[j][i] = (gpvec) realloc(Product[j][i], (l + Length(tail) + 1) * sizeof(gpower));
-        for (unsigned m = 0; tail[m].g != EOW; m++) {
-          Product[j][i][l + m].g = tail[m].g;
-          coeff_set(Product[j][i][l + m].c, tail[m].c);
-        }
-        Product[j][i][l + Length(tail)].g = EOW;
-        free(tail);
+	gpvec tail = FreshVec();
+	Tail_ab(tail, j, i);
+	unsigned k;
+	for (k = 0; Product[j][i][k].g != EOW; k++)
+	  if (Product[j][i][k].g != tail[k].g || coeff_cmp(Product[j][i][k].c,tail[k].c)) {
+	    perror("Tail [a,g,h]-[a,h,g]-[a,[g,h]] doesn't lie in centre");
+	    exit(5);
+	  }
+	if (tail[k].g != EOW) {
+	  Product[j][i] = ResizeVec(Product[j][i], Length(tail));
+	  Copy(Product[j][i]+k, tail+k);
+	}
+	PopVec();
       }
     }
   }

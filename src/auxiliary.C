@@ -1,16 +1,106 @@
 /******************************************************************************
 **
 **               Nilpotent Quotient for Lie Algebras
-** auxialiary.c                                                 Csaba Schneider
+** auxiliary.c                                                 Csaba Schneider
 **                                                           schcs@math.klte.hu
 */
 
 #include "lienq.h"
 
-gpvec NewGpVec(unsigned size) {
+/****************************************************************
+ to avoid malloc stress, we implement a simple stack for vector
+ variables. the commands are:
+
+ void InitStack(void) sets up the stack at begin of a large chunk of code
+ void FreeStack(void) frees the stack at end of a large chunk of code
+ gpvec FreshVec(void) returns a fresh vector from the top of the stack
+ void PopVec(void) removes a vector from the top of the stack
+ void PopVec(gpvec) pops the vector on top of the stack into its
+    argument, and uses the argument as new free storage
+
+ the vectors all have maximal capacity NrTotalGens, and are created empty.
+
+ to be able to pop into a given position, vectors are actually allocated with
+ length one greater; the returned vector starts at position 1, and position
+ 0 remembers the stack position in its gen field.
+
+ except that vectors must be explictly popped, FreshVec() is
+ essentially the same as a call to alloca.
+****************************************************************/
+static gpvec *Stack;
+static unsigned NrStack, MaxStack;
+
+void InitStack(void) {
+  Stack = (gpvec *) malloc(0);
+  NrStack = 0;
+  MaxStack = 0;
+}
+
+void dumpstack(const char *s) {
+  return;
+  fprintf(stderr,"%s:Stack is",s);
+  for (unsigned i = 0; i < MaxStack; i++) fprintf(stderr," %s[%d]%p", i == NrStack ? "|| " : "", Stack[i][-1].g, Stack[i]);
+  fprintf(stderr,"\n");
+}
+
+void FreeStack(void) {
+  if (NrStack != 0) {
+    fprintf(stderr, "Stack is not empty at program end! I'll die.");
+    exit(2);
+  }
+  dumpstack("free");
+  for (unsigned i = 0; i < MaxStack; i++)
+    FreeVec(Stack[i]-1, NrTotalGens);
+  free(Stack);
+}
+
+gpvec FreshVec(void) {
+  if (NrStack == MaxStack) {
+    MaxStack++;
+    Stack = (gpvec *) realloc(Stack, MaxStack * sizeof(gpvec *));
+    if (Stack == NULL) {
+      perror("FreshVec, realloc");
+      exit(2);
+    }
+    Stack[NrStack] = NewVec(NrTotalGens+1)+1;
+    dumpstack("freshalloc");
+    Stack[NrStack][-1].g = NrStack;
+  }
+  Stack[NrStack]->g = EOW;
+  
+  //  return Stack[NrStack++];
+  NrStack++; dumpstack("fresh"); return Stack[NrStack-1];
+}
+
+void PopVec(void) {
+  if (NrStack-- == 0) {
+    perror("PopVec, stack empty");
+    exit(2);
+  }
+  dumpstack("pop");
+}
+
+void PopVec(gpvec &p) {
+  if (NrStack-- == 0) {
+    perror("PopVec, stack empty");
+    exit(2);
+  }
+  dumpstack("beforepop");
+  unsigned swapwith = p[-1].g;
+  p = Stack[NrStack];
+  Stack[NrStack] = Stack[swapwith];
+  Stack[swapwith] = p;
+  Stack[NrStack][-1].g = NrStack;
+  Stack[swapwith][-1].g = swapwith;
+  dumpstack("afterpop");
+}
+
+/****************************************************************/
+
+gpvec NewVec(unsigned size) {
   gpvec v = (gpvec) malloc ((size+1)*sizeof v[0]);
   if (v == NULL) {
-    perror("NewGpVec: malloc failed");
+    perror("NewVec: malloc failed");
     exit(2);
   }
   for (unsigned i = 0; i < size; i++)
@@ -20,131 +110,28 @@ gpvec NewGpVec(unsigned size) {
   return v;
 }
 
-void FreeGpVec(gpvec v, unsigned size) {
+void FreeVec(gpvec v, unsigned size) {
   for (unsigned i = 0; i < size; i++)
     coeff_clear(v[i].c);
   free(v);
 }
 
-void FreeGpVec(gpvec v) {
+void FreeVec(gpvec v) {
   for (gpvec p = v; p->g != EOW; p++)
     coeff_clear(p->c);
   free(v);
 }
 
-coeffvec NewCoeffVec(void) {
-  coeffvec v = (coeffvec) calloc((NrTotalGens + 1), sizeof v[0]);
-  if (v == NULL) {
-    perror("NewCoeffVec: malloc failed");
-    exit(2);
-  }
-  for (unsigned i = 1; i <= NrTotalGens; i++)
-    coeff_init(v[i]);
-  
-  return v;
-}
-
-void ZeroCoeffVec(coeffvec v) {
-  for (unsigned i = 1; i <= NrTotalGens; i++)
-    coeff_set_si(v[i], 0);
-}
-
-void FreeCoeffVec(coeffvec v) {
-  for (unsigned i = 1; i <= NrTotalGens; i++)
-    coeff_clear(v[i]);
-  free(v);
-}
-
-void CpVec(gpvec vec1, constgpvec vec2) {
-  unsigned i = 0;
-
-  while (vec2[i].g != EOW) {
-    vec1[i].g = vec2[i].g;
-    coeff_set(vec1[i].c, vec2[i].c);
-    i++;
-  }
-  vec1[i].g = EOW;
-}
-
-/*
-**  GenToCoeffVec( n )  returns the coefficient vector corresponding
-**  the generator <n> i.e. a vector which has 1 in the n-th entry
-**  and zero otherwise.
-*/
-
-gpvec GenToGpVec(gen n) {
-  gpvec gv = NewGpVec(1);
-  gv[0].g = n;
-  coeff_init_set_si(gv[0].c, 1);
-  gv[1].g = EOW;
-
-  return gv;
-}
-
-/*   The following function stands for computing the Length for an
-**   arbitrary genpower vector.
-*/
-
-unsigned Length(gpvec vec) {
-  unsigned l = 0;
-
-  while (vec[l].g != EOW) l++;
-  
-  return l;
-}
-
-/* Compute the real length (number of nonzero elements in a coeffvec. */
-
-unsigned RealLength(coeffvec cv) {
-  unsigned l = 0;
-
-  for (unsigned i = 1; i <= NrTotalGens; i++)
-    if (coeff_nz(cv[i]))
-      l++;
-
-  return l;
-}
-
-/*  We might need to convert the two form of the Lie ring elements to each
-**  other (and indeed we do it sometimes), so the following functions are
-**  useful.
-*/
-
-void CoeffVecToGpVec(gpvec gv, coeffvec cv) {
-  gpvec p = gv;
-  
-  for (unsigned i = 1; i <= NrTotalGens; i++)
-    if (coeff_nz(cv[i])) {
-      p->g = i;
-      coeff_set(p->c, cv[i]);
-      p++;
-    }
-  p->g = EOW;
-}
-
-gpvec CoeffVecToGpVec(coeffvec cv) {
-  gpvec gv = NewGpVec(RealLength(cv));
-  CoeffVecToGpVec(gv, cv);
-  return gv;
-}
-
-coeffvec GpVecToCoeffVec(constgpvec gv) {
-  coeffvec cv;
-
-  cv = NewCoeffVec();
-  for (constgpvec p = gv; p->g != EOW; p++)
-    coeff_set(cv[p->g], p->c);
-
-  return cv;
-}
-
-/* shrink a gpvec to correct length */
-gpvec ShrinkGpVec(gpvec v) {
-  unsigned l = Length(v);
-  v = (gpvec) realloc (v, (l+1)*sizeof v[0]);
+gpvec ResizeVec(gpvec v, unsigned length) {
+  v = (gpvec) realloc (v, (length+1)*sizeof v[0]);
   if (v == NULL) {
     perror("realloc failed");
     exit(2);
   }
   return v;
+}
+
+/* resize a gpvec to correct length */
+gpvec ResizeVec(gpvec v) {
+  return ResizeVec(v, Length(v));
 }
