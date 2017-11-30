@@ -53,7 +53,8 @@ void AddGen(void) {
       if (Definitions[i].h == 0)
         IsDefIm[Definitions[i].g] = true;
   }
-
+  else
+    IsDefIm = NULL; /* shut up compiler bug gcc 4.8.4 which reports, when -O3, that IsDefIm can be used initialized */
   /*
   **  We have to sign the defining product relators as well in order to
   **  not get them wrong introducing new generators.
