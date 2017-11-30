@@ -34,21 +34,18 @@ void PrintPcPres(void) {
     fprintf(OutputFile, "# The definitions:\n");
     for (unsigned i = 1; i <= NrTotalGens; i++)
       if (Definitions[i].h > 0) {
-	gen *cv = (gen *)malloc((Weight[i] + 1) * sizeof(gen));
-	ComputePcGen(i, cv, 1);
-	fprintf(OutputFile, "# a%d = [ ", i);
-	for (unsigned j = 1; j <= Weight[i] - 1; j++)
-	  fprintf(OutputFile, "%s, ", Pres.Generators[cv[j]]);
-	fprintf(OutputFile, "%s ]\n", Pres.Generators[cv[Weight[i]]]);
-	free(cv);
+	gen cv[Weight[i] + 1], g = i;
+	for (unsigned pos = Weight[g]; Weight[g] > 1; pos--) {
+	  cv[pos] = Definitions[g].h;
+	  g = Definitions[g].g;
+	}
+	cv[1] = g;
+	fprintf(OutputFile, "#%10s a%d = [ %d, %d ] = [ ", "", i, Definitions[i].g, Definitions[i].h);
+	for (unsigned j = 1; j <= Weight[i]; j++)
+	  fprintf(OutputFile, "%s%s", Pres.Generators[cv[j]], j == Weight[i] ? " ]\n" : ", ");
+      } else {
+	fprintf(OutputFile, "#%10s a%d = (%d)epim\n", "", i, Definitions[i].g);
       }
-    fprintf(OutputFile, "# And again:\n");
-    for (unsigned i = 1; i <= NrPcGens; i++)
-      if (Definitions[i].h == 0)
-	fprintf(OutputFile, "# a%d = (%d)epim\n", i, Definitions[i].g);
-      else
-	fprintf(OutputFile, "# a%d = [ %d, %d ]\n", i, Definitions[i].g,
-		Definitions[i].h);
   }
 
   bool first = true;

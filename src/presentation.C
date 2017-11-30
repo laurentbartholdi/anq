@@ -7,20 +7,16 @@
 
 #include "lienq.h"
 
-gpvec *Epimorphism;
-gpvec *Power;
-gpvec **Product;
+gpvec **Product,  *Power, *Epimorphism;
 coeff *Coefficients;
 
-unsigned NrCenGens, NrPcGens, NrTotalGens;
-
-unsigned *Weight;
-unsigned *Dimensions;
+unsigned *Weight, *Dimensions;
 
 deftype *Definitions;
 
-void InitPcPres() {
+unsigned NrCenGens, NrPcGens, NrTotalGens;
 
+void InitPcPres(void) {
   /*
   ** We initialize the power-relations to be trivial.
   */
@@ -266,13 +262,17 @@ void ExtendPcPres(void) {
   ** be of length i-1.
   */
 
-  Product = (gpvec **)realloc(Product, (NrTotalGens + 1) * sizeof(gpvec *));
+  Product = (gpvec **) realloc(Product, (NrTotalGens + 1) * sizeof(gpvec *));
   if (Product == NULL) {
     perror("EvalAllRel, Product");
     exit(2);
   }
   for (unsigned i = NrPcGens + 1; i <= NrTotalGens; i++) {
-    Product[i] = (gpvec *)malloc(i * sizeof(gpvec));
+    Product[i] = (gpvec *) malloc(i * sizeof(gpvec));
+    if (Product[i] == NULL) {
+      perror("EvalAllRel, Product[i]");
+      exit(2);
+    }
     for (unsigned j = 1; j < i; j++) {
       Product[i][j] = NewVec(0);
       Product[i][j][0].g = EOW;
@@ -281,19 +281,4 @@ void ExtendPcPres(void) {
 
   NrPcGens += NrCenGens;
   NrCenGens = 0;
-}
-
-void ComputePcGen(gen g, gen *cv, int status) {
-  static int pos;
-
-  if (status)
-    pos = Weight[g];
-
-  if (Weight[Definitions[g].g] == 1 && Weight[Definitions[g].h] == 1) {
-    cv[1] = Definitions[g].g;
-    cv[2] = Definitions[g].h;
-  } else {
-    cv[pos--] = Definitions[g].h;
-    ComputePcGen(Definitions[g].g, cv, 0);
-  }
 }

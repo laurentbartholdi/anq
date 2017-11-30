@@ -93,26 +93,16 @@ struct deftype {
 #define MIN(x, y) ((x) > (y) ? (y) : (x))
 #define MAX(x, y) ((x) < (y) ? (y) : (x))
 #define SUM(a, n, s)                                                           \
-  {                                                                            \
-    unsigned i;                                                                     \
-    for (i = 1, s = 0; i <= (n); s += a[i], i++)                               \
-      ;                                                                        \
+  {									\
+    unsigned i;								\
+    for (i = 1, s = 0; i <= (n); s += a[i], i++)			\
+      ;									\
   }
 
 /*  The following data structures contain the nilpotent presentation. */
 
-extern gpvec **Product;
-extern gpvec *Power;
-extern coeff *Coefficients;
-extern gpvec *Epimorphism;
 
-extern unsigned *Weight;
-extern unsigned *Dimensions;
 
-extern deftype *Definitions;
-
-extern unsigned NrPcGens, NrCenGens, NrTotalGens;
-extern unsigned Class;
 extern presentation Pres;
 
 /****************************************************************
@@ -120,8 +110,8 @@ extern presentation Pres;
  ****************************************************************/
 extern bool Graded, PrintZeros, PrintDefs;
 extern unsigned Debug;
-
 extern FILE *OutputFile;
+extern unsigned Class;
 
 /* auxiliary functions */
 void InitStack(void);
@@ -160,9 +150,14 @@ void PrintVec(gpvec);
 void PrintPcPres(void);
 
 /* presentation functions */
+extern gpvec **Product, *Power, *Epimorphism;
+extern coeff *Coefficients;
+extern unsigned *Weight, *Dimensions;
+extern deftype *Definitions;
+extern unsigned NrPcGens, NrCenGens, NrTotalGens;
+
 void InitPcPres(void);
 void FreePcPres(void);
-void ComputePcGen(gen, gen *, int);
 void EvalAllRel(void);
 void UpdatePcPres(void);
 void ExtendPcPres(void);
@@ -218,7 +213,8 @@ void EvalRel(gpvec, node *);
 void AddGen(void);
 
 /* matrix functions */
-extern unsigned NrRows, NrCols, *Heads;
+extern unsigned NrRows;
+
 gpvec *MatrixToExpVecs(void);
 bool AddRow(gpvec);
 void InitMatrix(void);

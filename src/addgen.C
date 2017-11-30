@@ -45,7 +45,7 @@ void AddGen(void) {
   **  do it.
   */
   if (!Graded) {
-    IsDefIm = (bool *) malloc((Pres.NrGens + 1) * sizeof(bool));
+    IsDefIm = new bool[Pres.NrGens + 1];
     for (unsigned i = 1; i <= Pres.NrGens; i++)
       IsDefIm[i] = false;
 
@@ -58,18 +58,9 @@ void AddGen(void) {
   **  We have to sign the defining product relators as well in order to
   **  not get them wrong introducing new generators.
   */
-  IsDefRel = (bool **) malloc((NrPcGens + 1) * sizeof(bool *));
-  if (IsDefRel == NULL) {
-    perror("AddGen, IsDefRel");
-    exit(2);
-  }
+  IsDefRel = new bool *[NrPcGens + 1];
   for (unsigned i = 1; i <= NrPcGens; i++) {
-    IsDefRel[i] = (bool *) malloc((Dimensions[1] + 1) * sizeof(bool));
-    if (IsDefRel[i] == NULL) {
-      perror("AddGen, IsDefRel[ i ]");
-      exit(2);
-    }
-
+    IsDefRel[i] = new bool[Dimensions[1] + 1];
     for (unsigned j = 1; j <= Dimensions[1]; j++)
       IsDefRel[i][j] = false;
 
@@ -78,17 +69,19 @@ void AddGen(void) {
   }
 
   /* Allocate space for the Definitions. */
-  Definitions = (deftype *)realloc(
-      (void *)Definitions, (NrTotalGens + 1) * sizeof(deftype));
-
+  Definitions = (deftype *) realloc(Definitions, (NrTotalGens + 1) * sizeof(deftype));
+  if (Definitions == NULL) {
+    perror("AddGen: realloc(Definitions) failed");
+    exit(2);
+  }
+  
   shift = NrPcGens + 1; /* points to the place of the new/pseudo generator. */
   if (!Graded) {
     /* Let's modify the epimorphic images. */
     for (unsigned i = 1; i <= Pres.NrGens; i++)
       if (!IsDefIm[i]) {
         unsigned l = Length(Epimorphism[i]);
-        Epimorphism[i] = (gpvec) realloc(Epimorphism[i], (l + 2) * sizeof(gpower));
-
+        Epimorphism[i] = ResizeVec(Epimorphism[i], l + 1);
         Epimorphism[i][l].g = shift;
         coeff_init_set_si(Epimorphism[i][l].c, 1);
         Epimorphism[i][l+1].g = EOW;
@@ -103,8 +96,7 @@ void AddGen(void) {
     for (unsigned i = 1; i <= NrPcGens; i++)
       if (coeff_nz(Coefficients[i])) {
         unsigned l = Length(Power[i]);
-        Power[i] = (gpvec)realloc(Power[i], (l + 2) * sizeof(gpower));
-
+        Power[i] = ResizeVec(Power[i], l + 1);
         Power[i][l].g = shift;
         coeff_init_set_si(Power[i][l].c, 1);
         Power[i][l+1].g = EOW;
@@ -118,15 +110,7 @@ void AddGen(void) {
       for (unsigned j = 1; j <= MIN(i - 1, Dimensions[1]); j++)
         if (!IsDefRel[i][j]) {
           unsigned l = Length(Product[i][j]);
-          Product[i][j] =
-              (gpvec)realloc(Product[i][j], (l + 2) * sizeof(gpower));
-
-          if (Product[i][j] == NULL) {
-            fprintf(OutputFile, "# Product[ %d ][ %d ]\n", i, j);
-            perror("AddGen, Product");
-            exit(2);
-          }
-
+          Product[i][j] = ResizeVec(Product[i][j], l + 1);
           Product[i][j][l].g = shift;
           coeff_init_set_si(Product[i][j][l].c, 1);
           Product[i][j][l+1].g = EOW;
@@ -138,11 +122,7 @@ void AddGen(void) {
     for (unsigned i = lwbd + 1; i <= NrPcGens; i++)
       for (unsigned j = 1; j <= MIN(i - 1, Dimensions[1]); j++) {
         unsigned l = Length(Product[i][j]);
-        Product[i][j] = (gpvec)realloc(Product[i][j], (l + 2) * sizeof(gpower));
-        if (Product[i][j] == NULL) {
-          perror("Addgen, Product");
-          exit(2);
-        }
+        Product[i][j] = ResizeVec(Product[i][j], l + 1);
         Product[i][j][l].g = shift;
         coeff_init_set_si(Product[i][j][l].c, 1);
         Product[i][j][l+1].g = EOW;
@@ -159,20 +139,28 @@ void AddGen(void) {
   */
 
   Coefficients = (coeff *) realloc(Coefficients, (NrTotalGens + 1) * sizeof(coeff));
+  if (Coefficients == NULL) {
+    perror("AddGen: realloc(Coefficients) failed");
+    exit(2);
+  }
   for (unsigned i = NrPcGens + 1; i <= NrTotalGens; i++)
     coeff_init_set_si(Coefficients[i], 0);
 
   Power = (gpvec *) realloc(Power, (NrTotalGens + 1) * sizeof(gpvec));
+  if (Power == NULL) {
+    perror("AddGen: realloc(Power) failed");
+    exit(2);
+  }
 
   /* The Product arrays will be modify later. */
 
   /* free the local structures. */
   if (!Graded)
-    free(IsDefIm);
+    delete IsDefIm;
 
   for (unsigned i = 1; i <= NrPcGens; i++)
-    free(IsDefRel[i]);
-  free(IsDefRel);
+    delete IsDefRel[i];
+  delete IsDefRel;
 
   if (Debug)
     fprintf(OutputFile, "# AddGen() finished\n");
