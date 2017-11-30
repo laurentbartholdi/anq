@@ -32,7 +32,6 @@
 #error you must specify a coefficient type: COEFF_IS_LONG, ...
 #include </> // force stop
 #endif
-typedef coeff *coeffvec;
 
 /****************************************************************
  * generators
@@ -59,8 +58,13 @@ typedef const gpower *constgpvec;
 ** multiplying an integer and a generator (w. r. t. the module) and wi also
 ** allow the power of a generator to an integer exponent (lie-product).
 */
+enum nodetype {
+  TNUM, TGEN, TMPROD, TLPROD, TSUM, TREL, TDRELL, TDRELR
+};
+
 struct node {
-  int type;
+  nodetype type;
+    
   union {
     coeff n;
     gen g;
@@ -70,7 +74,7 @@ struct node {
   } cont;
 };
 
-struct PresStruct {
+struct presentation {
   unsigned NrGens, NrRels, NrExtraRels;
   char **Generators;
   node **Relators;
@@ -99,7 +103,7 @@ struct deftype {
 
 extern gpvec **Product;
 extern gpvec *Power;
-extern coeffvec Coefficients;
+extern coeff *Coefficients;
 extern gpvec *Epimorphism;
 
 extern unsigned *Weight;
@@ -109,54 +113,51 @@ extern deftype *Definitions;
 
 extern unsigned NrPcGens, NrCenGens, NrTotalGens;
 extern unsigned Class;
-extern PresStruct Pres;
+extern presentation Pres;
 
 /****************************************************************
  * global variables dictating the behaviour of lienq
  ****************************************************************/
-extern bool Debug;
-extern bool ZeroCenGens;
-extern bool Graded;
-extern bool PrintZeros;
-
-extern FILE *InputFile;
-extern char *InputFileName;
+extern bool Graded, PrintZeros, PrintDefs;
+extern unsigned Debug;
 
 extern FILE *OutputFile;
-extern char *OutputFileName;
 
-/* auxialiary functions */
-gpvec NewGpVec(unsigned);
-void FreeGpVec(gpvec, unsigned);
-void FreeGpVec(gpvec);
-coeffvec NewCoeffVec(void);
-void ZeroCoeffVec(coeffvec);
-void FreeCoeffVec(coeffvec);
-void CpVec(gpvec, constgpvec);
-coeffvec GenToCoeffVec(gen);
-gpvec GenToGpVec(gen);
-unsigned Length(gpvec);
-unsigned RealLength(coeffvec);
-coeffvec GpVecToCoeffVec(constgpvec);
-gpvec CoeffVecToGpVec(coeffvec);
-void CoeffVecToGpVec(gpvec, coeffvec);
-gpvec ShrinkGpVec(gpvec);
+/* auxiliary functions */
+void InitStack(void);
+void FreeStack(void);
+gpvec FreshVec(void);
+void PopVec(void);
+void PopVec(gpvec &);
+
+inline void Copy(gpvec vec1, constgpvec vec2) {
+  for (; vec2->g != EOW; vec1++, vec2++)
+    coeff_set(vec1->c, vec2->c), vec1->g = vec2->g;
+  vec1->g = EOW;
+}
+inline unsigned Length(gpvec vec) {
+  unsigned l = 0;
+  while (vec[l].g != EOW) l++;
+  return l;
+}
+gpvec NewVec(unsigned);
+void FreeVec(gpvec, unsigned);
+void FreeVec(gpvec);
+gpvec ResizeVec(gpvec);
+gpvec ResizeVec(gpvec, unsigned);
 
 /* tails functions */
 void Tails(void);
 void GradedTails(void);
 
 /* consistency functions */
+void TripleProduct(gpvec &, gen, gen, gen);
 void Consistency(void);
 void GradedConsistency(void);
 
 /* print functions */
+void PrintVec(gpvec);
 void PrintPcPres(void);
-void PrintEpim(void);
-void PrintGpVec(gpvec);
-void PrintCoeffVec(coeffvec);
-void PrintMat(coeffvec *);
-void PrintDefinitions(void);
 
 /* presentation functions */
 void InitPcPres(void);
@@ -168,17 +169,38 @@ void ExtendPcPres(void);
 
 /* operation functions */
 void Sum(gpvec, constgpvec, constgpvec);
-unsigned Sum(gpvec, constgpvec, const coeff, constgpvec);
-void Sum(coeffvec, const coeff, constgpvec);
-void Sum(coeffvec, constgpvec);
+void Sum(gpvec, constgpvec, const coeff, constgpvec);
+void Sum(gpvec, const coeff, constgpvec, const coeff, constgpvec);
 void Diff(gpvec, constgpvec, constgpvec);
-unsigned Diff(gpvec, constgpvec, const coeff, constgpvec);
-void Diff(coeffvec, const coeff, constgpvec);
-void Diff(coeffvec, constgpvec);
+inline void Diff(gpvec vec0, constgpvec vec1, const coeff x2, constgpvec vec2) {
+  coeff y2;
+  coeff_init(y2);
+  coeff_neg(y2, x2);
+  Sum(vec0, vec1, y2, vec2);
+  coeff_clear(y2);
+}
+inline void Diff(gpvec vec0, const coeff x1, constgpvec vec1, const coeff x2, constgpvec vec2) {
+  coeff y2;
+  coeff_init(y2);
+  coeff_neg(y2, x2);
+  Sum(vec0, x1, vec1, y2, vec2);
+  coeff_clear(y2);
+}
+inline void Prod(gpvec vec0, const coeff n, constgpvec vec) {
+  if (coeff_nz(n))
+    for (; vec->g != EOW; vec++) {
+      coeff_mul(vec0->c, vec->c, n);
+      if (coeff_nz(vec0->c))
+	vec0->g = vec->g, vec0++;
+    }
+  vec0->g = EOW;
+}
+inline void Neg(gpvec vec1, constgpvec vec2) {
+  for (; vec2->g != EOW; vec1++, vec2++)
+    coeff_neg(vec1->c, vec2->c), vec1->g = vec2->g;
+  vec1->g = EOW;
+}
 void Prod(gpvec, constgpvec, constgpvec);
-void ModProd(gpvec, const coeff, constgpvec);
-void ModNeg(gpvec, constgpvec);
-void Collect(coeffvec);
 void Collect(gpvec, constgpvec);
 void ShrinkCollect(gpvec &);
 
@@ -198,6 +220,6 @@ void AddGen(void);
 /* matrix functions */
 extern unsigned NrRows, NrCols, *Heads;
 gpvec *MatrixToExpVecs(void);
-bool AddRow(coeffvec);
+bool AddRow(gpvec);
 void InitMatrix(void);
 void FreeMatrix(void);

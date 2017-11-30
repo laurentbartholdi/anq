@@ -16,259 +16,164 @@
 ** an integer-product: A module-operation of course. Makes no problem(?).
 */
 
-/*
-**  The following function writes a coeffvec in normal form i.e. cancels the
-**  coefficients that are not allowed becausee of the power relations. The
-**  result remains in <ev>.
-*/
-
-void Collect(coeffvec ev) {
-  coeff mp;
-  coeff_init(mp);
-  for (unsigned i = 1; i <= NrTotalGens; i++) {
-    if (!coeff_nz(Coefficients[i]))
-      continue;
-    coeff_fdiv_q(mp, ev[i], Coefficients[i]);
-    if (coeff_nz(mp)) {
-      coeff_submul(ev[i], mp, Coefficients[i]);
-      for (constgpvec p = Power[i]; p->g != EOW; p++)
-        coeff_addmul(ev[p->g], mp, p->c);
-    }
-  }
-  coeff_clear(mp);
-}
-
-void ShrinkCollect(gpvec &v) {
-  for (gpvec p = v; p->g != EOW; p++)
-    if(!coeff_reduced_p(p->c, Coefficients[p->g])) {
-      coeffvec cv = GpVecToCoeffVec(v);
-      Collect(cv);
-      FreeGpVec(v);
-      v = CoeffVecToGpVec(cv);
-      FreeCoeffVec(cv);
-      break;
-    }
-}
-
-void Collect(gpvec v0, constgpvec gv) {
-  coeffvec cv;
-
-  cv = GpVecToCoeffVec(gv);
-  Collect(cv);
-  CoeffVecToGpVec(v0,cv);
-  FreeCoeffVec(cv);
-}
-
-#if 0
-gpvec Collect(gpvec gv) {
-  gpvec result = malloc(lots...);
-  struct { coeff c; constgpvec p; } *queue = malloc(lots...);
-  queue[0] = { 1, gv };
-  int qlen = 1, gen  = 0;
-  while (qlen > 0) {
-    find minimum of all gens in queue; when one queue is exhausted, pop;
-    sum all corresponding coefficients;
-    if non-zero, reduce; and if non-trivial reduction, add power to queue;
-    if non-zero, put in result;
-  }
-  return result;
-}
-#endif
-
-/* v += x*w */
-void Sum(coeffvec v, const coeff x, constgpvec w) {
-  for (constgpvec p = w; p->g != EOW; p++)
-    coeff_addmul(v[p->g], x, p->c);
-}
-
-/* v += w */
-void Sum(coeffvec v, constgpvec w) {
-  for (constgpvec p = w; p->g != EOW; p++)
-    coeff_add(v[p->g], v[p->g], p->c);
-}
-
-/* v -= x*w */
-void Diff(coeffvec v, const coeff x, constgpvec w) {
-  for (constgpvec p = w; p->g != EOW; p++)
-    coeff_submul(v[p->g], x, p->c);
-}
-
-/* v -= w */
-void Diff(coeffvec v, constgpvec w) {
-  for (constgpvec p = w; p->g != EOW; p++)
-    coeff_sub(v[p->g], v[p->g], p->c);
-}
-
+/****************************************************************
+ vector addition and scalar multiplication
+****************************************************************/
 /* vec0 = vec1 + vec2 */
 void Sum(gpvec vec0, constgpvec vec1, constgpvec vec2) {
-  for (constgpvec p1 = vec1, p2 = vec2;;) {
-    if (p1->g == EOW) {
-      while (p2->g != EOW) {
-	coeff_set(vec0->c, p2->c), vec0->g = p2->g;
-	vec0++;
-	p2++;
-      }
-      goto done;
+  for (;;) {
+    if (vec1->g == EOW) {
+      Copy(vec0, vec2);
+      return;
     }
-    if (p2->g == EOW) {
-      while (p1->g != EOW) {
-	coeff_set(vec0->c, p1->c), vec0->g = p1->g;
-	vec0++;
-	p1++;
-      }
-      goto done;
+    if (vec2->g == EOW) {
+      Copy(vec0, vec1);
+      return;
     }
-    if (p1->g < p2->g) {
-      coeff_set(vec0->c, p1->c), vec0->g = p1->g;
+    if (vec1->g < vec2->g) {
+      coeff_set(vec0->c, vec1->c), vec0->g = vec1->g;
       vec0++;
-      p1++;
-    } else if (p1->g > p2->g) {
-	coeff_set(vec0->c, p2->c), vec0->g = p2->g;
-	vec0++;
-	p2++;
+      vec1++;
+    } else if (vec1->g > vec2->g) {
+      coeff_set(vec0->c, vec2->c), vec0->g = vec2->g;
+      vec0++;
+      vec2++;
     } else {
-      coeff c;
-      coeff_add(c, p1->c, p2->c);
-      if (coeff_nz(c))
-	coeff_set(vec0->c, c), vec0->g = p1->g, vec0++;
-      p1++;
-      p2++;
+      coeff_add(vec0->c, vec1->c, vec2->c);
+      if (coeff_nz(vec0->c))
+	vec0->g = vec1->g, vec0++;
+      vec1++;
+      vec2++;
     }
   }
- done:
-  vec0->g = EOW;
-  return;
 }
 
-/* vec0 = vec1 + x*vec2 */
-unsigned Sum(gpvec vec0, constgpvec vec1, const coeff x, constgpvec vec2) {
-  unsigned len = 0;
-  if (!coeff_nz(x)) {
-    for (constgpvec p1 = vec1; p1->g != EOW; p1++) {
-      coeff_set(vec0[len].c, p1->c), vec0[len].g = p1->g;
-      len++;
-    }
-    goto done;    
+/* vec0 = vec1 + x2*vec2 */
+void Sum(gpvec vec0, constgpvec vec1, const coeff x2, constgpvec vec2) {
+  if (!coeff_nz(x2)) {
+    Copy(vec0, vec1);
+    return;
   }
   
-  for (constgpvec p1 = vec1, p2 = vec2;;) {
-    if (p1->g == EOW) {
-      for (; p2->g != EOW; p2++) {
-	coeff_mul(vec0[len].c, x, p2->c);
-	if (coeff_nz(vec0[len].c))
-	  vec0[len].g = p2->g, len++;
-      }
-      goto done;
+  for (;;) {
+    if (vec1->g == EOW) {
+      Prod(vec0, x2, vec2);
+      return;
     }
-    if (p2->g == EOW) {
-      for (; p1->g != EOW; p1++) {
-	coeff_set(vec0[len].c, p1->c), vec0[len].g = p1->g;
-	len++;
-      }
-      goto done;
+    if (vec2->g == EOW) {
+      Copy(vec0, vec1);
+      return;
     }
-    if (p1->g < p2->g) {
-      coeff_set(vec0[len].c, p1->c), vec0[len].g = p1->g;
-      len++;
-      p1++;
-    } else if (p1->g > p2->g) {
-      coeff_mul(vec0[len].c, x, p2->c);
-      if (coeff_nz(vec0[len].c))
-	vec0[len].g = p2->g, len++;
-      p2++;
+    if (vec1->g < vec2->g) {
+      coeff_set(vec0->c, vec1->c), vec0->g = vec1->g;
+      vec0++;
+      vec1++;
+    } else if (vec1->g > vec2->g) {
+      coeff_mul(vec0->c, x2, vec2->c);
+      if (coeff_nz(vec0->c))
+	vec0->g = vec2->g, vec0++;
+      vec2++;
     } else {
-      coeff_set(vec0[len].c, p1->c);
-      coeff_addmul(vec0[len].c, x, p2->c);
-      if (coeff_nz(vec0[len].c))
-	vec0[len].g = p1->g, len++;
-      p1++;
-      p2++;
+      coeff_set(vec0->c, vec1->c);
+      coeff_addmul(vec0->c, x2, vec2->c);
+      if (coeff_nz(vec0->c))
+	vec0->g = vec1->g, vec0++;
+      vec1++;
+      vec2++;
     }
   }
- done:
-  vec0[len].g = EOW;
-  return len;
+}
+
+/* vec0 = x1*vec1 + x2*vec2 */
+void Sum(gpvec vec0, const coeff x1, constgpvec vec1, const coeff x2, constgpvec vec2) {
+  if (!coeff_nz(x1)) {
+    Prod(vec0, x2, vec2);
+    return;
+  }
+  if (!coeff_nz(x2)) {
+    Prod(vec0, x1, vec1);
+    return;
+  }
+  
+  for (;;) {
+    if (vec1->g == EOW) {
+      Prod(vec0, x2, vec2);
+      return;
+    }
+    if (vec2->g == EOW) {
+      Prod(vec0, x1, vec1);
+      return;
+    }
+    if (vec1->g < vec2->g) {
+      coeff_mul(vec0->c, x1, vec1->c);
+      if (coeff_nz(vec0->c))
+	vec0->g = vec1->g, vec0++;
+      vec1++;
+    } else if (vec1->g > vec2->g) {
+      coeff_mul(vec0->c, x2, vec2->c);
+      if (coeff_nz(vec0->c))
+	vec0->g = vec2->g, vec0++;
+      vec2++;
+    } else {
+      coeff_mul(vec0->c, x1, vec1->c);
+      coeff_addmul(vec0->c, x2, vec2->c);
+      if (coeff_nz(vec0->c))
+	vec0->g = vec1->g, vec0++;
+      vec1++;
+      vec2++;
+    }
+  }
 }
 
 /* vec0 = vec1 - vec2 */
 void Diff(gpvec vec0, constgpvec vec1, constgpvec vec2) {
-  for (constgpvec p1 = vec1, p2 = vec2;;) {
-    if (p1->g == EOW) {
-      while (p2->g != EOW) {
-	coeff_neg(vec0->c, p2->c), vec0->g = p2->g;
-	vec0++;
-	p2++;
-      }
-      goto done;
+  for (;;) {
+    if (vec1->g == EOW) {
+      Neg(vec0, vec2);
+      return;
     }
-    if (p2->g == EOW) {
-      while (p1->g != EOW) {
-	coeff_set(vec0->c, p1->c), vec0->g = p1->g;
-	vec0++;
-	p1++;
-      }
-      goto done;
+    if (vec2->g == EOW) {
+      Copy(vec0, vec1);
+      return;
     }
-    if (p1->g < p2->g) {
-      coeff_set(vec0->c, p1->c), vec0->g = p1->g;
+    if (vec1->g < vec2->g) {
+      coeff_set(vec0->c, vec1->c), vec0->g = vec1->g;
       vec0++;
-      p1++;
-    } else if (p1->g > p2->g) {      
-      coeff_neg(vec0->c, p2->c), vec0->g = p2->g;
+      vec1++;
+    } else if (vec1->g > vec2->g) {
+      coeff_neg(vec0->c, vec2->c), vec0->g = vec2->g;
       vec0++;
-      p2++;
+      vec2++;
     } else {
-      coeff c;
-      coeff_sub(c, p1->c, p2->c);
-      if (coeff_nz(c))
-	coeff_set(vec0->c, c), vec0->g = p1->g, vec0++;
-      p1++;
-      p2++;
-    }
-  }
- done:
-  vec0->g = EOW;
-}
-
-/* vec0 = vec1 - x*vec2 */
-unsigned Diff(gpvec vec0, constgpvec vec1, const coeff x, constgpvec vec2) {
-  if (!coeff_nz(x)) {
-    unsigned len = 0;
-    for (constgpvec p1 = vec1; p1->g != EOW; p1++) {
-      coeff_set(vec0[len].c, p1->c), vec0[len].g = p1->g;
-      len++;
-    }
-    vec0[len].g = EOW;
-    return len;
-  }
-
-  coeff y;
-  coeff_init(y);
-  coeff_neg(y, x);
-  unsigned len = Sum(vec0, vec1, y, vec2);
-  coeff_clear(y);
-  return len;
-}
-
-/* puts n * vec into vec0 */
-void ModProd(gpvec vec0, const coeff n, constgpvec vec) {
-  if (coeff_nz(n))
-    for (constgpvec p = vec; p->g != EOW; p++) {
-      coeff_mul(vec0->c, p->c, n);
+      coeff_sub(vec0->c, vec1->c, vec2->c);
       if (coeff_nz(vec0->c))
-	vec0->g = p->g, vec0++;
+	vec0->g = vec1->g, vec0++;
+      vec1++;
+      vec2++;
     }
-  vec0->g = EOW;
+  }
 }
 
+/****************************************************************
+ Lie bracket of vectors
+
+ this could be very inefficient the way it's implemented:
+ if vec1 and vec2 are almost full vectors (of length N), and each
+ Product[] entry is a short vector (of length n), then we have
+ complexity O(N^3) while we could achieve O(N^2n) in theory.
+
+ it would be better to do this with a container storing all
+ coefficients of all sums of Product[]s, and reading the results from
+ there into vec0.
+****************************************************************/
 /* vec0 = [ vec1, vec2 ] */
 void Prod(gpvec vec0, constgpvec vec1, constgpvec vec2) {
   gpvec temp[2];
-  bool parity = 0;
-  temp[0] = NewGpVec(NrTotalGens);
-  temp[1] = NewGpVec(NrTotalGens);
-  temp[0][0].g = EOW;
+  bool parity = false;
+  temp[0] = FreshVec();
+  temp[1] = FreshVec();
   coeff c;
+  coeff_init(c);
   
   for (constgpvec p1 = vec1; p1->g != EOW; p1++)
     for (constgpvec p2 = vec2; p2->g != EOW; p2++)
@@ -284,11 +189,59 @@ void Prod(gpvec vec0, constgpvec vec1, constgpvec vec2) {
 	  parity ^= 1;
 	}
       }
-  CpVec(vec0, temp[parity]);
-  free(temp[0]);
-  free(temp[1]);
+  Copy(vec0, temp[parity]);
+  PopVec();
+  PopVec();
 }
 
+/* the main collection routine. It could be optimized:
+   if all Power relations have length n, and gv is full of length N,
+   then the complexity is O(N^3) rather than O(N^2 n).
+
+   We should do it with a container such as <map>
+*/
+void Collect(gpvec vec0, constgpvec v) {
+  gpvec temp[2], p;
+  temp[0] = FreshVec();
+  temp[1] = FreshVec();
+  bool parity = false;
+  coeff mp;
+  coeff_init(mp);
+  
+  for (p = (gpvec) v; p->g != EOW;) {
+    gen i = p->g;
+    if(coeff_reduced_p(p->c, Coefficients[i])) {
+      coeff_set(vec0->c, p->c), vec0->g = i;
+      vec0++;
+      p++;
+    } else {
+      coeff_fdiv_q(mp, p->c, Coefficients[i]);
+      coeff_set(vec0->c, p->c);
+      coeff_submul(vec0->c, mp, Coefficients[i]);
+      if (coeff_nz(vec0->c))
+	vec0->g = i, vec0++;
+      p++;
+      if (Power[i]->g != EOW) {
+	Sum(temp[!parity], p, mp, Power[i]);
+	parity ^= 1;
+	p = temp[parity];
+      }
+    }
+  }
+  vec0->g = EOW;
+  PopVec();
+  PopVec();
+  coeff_clear(mp);
+}
+
+void ShrinkCollect(gpvec &v) {
+  gpvec newv = NewVec(NrTotalGens);
+  Collect(newv, v);
+  FreeVec(v);
+  v = ResizeVec(newv);
+}
+
+#if 0
 /* vec0 += [ vec1, vec2 ] */
 void Prod(coeffvec vec0, constgpvec vec1, constgpvec vec2) {
   coeff c;
@@ -308,3 +261,25 @@ void Prod(coeffvec vec0, constgpvec vec1, constgpvec vec2) {
       }
   coeff_clear(c);
 }
+
+/*
+**  The following function writes a coeffvec in normal form i.e. cancels the
+**  coefficients that are not allowed becausee of the power relations. The
+**  result remains in <ev>.
+*/
+void Collect(coeffvec ev) {
+  coeff mp;
+  coeff_init(mp);
+  for (unsigned i = 1; i <= NrTotalGens; i++) {
+    if (!coeff_nz(Coefficients[i]))
+      continue;
+    coeff_fdiv_q(mp, ev[i], Coefficients[i]);
+    if (coeff_nz(mp)) {
+      coeff_submul(ev[i], mp, Coefficients[i]);
+      for (constgpvec p = Power[i]; p->g != EOW; p++)
+        coeff_addmul(ev[p->g], mp, p->c);
+    }
+  }
+  coeff_clear(mp);
+}
+#endif

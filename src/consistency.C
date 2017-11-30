@@ -17,38 +17,59 @@
 **  the triple ( a, b, c ) and returns its value in cv.
 */
 
-/* cv += [[a,b],c] */
-static void TripleProduct(coeffvec cv, gen a, gen b, gen c) {
+/* v += [[a,b],c] */
+void TripleProduct(gpvec &v, gen a, gen b, gen c) {
+  gpvec temp[2];
+  temp[0] = FreshVec();
+  temp[1] = FreshVec();
+  bool parity = false;
+  
   if (a < b) {
     for (gpvec p = Product[b][a]; p->g != EOW && p->g <= NrPcGens; p++)
       if (p->g > c)
-	Diff(cv, p->c, Product[p->g][c]);
+	Diff(temp[!parity], temp[parity], p->c, Product[p->g][c]), parity ^= 1;
       else if (p->g < c)
-	Sum(cv, p->c, Product[c][p->g]);
+	Sum(temp[!parity], temp[parity], p->c, Product[c][p->g]), parity ^= 1;
   } else {
     for (gpvec p = Product[a][b]; p->g != EOW && p->g <= NrPcGens; p++)
       if (p->g > c)
-	Sum(cv, p->c, Product[p->g][c]);
+	Sum(temp[!parity], temp[parity], p->c, Product[p->g][c]), parity ^= 1;
       else if (p->g < c)
-	Diff(cv, p->c, Product[c][p->g]);
+	Diff(temp[!parity], temp[parity], p->c, Product[c][p->g]), parity ^= 1;
   }
+#if 0
+  if (parity)
+    PopVec(v), PopVec();
+  else
+    PopVec(), PopVec(v);
+#else
+  Copy(v, temp[parity]);
+  PopVec();
+  PopVec();
+#endif
 }
 
-static void CheckJacobi(coeffvec cv, gen a, gen b, gen c) {
+static void CheckJacobi(gpvec v, gen a, gen b, gen c) {
   if (Weight[a] + Weight[b] + Weight[c] > Class)
     return;
 
-  ZeroCoeffVec(cv);	
+  gpvec temp1 = FreshVec();
+  gpvec temp2 = FreshVec();
+  gpvec temp3 = FreshVec();
+  TripleProduct(temp1, a, b, c);
+  TripleProduct(temp2, b, c, a);
+  TripleProduct(temp3, c, a, b);
+  Sum(v, temp1, temp3);
+  Sum(temp3, v, temp2);
+  Collect(v, temp3);
 
-  TripleProduct(cv, a, b, c);
-  TripleProduct(cv, b, c, a);
-  TripleProduct(cv, c, a, b);
-
-  Collect(cv);
+  PopVec();
+  PopVec();
+  PopVec();
 
   if (Debug) {
     fprintf(OutputFile, "# consistency: [ %d, %d, %d ] = ", a, b, c);
-    PrintCoeffVec(cv);
+    PrintVec(v);
     fprintf(OutputFile, "\n");
   }
 }
@@ -59,26 +80,32 @@ static void CheckJacobi(coeffvec cv, gen a, gen b, gen c) {
 **  of the argument with its relation.
 **
 */
-static void CheckPower(coeffvec cv, gen a, gen b) {
-  ZeroCoeffVec(cv);
-
+static void CheckPower(gpvec v, gen a, gen b) {
+  gpvec temp[2];
+  temp[0] = FreshVec();
+  temp[1] = FreshVec();
+  bool parity = false;
+  
   for (gpvec p = Power[a]; p->g <= NrPcGens && p->g != EOW; p++) {
     gen g = p->g;
     if (g > b)
-      Diff(cv, p->c, Product[g][b]);
+      Diff(temp[!parity], temp[parity], p->c, Product[g][b]), parity ^= 1;
     else if (g < b)
-      Sum(cv, p->c, Product[b][g]);
+      Sum(temp[!parity], temp[parity], p->c, Product[b][g]), parity ^= 1;
   }
 
   if (a > b)
-    Sum(cv, Coefficients[a], Product[a][b]);
+    Sum(temp[!parity], temp[parity], Coefficients[a], Product[a][b]), parity ^= 1;
   else if (a < b)
-    Diff(cv, Coefficients[a], Product[b][a]);
+    Diff(temp[!parity], temp[parity], Coefficients[a], Product[b][a]), parity ^= 1;
+  Collect(v, temp[parity]);
 
-  Collect(cv);
+  PopVec();
+  PopVec();
+  
   if (Debug) {
     fprintf(OutputFile, "# consistency %d %d: ", a, b);
-    PrintCoeffVec(cv);
+    PrintVec(v);
     fprintf(OutputFile, "\n");
   }
 }
@@ -90,31 +117,30 @@ static void CheckPower(coeffvec cv, gen a, gen b) {
 **  generators.
 */
 
-void Consistency() {
-  coeffvec cv = NewCoeffVec();
-
+void Consistency(void) {
   for (unsigned i = 1; i <= Dimensions[1]; i++)
     for (unsigned j = i + 1; j <= NrPcGens; j++)
       for (unsigned k = j + 1; k <= NrPcGens; k++) {
-        CheckJacobi(cv, i, j, k);
-	AddRow(cv);
+	gpvec v = FreshVec();
+        CheckJacobi(v, i, j, k);
+	AddRow(v);
+	PopVec();
       }
 
   for (unsigned i = 1; i <= NrPcGens; i++)
     if (coeff_nz(Coefficients[i]))
       for (unsigned j = 1; j <= NrPcGens; j++) {
-        CheckPower(cv, i, j);
-        AddRow(cv);
+	gpvec v = FreshVec();
+        CheckPower(v, i, j);
+        AddRow(v);
+	PopVec();
       }
-  FreeCoeffVec(cv);
 
   if (Debug)
     fprintf(OutputFile, "# Consistency() finished\n");
 }
 
-void GradedConsistency() {
-  coeffvec cv = NewCoeffVec();
-
+void GradedConsistency(void) {
   for (unsigned a = 1; a <= Dimensions[1]; a++)  /* a is of weight 1 */
     for (unsigned bw = 1; bw <= Class / 2; bw++) /* bw is the weight of b */
     {
@@ -124,8 +150,10 @@ void GradedConsistency() {
 	unsigned lwbdc;
         SUM(Dimensions, cw - 1, lwbdc);
         for (unsigned c = MAX(b + 1, lwbdc + 1); c <= lwbdc + Dimensions[cw]; c++) {
-	  CheckJacobi(cv, a, b, c);
-	  AddRow(cv);
+	  gpvec v = FreshVec();
+	  CheckJacobi(v, a, b, c);
+	  AddRow(v);
+	  PopVec();
         }
       }
     }
@@ -138,11 +166,12 @@ void GradedConsistency() {
     for (unsigned a = lwbda + 1; a <= lwbda + Dimensions[aw]; a++)
       if (coeff_nz(Coefficients[a]))
         for (unsigned b = lwbdb + 1; b <= lwbdb + Dimensions[bw]; b++) {
-	  CheckPower(cv, a, b);
-	  AddRow(cv);
+	  gpvec v = FreshVec();
+	  CheckPower(v, a, b);
+	  AddRow(v);
+	  PopVec();
         }
   }
-  FreeCoeffVec(cv);
 
   if (Debug)
     fprintf(OutputFile, "# GradedConsistency() finished.\n");

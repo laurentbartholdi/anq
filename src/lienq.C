@@ -21,7 +21,8 @@ static void Usage(const char *msg) {
   exit(3);
 }
 
-bool  Debug = false, PrintZeros = false, Graded = false, Gap = false, PrintDefs = false;
+bool PrintZeros = false, Graded = false, Gap = false, PrintDefs = false;
+unsigned Debug = 0;
 unsigned Class;
 
 int main(int argc, char **argv) {
@@ -37,7 +38,7 @@ int main(int argc, char **argv) {
       strcat(flags, "-G ");
       break;
     case 'D':
-      Debug = !Debug;
+      Debug++;
       strcat(flags, "-D ");
       break;
     case 'A':
@@ -94,22 +95,19 @@ int main(int argc, char **argv) {
   for (Class = 1; UpToClass == 0 || Class <= UpToClass; Class++) {
     unsigned OldNrPcGens = NrPcGens;
 
-    if (Class >= 2) {
+    if (Class >= 2)
       AddGen();
 
-      if (Graded)
-	GradedTails();
-      else
-	Tails();
+    InitStack();
+
+    if (Class >= 2) {
+      if (Graded) GradedTails(); else Tails();
     }
     
     InitMatrix();
 
     if (Class >= 2) {
-      if (Graded)
-	GradedConsistency();
-      else
-	Consistency();
+      if (Graded) GradedConsistency(); else Consistency();
     }
     
     EvalAllRel();
@@ -117,12 +115,14 @@ int main(int argc, char **argv) {
     UpdatePcPres();
 
     FreeMatrix();
-
+    
     if (NrCenGens == 0)
       break;
 
     ExtendPcPres();
   
+    FreeStack();
+
     const char *stndrdth;
     if (Class % 10 == 1 && Class != 11)
       stndrdth = "st";
@@ -138,10 +138,9 @@ int main(int argc, char **argv) {
       fprintf(OutputFile, "%ld%s", coeff_get_si(Coefficients[i]), i == NrPcGens ? "\n\n" : ", ");
   }
 
+  InitStack();
   PrintPcPres();
-
-  if (PrintDefs)
-    PrintDefinitions();
+  FreeStack();
 
   fprintf(OutputFile, "# Runtime: %.3g seconds\n",
           (clock() - start) / (float)CLOCKS_PER_SEC);

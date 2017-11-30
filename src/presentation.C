@@ -10,7 +10,7 @@
 gpvec *Epimorphism;
 gpvec *Power;
 gpvec **Product;
-coeffvec Coefficients;
+coeff *Coefficients;
 
 unsigned NrCenGens, NrPcGens, NrTotalGens;
 
@@ -24,7 +24,7 @@ void InitPcPres() {
   /*
   ** We initialize the power-relations to be trivial.
   */
-  Coefficients = (coeffvec)calloc(Pres.NrGens + 1, sizeof(coeff));
+  Coefficients = (coeff *) calloc(Pres.NrGens + 1, sizeof(coeff));
   if (Coefficients == NULL) {
     perror("InitPcPres, Coefficients");
     exit(2);
@@ -63,12 +63,12 @@ void InitPcPres() {
 void FreePcPres(void) {
   for (unsigned i = 1; i <= NrTotalGens; i++)
     if (coeff_nz(Coefficients[i]))
-      free(Power[i]);
+      FreeVec(Power[i]);
   free(Power);
   free(Coefficients);
   for (unsigned i = 1; i <= NrTotalGens; i++) {
     for (unsigned j = 1; j < i; j++)
-      free(Product[i][j]);
+      FreeVec(Product[i][j]);
     free(Product[i]);
   }
   free(Product);
@@ -81,30 +81,29 @@ void FreePcPres(void) {
 void ElementaryColumnOp(gpvec &v, gen g, gpvec w) {
   for (unsigned i = 0; v[i].g != EOW; i++)
     if (v[i].g == g) {
-      gpvec newv = NewGpVec(NrTotalGens); //Length(w)+Length(v+i));
+      gpvec newv = NewVec(NrTotalGens); //Length(w)+Length(v+i));
       Diff(newv, v, v[i].c, w);
-      FreeGpVec(v);
-      v = ShrinkGpVec(newv);
+      FreeVec(v); // @@@ could be optimized if we put matrix on stack
+      v = ResizeVec(newv);
       break;
     }
 }
 
 void EvalAllRel(void) {
-  gpvec gv = NewGpVec(NrTotalGens);
-  
+  gpvec v = FreshVec();
   for (unsigned i = 0; i < Pres.NrRels; i++) {
-    EvalRel(gv, Pres.Relators[i]);
-    coeffvec cv = GpVecToCoeffVec(gv);
-    Collect(cv);
+    gpvec temp = FreshVec();
+    EvalRel(temp, Pres.Relators[i]);
+    Collect(v, temp);
+    PopVec();
     if (Debug) {
       fprintf(OutputFile, "# relation: ");
-      PrintCoeffVec(cv);
+      PrintVec(v);
       fprintf(OutputFile, "\n");
     }
-    AddRow(cv);
-    FreeCoeffVec(cv);
+    AddRow(v);
   }
-  free(gv);
+  PopVec();
   
   if (Debug)
     fprintf(OutputFile, "# EvalAllRel() finished\n");
@@ -116,12 +115,12 @@ void UpdatePcPres(void) {
   gpvec *ExpMat = MatrixToExpVecs();
   if (Debug) {
     for (unsigned i = 0; i < NrRows; i++) {
-      PrintGpVec(ExpMat[i]);
+      PrintVec(ExpMat[i]);
       fprintf(OutputFile, "\n");
     }
   }
 
-  gen *renumber = (gen *)malloc((NrTotalGens + 1) * sizeof(gen));
+  gen *renumber = (gen *) malloc((NrTotalGens + 1) * sizeof(gen));
   if (renumber == NULL) {
     perror("EvalAllRel, renumber");
     exit(2);
@@ -136,7 +135,7 @@ void UpdatePcPres(void) {
       int newk = renumber[k] = k - trivialgens;
       coeff_set(Coefficients[newk], ExpMat[i]->c);
       
-      Power[newk] = NewGpVec(Length(ExpMat[i])-1);
+      Power[newk] = NewVec(Length(ExpMat[i])-1);
       unsigned pos = 0;
       for (gpvec p = ExpMat[i]+1; p->g != EOW; p++) {
 	Power[newk][pos].g = p->g;
@@ -275,7 +274,7 @@ void ExtendPcPres(void) {
   for (unsigned i = NrPcGens + 1; i <= NrTotalGens; i++) {
     Product[i] = (gpvec *)malloc(i * sizeof(gpvec));
     for (unsigned j = 1; j < i; j++) {
-      Product[i][j] = NewGpVec(0);
+      Product[i][j] = NewVec(0);
       Product[i][j][0].g = EOW;
     }
   }
