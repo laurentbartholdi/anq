@@ -99,12 +99,6 @@ struct deftype {
       ;									\
   }
 
-/*  The following data structures contain the nilpotent presentation. */
-
-
-
-extern presentation Pres;
-
 /****************************************************************
  * global variables dictating the behaviour of lienq
  ****************************************************************/
@@ -205,6 +199,8 @@ void FreeEpim(void);
 gpvec Epim(gen);
 
 /* readpres functions */
+extern presentation Pres;
+
 void ReadPresentation(const char *);
 void FreePresentation(void);
 void EvalRel(gpvec, node *);

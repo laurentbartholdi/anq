@@ -10,8 +10,22 @@
 #include <ctype.h>
 #include <stdio.h>
 
-static int Ch;            /* Contains the next char on the input. */
-static int Token;         /* Contains the current token. */
+#if 0
+static const char *TokenName[] = {
+  "LParen", "RParen", "LBrack", "RBrack",  "LBrace",  "RBrace",
+  "Mult",   "Power",  "Equal",  "DEqualL", "DEqualR", "Plus",
+  "Minus",  "LAngle", "RAngle", "Pipe",    "Comma",   "Number",
+  "Gen"};
+#endif
+
+enum token {
+  LPAREN, RPAREN, LBRACK, RBRACK, LBRACE, RBRACE,
+  MULT, POWER, EQUAL, DEQUALL, DEQUALR, PLUS,
+  MINUS, LANGLE, RANGLE, PIPE, COMMA, SEMICOLON, NUMBER,
+  GEN };
+  
+static char Ch;           /* Contains the next char on the input. */
+static token Token;       /* Contains the current token. */
 static int Line;          /* Current line number. */
 static int TLine;         /* Line number where token starts. */
 static int Char;          /* Current character number. */
@@ -20,69 +34,31 @@ static const char *InFileName;  /* Current input file name. */
 static FILE *InFp;        /* Current input file pointer. */
 static coeff N;           /* Contains the integer just read. */
 static char Gen[128];     /* Contains the generator name. */
-#if 0
-static const char *TokenName[] = {
-    "",       "LParen", "RParen", "LBrack",  "RBrack",  "LBrace", "RBrace",
-    "Mult",   "Power",  "Equal",  "DEqualL", "DEqualR", "Plus",   "Minus",
-    "LAngle", "RAngle", "Pipe",   "Comma",   "Number",  "Gen"};
-#endif
-/*
-**    The following macros define tokens.
-*/
-#define LPAREN 1
-#define RPAREN 2
-#define LBRACK 3
-#define RBRACK 4
-#define LBRACE 5
-#define RBRACE 6
-
-#define MULT 7
-#define POWER 8
-#define EQUAL 9
-#define DEQUALL 10
-#define DEQUALR 11
-
-#define PLUS 12
-#define MINUS 13
-
-#define LANGLE 14
-#define RANGLE 15
-
-#define PIPE 16
-#define COMMA 17
-#define SEMICOLON 18
-#define NUMBER 19
-#define GEN 20
 
 /* The following structure will carry the presentation given by the user. */
 
 presentation Pres;
-
-static char **Generators;
 
 void FreeNode(node *n) {
   if (n->type != TGEN && n->type != TNUM) {
     FreeNode(n->cont.op.l);
     FreeNode(n->cont.op.r);
   }
-  free(n);
+  delete n;
 }
 
 static node *NewNode(nodetype type) {
-  node *n;
-  n = (node *) malloc(sizeof(node));
+  node *n = new node;
   n->type = type;
   return n;
 }
 
-#define NOCREATE 0
-#define CREATE 1
+enum genstatus { NOCREATE, CREATE };
 
-static gen GenNumber(char *gname, int status) {
-  unsigned i;
+static gen GenNumber(char *gname, genstatus status) {
   if (status == CREATE && Pres.NrGens == 0)
     Pres.Generators = (char **) malloc(2 * sizeof(char *));
-  for (i = 1; i <= Pres.NrGens; i++) {
+  for (unsigned i = 1; i <= Pres.NrGens; i++) {
     if (!strcmp(gname, Pres.Generators[i])) {
       if (status == CREATE)
         return (gen) 0;
@@ -93,8 +69,7 @@ static gen GenNumber(char *gname, int status) {
     return (gen) 0;
   Pres.NrGens++;
   Pres.Generators = (char **) realloc(Pres.Generators, (Pres.NrGens + 1) * sizeof(char *));
-  i = strlen(gname);
-  Pres.Generators[Pres.NrGens] = (char *) malloc((i + 1) * sizeof(char));
+  Pres.Generators[Pres.NrGens] = new char[strlen(gname) + 1];
   strcpy(Pres.Generators[Pres.NrGens], gname);
 
   return Pres.NrGens;
@@ -103,7 +78,7 @@ static gen GenNumber(char *gname, int status) {
 char *GenName(gen g) {
   if (g > Pres.NrGens)
     return (char *) NULL;
-  return Generators[g];
+  return Pres.Generators[g];
 }
 
 static void SyntaxError(const char *str) {
@@ -588,7 +563,7 @@ void PrintNode(node *n) {
     fprintf(OutputFile, "%ld  ", coeff_get_si(n->cont.n));
     break;
   case TGEN:
-    fprintf(OutputFile, "%s  ", Generators[n->cont.g]);
+    fprintf(OutputFile, "%s  ", Pres.Generators[n->cont.g]);
     break;
   case TSUM:
     PrintNode(n->cont.op.l);

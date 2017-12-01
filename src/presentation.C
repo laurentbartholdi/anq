@@ -6,6 +6,7 @@
 */
 
 #include "lienq.h"
+#include <time.h> // for clock
 
 gpvec **Product,  *Power, *Epimorphism;
 coeff *Coefficients;
@@ -116,14 +117,11 @@ void UpdatePcPres(void) {
     }
   }
 
-  gen *renumber = (gen *) malloc((NrTotalGens + 1) * sizeof(gen));
-  if (renumber == NULL) {
-    perror("EvalAllRel, renumber");
-    exit(2);
-  }
+  gen *renumber = new gen[NrTotalGens + 1];
   for (unsigned i = 1; i <= NrCenGens; i++)
     renumber[NrPcGens + i] = 0;
 
+  fprintf(stderr, "%10g: rewrite powers\n", clock() /(float) CLOCKS_PER_SEC);
   for (unsigned k = NrPcGens + 1, i = 0; k <= NrTotalGens; k++)
     if (i >= NrRows || k != ExpMat[i]->g) { /* no relation for k, remains infinite */
       renumber[k] = k - trivialgens;
@@ -131,13 +129,8 @@ void UpdatePcPres(void) {
       int newk = renumber[k] = k - trivialgens;
       coeff_set(Coefficients[newk], ExpMat[i]->c);
       
-      Power[newk] = NewVec(Length(ExpMat[i])-1);
-      unsigned pos = 0;
-      for (gpvec p = ExpMat[i]+1; p->g != EOW; p++) {
-	Power[newk][pos].g = p->g;
-	coeff_neg(Power[newk][pos++].c, p->c);
-      }
-      Power[newk][pos].g = EOW;
+      Power[newk] = NewVec(Length(ExpMat[i]+1));
+      Neg(Power[newk], ExpMat[i]+1);
       i++;
     } else { /* k is trivial, and should be eliminated */
       /*  Modify the epimorphisms: */
@@ -157,6 +150,7 @@ void UpdatePcPres(void) {
       i++;
     }
 
+  fprintf(stderr, "%10g: done\n", clock() /(float) CLOCKS_PER_SEC);
   /* First we eliminate the generators from the epimorphism */
   for (unsigned i = 1; i <= Pres.NrGens; i++) {
     unsigned j = 0;
@@ -192,8 +186,7 @@ void UpdatePcPres(void) {
       Product[i][j][k].g = EOW;
     }
 
-  /* Let us eleminate the generators from the power relations. */
-
+  /* Let us eliminate the generators from the power relations. */
   for (unsigned i = 1; i <= NrTotalGens; i++)
     if (coeff_nz(Coefficients[i])) {
       unsigned j = 0;
@@ -228,8 +221,8 @@ void UpdatePcPres(void) {
       Definitions[renumber[i]].g = Definitions[i].g;
       Definitions[renumber[i]].h = Definitions[i].h;
     }
-
-  free(renumber);
+  
+  delete renumber;
 
   NrCenGens -= trivialgens;
   NrTotalGens -= trivialgens;

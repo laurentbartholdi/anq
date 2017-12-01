@@ -29,6 +29,7 @@ inline bool coeff_nz(const coeff a) {
 #define coeff_cmp_si mpz_cmp_si
 #define coeff_divexact mpz_divexact
 #define coeff_fdiv_q mpz_fdiv_q
+#define coeff_fdiv_q mpz_fdiv_r
 #define coeff_gcdext mpz_gcdext
 #define coeff_mul mpz_mul
 #define coeff_neg mpz_neg

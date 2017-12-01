@@ -6,6 +6,7 @@
 */
 
 #include "lienq.h"
+#include <map>
 
 /*
 ** The purpose of this couple of functions is to handle the Lie-algebra
@@ -200,6 +201,7 @@ void Prod(gpvec vec0, constgpvec vec1, constgpvec vec2) {
 
    We should do it with a container such as <map>
 */
+#if 1 // old method -- used gpvecs to collect
 void Collect(gpvec vec0, constgpvec v) {
   gpvec temp[2], p;
   temp[0] = FreshVec();
@@ -234,12 +236,77 @@ void Collect(gpvec vec0, constgpvec v) {
   coeff_clear(mp);
 }
 
+/* It seems the following routine is time-critical.
+   It can be improved in 4 manners:
+  -- if Power[g]->g != EOW but we're at the end (likely case), can just append
+  -- if shift<0, we may have space to accomodate Power[g]
+  -- we only need to call a full collect on the part starting at p
+  -- we should use a std::map in the full collect, see above
+*/
 void ShrinkCollect(gpvec &v) {
-  gpvec newv = NewVec(NrTotalGens);
-  Collect(newv, v);
-  FreeVec(v);
-  v = ResizeVec(newv);
+  int shift = 0;
+  gpvec p;
+  for (p = v; p->g != EOW; p++) {
+    gen g = p->g;
+    if(!coeff_reduced_p(p->c, Coefficients[g])) {
+      if (Power[g]->g != EOW) { // bad news, collection can become longer
+	gpvec newv = NewVec(NrTotalGens);
+	Collect(newv, v);
+	FreeVec(v);
+	v = ResizeVec(newv);
+	return;
+      }
+      coeff_fdiv_r(p->c, p->c, Coefficients[g]);
+      if (!coeff_nz(p->c)) { shift--; continue; }
+    }
+    if (shift < 0)
+      coeff_set(p[shift].c, p->c), p[shift].g = g;
+  }
+  if (shift < 0) {
+    p[shift].g = EOW;
+    v = ResizeVec(v);
+  }
 }
+#else
+// work-in-progress attempt
+typedef std::map<gen,coeff> sparsevec;
+
+void Collect(gpvec &vec, bool resize) {
+  sparsevec todo;
+  int pos, shift;
+  coeff mp;
+  coeff_init(mp);
+  for (pos = shift = 0; vec[pos].g != EOW; pos++) {
+    gen g = vec[pos].g;
+    if(!coeff_reduced_p(vec[pos].c, Coefficients[g])) {
+      coeff_fdiv_q(mp, vec[pos].c, Coefficients[g]);
+      coeff_submul(vec[pos].c, mp, Coefficients[g]);
+      if (coeff_nz(vec[pos].c) && Power[g]->g == EOW)
+	goto next;  // just reduce the coeff, trivial power
+      if (Power[g]->g == EOW) {
+	shift++; // we're about to shrink the vector, a coefficient vanished
+	continue;
+      }
+      // insert Power[g] into todo. When looping, compare elements and head of todo; pop whichever comes first, maybe add, reduce, maybe push more on todo.
+
+      // simpler, probably equivalent in performance: push Power and all of remainder of word on todo (combining). Then repeatedly remove head of todo, reduce, maybe push back a Power, and write into vec. If reached EOW, either realloc or keep writing.
+    }
+  next:
+    if (shift)
+      coeff_set(vec[pos-shift].c, vec[pos].c), vec[pos-shift].g = g;
+  }
+  coeff_clear(mp);
+}
+
+void Collect(gpvec v0, constgpvec v1) {
+  Collect((gpvec) v1, false);
+  Copy(v0, v1);
+}
+
+void ShrinkCollect(gpvec &v) {
+  Collect(v, true);
+}
+#endif
 
 #if 0
 /* vec0 += [ vec1, vec2 ] */

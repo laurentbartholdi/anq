@@ -68,6 +68,10 @@ inline void coeff_fdiv_q(coeff &result, const coeff &a, const coeff &b) {
   result.data = a.data / b.data;
 }
 
+inline void coeff_fdiv_r(coeff &result, const coeff &a, const coeff &b) {
+  result.data = a.data % b.data;
+}
+
 inline void coeff_mul(coeff &result, const coeff &a, const coeff &b) {
   result.data = a.data * b.data;
 }
