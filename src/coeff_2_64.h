@@ -5,6 +5,8 @@
 ** defines coefficients as signed 64-bit integers
 */
 
+#include <inttypes.h>
+
 struct coeff {
   uint64_t data;
 };
