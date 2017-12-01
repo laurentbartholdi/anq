@@ -74,18 +74,45 @@ void FreePcPres(void) {
   free(Weight);
 }
 
-/* v -= v[g]*w */
-void ElementaryColumnOp(gpvec &v, gen g, gpvec w) {
-  for (unsigned i = 0; v[i].g != EOW; i++)
-    if (v[i].g == g) {
-      gpvec newv = NewVec(NrTotalGens); //Length(w)+Length(v+i));
-      Diff(newv, v, v[i].c, w);
-      FreeVec(v); // @@@ could be optimized if we put matrix on stack
-      v = ResizeVec(newv);
-      break;
-    }
-}
+/* This is time-critical. It can be optimized in various ways:
+   -- g is a central generator, so we can skip the beginning if we ever
+      have to call Diff
+   -- Matrix is in Hermite normal form -- we could put it in Smith NF, maybe,
+      and then the collection would be simpler?
+   -- often w will have only 1 or 2 non-trivial entries, in which case the
+      operation can be done in-place
+*/
 
+void EliminateTrivialGenerators(gpvec &v, int renumber[], gpvec relation[]) {
+  bool copied = false;
+  gpvec p = v;
+
+  for (; p->g != EOW;) {
+    int newg = renumber[p->g];
+    if (newg >= 1) {
+      p->g = newg;
+      p++;
+    } else {
+      gpvec rel = relation[-newg];
+      gpvec temp = FreshVec();
+      Diff(temp, p+1, p->c, rel+1);
+      if (!copied) { /* we should make sure we have enough space */
+	gpvec newv = NewVec(NrTotalGens);
+	p->g = EOW; /* cut original p at this position, copy to newv */
+	Copy(newv, v);
+	p = p-v + newv;
+	FreeVec(v);
+	v = newv;
+      }
+      Copy(p, temp);
+      PopVec();
+      copied = true;
+    }
+  }
+
+  ShrinkCollect(v);
+}
+  
 void EvalAllRel(void) {
   gpvec v = FreshVec();
   for (unsigned i = 0; i < Pres.NrRels; i++) {
@@ -117,107 +144,45 @@ void UpdatePcPres(void) {
     }
   }
 
-  gen *renumber = new gen[NrTotalGens + 1];
-  for (unsigned i = 1; i <= NrCenGens; i++)
-    renumber[NrPcGens + i] = 0;
+  /* renumber[k] = j >= 1 means generator k should be renumbered j.
+     renumber[k] = j <= 0 means generator k should be eliminated using row j */
+  int *renumber = new int[NrTotalGens + 1];
+  
+  for (unsigned k = 1, i = 0; k <= NrTotalGens; k++) {
+    unsigned newk = renumber[k] = k - trivialgens;
+    if (i >= NrRows || k != ExpMat[i]->g) /* no relation for k, remains */
+      continue;
 
-  fprintf(stderr, "%10g: rewrite powers\n", clock() /(float) CLOCKS_PER_SEC);
-  for (unsigned k = NrPcGens + 1, i = 0; k <= NrTotalGens; k++)
-    if (i >= NrRows || k != ExpMat[i]->g) { /* no relation for k, remains infinite */
-      renumber[k] = k - trivialgens;
-    } else if (coeff_cmp_si(ExpMat[i]->c, 1)) { /* k is torsion, nontrivial */
-      int newk = renumber[k] = k - trivialgens;
+    if (coeff_cmp_si(ExpMat[i]->c, 1)) { /* k is torsion, nontrivial */
       coeff_set(Coefficients[newk], ExpMat[i]->c);
-      
       Power[newk] = NewVec(Length(ExpMat[i]+1));
       Neg(Power[newk], ExpMat[i]+1);
-      i++;
-    } else { /* k is trivial, and should be eliminated */
-      /*  Modify the epimorphisms: */
-      for (unsigned j = 1; j <= Pres.NrGens; j++)
-	ElementaryColumnOp(Epimorphism[j], k, ExpMat[i]);
-
-      /*  Products' turn: */
-      for (unsigned j = 1; j <= NrPcGens; j++)
-        for (unsigned l = 1; l < j; l++)
-	  ElementaryColumnOp(Product[j][l], k, ExpMat[i]);
-
-      /* The Torsions:  */
-      for (unsigned j = 1; j <= NrPcGens; j++)
-        if (coeff_nz(Coefficients[j]))
-	  ElementaryColumnOp(Power[j], k, ExpMat[i]);
+    } else { /* k is trivial, and will be eliminated */
       trivialgens++;
-      i++;
+      renumber[k] = -i; /* mark as trivial */
     }
-
-  fprintf(stderr, "%10g: done\n", clock() /(float) CLOCKS_PER_SEC);
-  /* First we eliminate the generators from the epimorphism */
-  for (unsigned i = 1; i <= Pres.NrGens; i++) {
-    unsigned j = 0;
-    unsigned pos = 0;
-    while (Epimorphism[i][j].g <= NrPcGens && Epimorphism[i][j].g != EOW)
-      j++;
-    pos = j;
-    while (Epimorphism[i][pos].g != EOW) {
-      if (renumber[Epimorphism[i][pos].g]) {
-        Epimorphism[i][j].g = renumber[Epimorphism[i][pos].g];
-        j++;
-      }
-      pos++;
-      Epimorphism[i][j].g = EOW;
-    }
+    i++;
   }
 
-  /* Let kill all of the redundant generators from the product relations. */
-  for (unsigned i = 1; i <= NrPcGens; i++)
-    for (unsigned j = 1; j < i; j++) {
-      unsigned k = 0;
-      unsigned pos = 0;
-      while (Product[i][j][k].g <= NrPcGens && Product[i][j][k].g != EOW)
-        k++;
-      pos = k;
-      while (Product[i][j][pos].g != EOW) {
-        if (renumber[Product[i][j][pos].g]) {
-          Product[i][j][k].g = renumber[Product[i][j][pos].g];
-          k++;
-        }
-        pos++;
-      }
-      Product[i][j][k].g = EOW;
-    }
+  /* Modify the torsions first, in decreasing order, since they're needed
+     for Collect */
+  for (unsigned j = NrTotalGens; j >= 1; j--)
+    if (coeff_nz(Coefficients[j]))
+      EliminateTrivialGenerators(Power[j], renumber, ExpMat);
 
-  /* Let us eliminate the generators from the power relations. */
-  for (unsigned i = 1; i <= NrTotalGens; i++)
-    if (coeff_nz(Coefficients[i])) {
-      unsigned j = 0;
-      unsigned pos = 0;
-      while (Power[i][j].g <= NrPcGens && Power[i][j].g != EOW)
-        j++;
-      pos = j;
-      while (Power[i][pos].g != EOW) {
-        if (renumber[Power[i][pos].g]) {
-          Power[i][j].g = renumber[Power[i][pos].g];
-          j++;
-        }
-        pos++;
-      }
-      Power[i][j].g = EOW;
-    }
-
-  /* Collect the Torsions */
-  for (unsigned i = NrTotalGens; i >= 1; i--)
-    if (coeff_nz(Coefficients[i]))
-      ShrinkCollect(Power[i]);
-
-  /* Collect the Products */
-  for (unsigned i = 1; i <= NrPcGens; i++)
-    for (unsigned j = 1; j < i; j++)
-      ShrinkCollect(Product[i][j]);
+  /*  Modify the epimorphisms: */
+  for (unsigned j = 1; j <= Pres.NrGens; j++)
+    EliminateTrivialGenerators(Epimorphism[j], renumber, ExpMat);
+  
+  /*  Modify the products: */
+  for (unsigned j = 1; j <= NrPcGens; j++)
+    for (unsigned l = 1; l < j; l++)
+      EliminateTrivialGenerators(Product[j][l], renumber, ExpMat);
 
   /* Let us alter the Definitions as well. Recall that dead generator cannot
   have definition at all. It is only the right of the living ones. */
   for (unsigned i = NrPcGens + 1; i <= NrTotalGens; i++)
-    if (renumber[i] != 0) {
+    if (renumber[i] >= 1) {
       Definitions[renumber[i]].g = Definitions[i].g;
       Definitions[renumber[i]].h = Definitions[i].h;
     }
