@@ -210,8 +210,8 @@ void AddGen(void);
 
 /* matrix functions */
 extern unsigned NrRows;
-
-gpvec *MatrixToExpVecs(void);
+extern gpvec *Matrix;
+void HermiteNormalForm(void);
 bool AddRow(gpvec);
 void InitMatrix(void);
 void FreeMatrix(void);

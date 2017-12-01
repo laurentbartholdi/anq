@@ -8,7 +8,6 @@
 #include "lienq.h"
 
 unsigned NrRows;
-
 gpvec *Matrix;
 
 void InitMatrix(void) {
@@ -44,19 +43,22 @@ void ReduceRow(gpvec &v, gpvec &w) {
     }
 }
 
-/*
-**    MatrixToExpVec() converts the contents of Matrix[] to a list of
-**    exponent vectors which can be used easily by the elimination
-**    routines. It also checks that the integers are not bigger than 2^15.
-**    If this is the case it prints a warning and aborts.
-*/
-gpvec *MatrixToExpVecs(void) {
-  /* first reduce all the head columns, to achieve Hermite normal form. */
+void HermiteNormalForm(void) {
+  /* reduce all the head columns, to achieve Hermite normal form. */
   for (unsigned i = 1; i < NrRows; i++)
     for (unsigned j = 0; j < i; j++)
       ReduceRow(Matrix[j], Matrix[i]);
+}
 
-  return Matrix;
+/* a failed attempt to improve the matrix code */
+void PartialHermite(unsigned row) {
+  return;
+  for (unsigned j = 0; j < row; j++)
+    ReduceRow(Matrix[j], Matrix[row]);
+  return;
+  for (unsigned j = row+1; j < NrRows; j++)
+    ReduceRow(Matrix[row], Matrix[j]);
+  return;
 }
 
 bool AddRow(gpvec cv) {
@@ -84,6 +86,7 @@ bool AddRow(gpvec cv) {
 	Matrix[i] = Matrix[i-1];
       Matrix[row] = NewVec(NrTotalGens);
       Prod(Matrix[row], unit, p);
+PartialHermite(row);
       if (Debug >= 2) {
 	printf("ADD ROW %d: ",row); PrintVec(Matrix[row]); printf("\n");
       }
@@ -130,6 +133,7 @@ bool AddRow(gpvec cv) {
 	Copy(p, newp);
 	PopVec();
 #endif
+PartialHermite(row);
 	if (Debug >= 2) {
 	  printf("CHANGE ROW %d: ",row); PrintVec(Matrix[row]); printf("\n");
 	}

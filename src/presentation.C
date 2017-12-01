@@ -83,7 +83,7 @@ void FreePcPres(void) {
       operation can be done in-place
 */
 
-void EliminateTrivialGenerators(gpvec &v, int renumber[], gpvec relation[]) {
+void EliminateTrivialGenerators(gpvec &v, int renumber[]) {
   bool copied = false;
   gpvec p = v;
 
@@ -93,7 +93,7 @@ void EliminateTrivialGenerators(gpvec &v, int renumber[], gpvec relation[]) {
       p->g = newg;
       p++;
     } else {
-      gpvec rel = relation[-newg];
+      gpvec rel = Matrix[-newg];
       gpvec temp = FreshVec();
       Diff(temp, p+1, p->c, rel+1);
       if (!copied) { /* we should make sure we have enough space */
@@ -136,10 +136,9 @@ void EvalAllRel(void) {
 void UpdatePcPres(void) {
   unsigned trivialgens = 0;
 
-  gpvec *ExpMat = MatrixToExpVecs();
   if (Debug) {
     for (unsigned i = 0; i < NrRows; i++) {
-      PrintVec(ExpMat[i]);
+      PrintVec(Matrix[i]);
       fprintf(OutputFile, "\n");
     }
   }
@@ -150,13 +149,13 @@ void UpdatePcPres(void) {
   
   for (unsigned k = 1, i = 0; k <= NrTotalGens; k++) {
     unsigned newk = renumber[k] = k - trivialgens;
-    if (i >= NrRows || k != ExpMat[i]->g) /* no relation for k, remains */
+    if (i >= NrRows || k != Matrix[i]->g) /* no relation for k, remains */
       continue;
 
-    if (coeff_cmp_si(ExpMat[i]->c, 1)) { /* k is torsion, nontrivial */
-      coeff_set(Coefficients[newk], ExpMat[i]->c);
-      Power[newk] = NewVec(Length(ExpMat[i]+1));
-      Neg(Power[newk], ExpMat[i]+1);
+    if (coeff_cmp_si(Matrix[i]->c, 1)) { /* k is torsion, nontrivial */
+      coeff_set(Coefficients[newk], Matrix[i]->c);
+      Power[newk] = NewVec(Length(Matrix[i]+1));
+      Neg(Power[newk], Matrix[i]+1);
     } else { /* k is trivial, and will be eliminated */
       trivialgens++;
       renumber[k] = -i; /* mark as trivial */
@@ -168,16 +167,16 @@ void UpdatePcPres(void) {
      for Collect */
   for (unsigned j = NrTotalGens; j >= 1; j--)
     if (coeff_nz(Coefficients[j]))
-      EliminateTrivialGenerators(Power[j], renumber, ExpMat);
+      EliminateTrivialGenerators(Power[j], renumber);
 
   /*  Modify the epimorphisms: */
   for (unsigned j = 1; j <= Pres.NrGens; j++)
-    EliminateTrivialGenerators(Epimorphism[j], renumber, ExpMat);
+    EliminateTrivialGenerators(Epimorphism[j], renumber);
   
   /*  Modify the products: */
   for (unsigned j = 1; j <= NrPcGens; j++)
     for (unsigned l = 1; l < j; l++)
-      EliminateTrivialGenerators(Product[j][l], renumber, ExpMat);
+      EliminateTrivialGenerators(Product[j][l], renumber);
 
   /* Let us alter the Definitions as well. Recall that dead generator cannot
   have definition at all. It is only the right of the living ones. */

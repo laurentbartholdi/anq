@@ -112,6 +112,8 @@ int main(int argc, char **argv) {
     
     EvalAllRel();
 
+    HermiteNormalForm();
+    
     UpdatePcPres();
 
     FreeMatrix();
