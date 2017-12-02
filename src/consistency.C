@@ -67,7 +67,7 @@ static void CheckJacobi(gpvec v, gen a, gen b, gen c) {
   PopVec();
   PopVec();
 
-  if (Debug) {
+  if (Debug >= 2) {
     fprintf(OutputFile, "# consistency: [ %d, %d, %d ] = ", a, b, c);
     PrintVec(v);
     fprintf(OutputFile, "\n");
@@ -103,8 +103,8 @@ static void CheckPower(gpvec v, gen a, gen b) {
   PopVec();
   PopVec();
   
-  if (Debug) {
-    fprintf(OutputFile, "# consistency %d %d: ", a, b);
+  if (Debug >= 2) {
+    fprintf(OutputFile, "# consistency [ N %d, %d ] = ", a, b);
     PrintVec(v);
     fprintf(OutputFile, "\n");
   }
@@ -136,8 +136,7 @@ void Consistency(void) {
 	PopVec();
       }
 
-  if (Debug)
-    fprintf(OutputFile, "# Consistency() finished\n");
+  TimeStamp("Consistency()");
 }
 
 void GradedConsistency(void) {
@@ -173,6 +172,5 @@ void GradedConsistency(void) {
         }
   }
 
-  if (Debug)
-    fprintf(OutputFile, "# GradedConsistency() finished.\n");
+  TimeStamp("GradedConsistency()");
 }

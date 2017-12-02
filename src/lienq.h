@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 /****************************************************************
  * coefficients.
@@ -141,10 +142,12 @@ void Consistency(void);
 void GradedConsistency(void);
 
 /* print functions */
+extern clock_t ClockStart;
 extern void abortprintf(int, const char *, ...) __attribute__((format(printf, 2, 3)));
 void PrintVec(gpvec);
 void PrintPcPres(void);
-
+void TimeStamp(const char *);
+  
 /* presentation functions */
 extern gpvec **Product, *Power, *Epimorphism;
 extern coeff *Coefficients;

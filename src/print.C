@@ -13,6 +13,8 @@
 ** print the result in a nice format.
 */
 
+clock_t ClockStart;
+
 void abortprintf(int errorcode, const char *format, ...) {
   va_list ap;
   va_start(ap, format);
@@ -26,6 +28,13 @@ void abortprintf(int errorcode, const char *format, ...) {
   va_end(ap);
   
   exit(errorcode);
+}
+
+void TimeStamp(const char *s) {
+  if (Debug) {
+    fprintf(OutputFile, "# %s finished, %.3gs\n", s, (clock()-ClockStart) / (float)CLOCKS_PER_SEC);
+    fflush(OutputFile);
+  }
 }
 
 void PrintVec(gpvec gv) {

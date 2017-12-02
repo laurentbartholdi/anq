@@ -85,7 +85,7 @@ bool AddRow(gpvec cv) {
       Matrix[row] = NewVec(NrTotalGens);
       Prod(Matrix[row], unit, p);
 PartialHermite(row);
-      if (Debug >= 2) {
+      if (Debug >= 3) {
 	printf("ADD ROW %d: ",row); PrintVec(Matrix[row]); printf("\n");
       }
       NrRows++;
@@ -132,7 +132,7 @@ PartialHermite(row);
 	PopVec();
 #endif
 PartialHermite(row);
-	if (Debug >= 2) {
+	if (Debug >= 3) {
 	  printf("CHANGE ROW %d: ",row); PrintVec(Matrix[row]); printf("\n");
 	}
       }

@@ -123,7 +123,7 @@ void EvalAllRel(void) {
     EvalRel(temp, Pres.Relators[i]);
     Collect(v, temp);
     PopVec();
-    if (Debug) {
+    if (Debug >= 2) {
       fprintf(OutputFile, "# relation: ");
       PrintVec(v);
       fprintf(OutputFile, "\n");
@@ -132,17 +132,16 @@ void EvalAllRel(void) {
   }
   PopVec();
   
-  if (Debug)
-    fprintf(OutputFile, "# EvalAllRel() finished\n");
+  TimeStamp("EvalAllRel()");
 }
 
 void UpdatePcPres(void) {
   unsigned trivialgens = 0;
 
-  if (Debug) {
+  if (Debug >= 2) {
+    fprintf(OutputFile, "# relations matrix:\n");
     for (unsigned i = 0; i < NrRows; i++) {
-      PrintVec(Matrix[i]);
-      fprintf(OutputFile, "\n");
+      fprintf(OutputFile, "# "); PrintVec(Matrix[i]); fprintf(OutputFile, "\n");
     }
   }
 
@@ -197,8 +196,7 @@ void UpdatePcPres(void) {
   NrCenGens -= trivialgens;
   NrTotalGens -= trivialgens;
 
-  if (Debug)
-    fprintf(OutputFile, "# UpdatePcPres() finished\n");
+  TimeStamp("UpdatePcPres()");
 }
 
 void ExtendPcPres(void) {

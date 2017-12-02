@@ -39,7 +39,7 @@ static void Tail_ab(gpvec v, gen a, gen b) {
   PopVec();
   PopVec();
 
-  if (Debug) {
+  if (Debug >= 2) {
     fprintf(OutputFile, "# tail: [ %d, %d ] = ", a, b);
     PrintVec(v);
     fprintf(OutputFile, "\n");
@@ -63,8 +63,7 @@ void Tails(void) {
       PopVec();
     }
 
-  if (Debug)
-    fprintf(OutputFile, "# Tails() finished\n");
+  TimeStamp("Tails()");
 }
 
 void GradedTails(void) {
@@ -92,6 +91,6 @@ void GradedTails(void) {
       }
     }
   }
-  if (Debug)
-    fprintf(OutputFile, "# GradedTails() finished.\n");
+
+  TimeStamp("GradedTails()");
 }

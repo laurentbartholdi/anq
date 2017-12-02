@@ -19,6 +19,9 @@
 */
 void InitEpim(void) {
   Epimorphism = (gpvec *) malloc((Pres.NrGens + 1) * sizeof(gpvec));
+  if (Epimorphism == NULL)
+    abortprintf(2, "InitEpim: malloc(Epimorphism) failed");
+  
   for (unsigned i = 1; i <= Pres.NrGens; i++) {
     Epimorphism[i] = NewVec(1);
     Epimorphism[i][0].g = i;

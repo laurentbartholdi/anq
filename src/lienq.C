@@ -8,7 +8,6 @@
 #include "lienq.h"
 #include <string.h>
 #include <sys/types.h>
-#include <time.h>
 #include <unistd.h>
 
 FILE *OutputFile = stdout;
@@ -81,7 +80,7 @@ int main(int argc, char **argv) {
   fprintf(OutputFile, "# Class:      %d\n", UpToClass);
   fprintf(OutputFile, "# Flags:      %s\n\n", flags);
 
-  clock_t start = clock();
+  ClockStart = clock();
 
   InitPcPres();
   InitEpim();
@@ -139,8 +138,7 @@ int main(int argc, char **argv) {
   PrintPcPres();
   FreeStack();
 
-  fprintf(OutputFile, "# Runtime: %.3g seconds\n",
-          (clock() - start) / (float)CLOCKS_PER_SEC);
+  TimeStamp("main()");
 
   FreePresentation();
   FreeEpim();

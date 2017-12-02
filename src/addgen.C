@@ -37,7 +37,7 @@ static void ExtendCoefficientsAndPower(void) {
 
   /* The Product arrays will be modify later. */
 
-  if (Debug) {
+  if (Debug >= 2) {
     fprintf(OutputFile, "# The newly introduced generators at level %d:\n", Class);
     for (unsigned i = 1; i <= NrCenGens; i++)
       if (Definitions[NrPcGens + i].g)
@@ -135,8 +135,7 @@ void AddGen(void) {
 
   ExtendCoefficientsAndPower();
   
-  if (Debug)
-    fprintf(OutputFile, "# AddGen() finished\n");
+  TimeStamp("AddGen()");
 }
 
 void GradedAddGen(void) {
@@ -170,6 +169,5 @@ void GradedAddGen(void) {
 
   ExtendCoefficientsAndPower();
 
-  if (Debug)
-    fprintf(OutputFile, "# AddGen() finished\n");
+  TimeStamp("GradedAddGen()");
 }
