@@ -11,10 +11,10 @@ unsigned NrRows;
 gpvec *Matrix;
 
 void InitMatrix(void) {
-  if ((Matrix = (gpvec *) malloc(NrCenGens * sizeof(gpvec))) == NULL) {
-    perror("InitMatrix, Matrix ");
-    exit(2);
-  }
+  Matrix = (gpvec *) malloc(NrCenGens * sizeof(gpvec));
+  if (Matrix == NULL)
+    abortprintf(2, "InitMatrix: malloc(Matrix) failed");
+
   NrRows = 0;
 }
 
@@ -64,10 +64,8 @@ void PartialHermite(unsigned row) {
 bool AddRow(gpvec cv) {
   bool ChangedMatrix = false;
 
-  if (cv->g != EOW && cv->g <= NrPcGens) {
-    perror("AddRow has a coefficient not in the center");
-    exit(5);
-  }
+  if (cv->g != EOW && cv->g <= NrPcGens)
+    abortprintf(5, "AddRow: vector has a coefficient a%d not in the centre", cv->g);
 
   gpvec p = FreshVec();
   Copy(p, cv);

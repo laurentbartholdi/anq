@@ -237,10 +237,9 @@ void Collect(gpvec vec0, constgpvec v) {
 }
 
 /* It seems the following routine is time-critical.
-   It can be improved in 4 manners:
+   It can be improved in many manners:
   -- if Power[g]->g != EOW but we're at the end (likely case), can just append
-  -- if shift<0, we may have space to accomodate Power[g]
-  -- we only need to call a full collect on the part starting at p
+  -- if shift<0, or reduced coeff=0, we may have space to accomodate Power[g]
   -- we should use a std::map in the full collect, see above
 */
 void ShrinkCollect(gpvec &v) {
@@ -250,10 +249,22 @@ void ShrinkCollect(gpvec &v) {
     gen g = p->g;
     if(!coeff_reduced_p(p->c, Coefficients[g])) {
       if (Power[g]->g != EOW) { // bad news, collection can become longer
-	gpvec newv = NewVec(NrTotalGens);
-	Collect(newv, v);
-	FreeVec(v);
-	v = ResizeVec(newv);
+	gpvec newp = FreshVec();
+	Collect(newp, p);
+	unsigned lenv = Length(v), lennewp = Length(newp);
+	if (v+lenv >= p+shift+lennewp) {
+	  Copy(p+shift, newp);
+	  if (v+lenv != p+shift+lennewp)
+	    v = ResizeVec(v);
+	} else {
+	  gpvec newv = NewVec(NrTotalGens);
+	  p[shift].g = EOW;
+	  Copy(newv, v);
+	  Copy(newv+(p-v), newp);
+	  FreeVec(v);
+	  v = ResizeVec(newv);
+	}
+	PopVec();
 	return;
       }
       coeff_fdiv_r(p->c, p->c, Coefficients[g]);

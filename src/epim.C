@@ -13,16 +13,6 @@
 */
 
 /*
-** The finction Epim( n ) returns the image of the n-th generator in the
-** finite presentation under the epimorphism. We suppose the image to be
-** in collected word.
-*/
-
-gpvec Epim(gen n) {
-  return Epimorphism[n];
-}
-
-/*
 ** We initialize the epimorphism from the finite presentation to the first
 ** (abelian) factor. It is rather trivial at the beginning, actually a
 ** one-to-one map between the two generator set.
@@ -34,8 +24,7 @@ void InitEpim(void) {
     Epimorphism[i][0].g = i;
     coeff_init_set_si(Epimorphism[i][0].c, 1);
     Epimorphism[i][1].g = EOW;
-    Definitions[i].g = i;
-    Definitions[i].h = 0;
+    Definitions[i] = {.g = i, .h = 0};
   }
 }
 

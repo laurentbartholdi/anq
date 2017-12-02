@@ -13,13 +13,7 @@
 
 FILE *OutputFile = stdout;
 
-/* A how-to-use messege. */
-static void Usage(const char *msg) {
-  if (msg != NULL)
-    fprintf(stderr, "%s", msg);
-  fprintf(stderr, "Usage: lienq [-G] [-D] [-A] [-Z] [-P] [-F <outputfile>] <inputfile> [<class>]\n");
-  exit(3);
-}
+const char USAGE[] = "Usage: lienq [-G] [-D] [-A] [-Z] [-P] [-F <outputfile>] <inputfile> [<class>]";
 
 bool PrintZeros = false, Graded = false, Gap = false, PrintDefs = false;
 unsigned Debug = 0;
@@ -48,7 +42,7 @@ int main(int argc, char **argv) {
     case 'F':
       OutputFile = fopen(optarg, "w");
       if (OutputFile == NULL)
-	Usage("Can't open output file.\n");
+	abortprintf(1, "I can't open the output file '%s'", optarg);
       strcat(flags, "-F ");
       break;
     case 'Z':
@@ -60,11 +54,11 @@ int main(int argc, char **argv) {
       strcat(flags, "-P ");
       break;
     default:
-      Usage("Undefined flag.\n");
+      abortprintf(1, "Undefined flag '%c'\n%s", c, USAGE);
     }
   
   if (optind >= argc)
-    Usage("Needs at least one name for input file.\n");
+    abortprintf(1, "I need at least one name as input file\n%s", USAGE);
 
   char *InputFileName = argv[optind++];
   ReadPresentation(InputFileName);
@@ -95,8 +89,9 @@ int main(int argc, char **argv) {
   for (Class = 1; UpToClass == 0 || Class <= UpToClass; Class++) {
     unsigned OldNrPcGens = NrPcGens;
 
-    if (Class >= 2)
-      AddGen();
+    if (Class >= 2) {
+      if (Graded) GradedAddGen(); else AddGen();
+    }
 
     InitStack();
 

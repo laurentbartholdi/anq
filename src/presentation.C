@@ -22,36 +22,39 @@ void InitPcPres(void) {
   ** We initialize the power-relations to be trivial.
   */
   Coefficients = (coeff *) calloc(Pres.NrGens + 1, sizeof(coeff));
-  if (Coefficients == NULL) {
-    perror("InitPcPres, Coefficients");
-    exit(2);
-  }
+  if (Coefficients == NULL)
+    abortprintf(2, "InitPcPres: calloc(Coefficients) failed");
 
   /*
   ** Suppose the power-relations to be in collected word, so it is enough
   ** to restore their coefficient vectors.
   */
-  Power = (gpvec *)malloc((Pres.NrGens + 1) * sizeof(gpvec));
+  Power = (gpvec *) malloc((Pres.NrGens + 1) * sizeof(gpvec));
+  if (Power == NULL)
+    abortprintf(2, "InitPcPres: malloc(Power) failed");
 
   /* The product relations are trivial too (yet).*/
-  Product = (gpvec **)malloc((Pres.NrGens + 1) * sizeof(gpvec *));
-
-  if (Product == NULL) {
-    perror("InitPcPres, Product");
-    exit(2);
-  }
+  Product = (gpvec **) malloc((Pres.NrGens + 1) * sizeof(gpvec *));
+  if (Product == NULL)
+    abortprintf(2, "InitPcPres: malloc(Product) failed");
 
   /* We allocate space for the Definitions[]. */
-  Definitions = (deftype *)malloc((Pres.NrGens + 1) * sizeof(deftype));
+  Definitions = (deftype *) malloc((Pres.NrGens + 1) * sizeof(deftype));
+  if (Definitions == NULL)
+    abortprintf(2, "InitPcPres: malloc(Definitions) failed");
 
   /*
   **  And finally the Dimensions will contain the number of the
   **  generators correspond to a certain weight.
   */
-  Dimensions = (unsigned *)malloc(1 * sizeof(unsigned));
+  Dimensions = (unsigned *) malloc(1 * sizeof(unsigned));
+  if (Dimensions == NULL)
+    abortprintf(2, "InitPcPres: malloc(Dimensions) failed");
   Dimensions[0] = 0;
 
-  Weight = (unsigned *)malloc(1 * sizeof(unsigned));
+  Weight = (unsigned *) malloc(1 * sizeof(unsigned));
+  if (Weight == NULL)
+    abortprintf(2, "InitPcPres: malloc(Weight) failed");
 
   NrCenGens = NrTotalGens = Pres.NrGens;
   NrPcGens = 0;
@@ -181,33 +184,34 @@ void UpdatePcPres(void) {
   /* Let us alter the Definitions as well. Recall that dead generator cannot
   have definition at all. It is only the right of the living ones. */
   for (unsigned i = NrPcGens + 1; i <= NrTotalGens; i++)
-    if (renumber[i] >= 1) {
-      Definitions[renumber[i]].g = Definitions[i].g;
-      Definitions[renumber[i]].h = Definitions[i].h;
-    }
+    if (renumber[i] >= 1)
+      Definitions[renumber[i]] = Definitions[i];
   
-  delete renumber;
+  for (unsigned i = 1; i <= NrTotalGens; i++)
+    if (Definitions[i].h == 0 && 0 > (int)Definitions[i].g) {
+      fprintf(stderr, "\aDefinition of generator %d is neither image of presentation generator nor commutator,\nbut rather power of generator %d. I'm almost surely screwed up, cross your fingers.\n", i, -Definitions[i].g);
+    }
+    
+  delete[] renumber;
 
   NrCenGens -= trivialgens;
   NrTotalGens -= trivialgens;
-  
+
   if (Debug)
     fprintf(OutputFile, "# UpdatePcPres() finished\n");
 }
 
 void ExtendPcPres(void) {
   Dimensions = (unsigned *) realloc(Dimensions, (Class + 1) * sizeof(unsigned));
-  if (Dimensions == NULL) {
-    perror("EvalAllRel, Dimensions");
-    exit(2);
-  }
+  if (Definitions == NULL)
+    abortprintf(2, "ExtendPcPres: realloc(Definitions) failed");
+
   Dimensions[Class] = NrCenGens;
 
   Weight = (unsigned *) realloc(Weight, (NrTotalGens + 1) * sizeof(unsigned));
-  if (Weight == NULL) {
-    perror("EvalAllRel, Weight");
-    exit(2);
-  }
+  if (Weight == NULL)
+    abortprintf(2, "ExtendPcPres: realloc(Weight) failed");
+
   for (unsigned i = NrPcGens + 1; i <= NrTotalGens; i++)
     Weight[i] = Class;
 
@@ -220,16 +224,14 @@ void ExtendPcPres(void) {
   */
 
   Product = (gpvec **) realloc(Product, (NrTotalGens + 1) * sizeof(gpvec *));
-  if (Product == NULL) {
-    perror("EvalAllRel, Product");
-    exit(2);
-  }
+  if (Product == NULL)
+    abortprintf(2, "ExtendPcPres: realloc(Product) failed");
+
   for (unsigned i = NrPcGens + 1; i <= NrTotalGens; i++) {
     Product[i] = (gpvec *) malloc(i * sizeof(gpvec));
-    if (Product[i] == NULL) {
-      perror("EvalAllRel, Product[i]");
-      exit(2);
-    }
+    if (Product[i] == NULL)
+      abortprintf(2, "ExtendPcPres: realloc(Product[%d]) failed", i);
+
     for (unsigned j = 1; j < i; j++) {
       Product[i][j] = NewVec(0);
       Product[i][j][0].g = EOW;

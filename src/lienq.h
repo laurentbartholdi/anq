@@ -82,7 +82,9 @@ struct presentation {
 };
 
 /****************************************************************
- * a definition of a generator is as a commutator [g,h]
+ * a definition of a generator is as a commutator [g,h].
+ * the special case h=0 means that generator is defined as image
+ * of presentation generator g.
  ****************************************************************/
 struct deftype {
   gen g;
@@ -90,7 +92,6 @@ struct deftype {
 };
 
 /* useful macros */
-#define MIN(x, y) ((x) > (y) ? (y) : (x))
 #define MAX(x, y) ((x) < (y) ? (y) : (x))
 #define SUM(a, n, s)                                                           \
   {									\
@@ -140,6 +141,7 @@ void Consistency(void);
 void GradedConsistency(void);
 
 /* print functions */
+extern void abortprintf(int, const char *, ...) __attribute__((format(printf, 2, 3)));
 void PrintVec(gpvec);
 void PrintPcPres(void);
 
@@ -196,7 +198,6 @@ void ShrinkCollect(gpvec &);
 /* epim functions */
 void InitEpim(void);
 void FreeEpim(void);
-gpvec Epim(gen);
 
 /* readpres functions */
 extern presentation Pres;
@@ -207,6 +208,7 @@ void EvalRel(gpvec, node *);
 
 /* addgen functions */
 void AddGen(void);
+void GradedAddGen(void);
 
 /* matrix functions */
 extern unsigned NrRows;

@@ -12,7 +12,7 @@ CPPFLAGS = -DVERSION='"3.0 2017-11-27"' -DCOEFF_IS_MOD2_64
 # CPPFLAGS = -DVERSION='"3.0 2017-11-27"' -DCOEFF_IS_LONG
 OPT = -O0
 DEBUG = -g -ggdb
-CXXFLAGS = -std=c++11 -Wall -Werror $(DEBUG) $(OPT)
+CXXFLAGS = -std=gnu++11 -Wall -Werror $(DEBUG) $(OPT)
 CFLAGS = -Wall -Werror $(DEBUG) $(OPT)
 LDLIBS = -lgmp
 LDFLAGS = $(DEBUG)
@@ -59,3 +59,6 @@ readpres.o: readpres.C $(LIENQ_INCLUDES)
 tails.o: tails.C $(LIENQ_INCLUDES)
 
 test: test.C
+
+smith: smith.C # libraries are compiled with g++, not g++-7!
+	g++ -O3 -march=native -std=c++11 smith.C -o smith -lgivaro -lgmp -lgmpxx -lntl -llinbox

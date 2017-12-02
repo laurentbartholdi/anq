@@ -44,10 +44,8 @@ void dumpstack(const char *s) {
 }
 
 void FreeStack(void) {
-  if (NrStack != 0) {
-    fprintf(stderr, "Stack is not empty at program end! I'll die.");
-    exit(2);
-  }
+  if (NrStack != 0)
+    abortprintf(4, "FreeStack: stack is not empty");
   dumpstack("free");
   for (unsigned i = 0; i < MaxStack; i++)
     FreeVec(Stack[i]-1, NrTotalGens);
@@ -58,10 +56,9 @@ gpvec FreshVec(void) {
   if (NrStack == MaxStack) {
     MaxStack++;
     Stack = (gpvec *) realloc(Stack, MaxStack * sizeof(gpvec *));
-    if (Stack == NULL) {
-      perror("FreshVec, realloc");
-      exit(2);
-    }
+    if (Stack == NULL)
+      abortprintf(2, "FreshVec: realloc(Stack) failed");
+    
     Stack[NrStack] = NewVec(NrTotalGens+1)+1;
     dumpstack("freshalloc");
     Stack[NrStack][-1].g = NrStack;
@@ -73,18 +70,16 @@ gpvec FreshVec(void) {
 }
 
 void PopVec(void) {
-  if (NrStack-- == 0) {
-    perror("PopVec, stack empty");
-    exit(2);
-  }
+  if (NrStack-- == 0)
+    abortprintf(4, "PopVec: stack is already empty");
+  
   dumpstack("pop");
 }
 
 void PopVec(gpvec &p) {
-  if (NrStack-- == 0) {
-    perror("PopVec, stack empty");
-    exit(2);
-  }
+  if (NrStack-- == 0)
+    abortprintf(4, "PopVec: stack is already empty");
+
   dumpstack("beforepop");
   unsigned swapwith = p[-1].g;
   p = Stack[NrStack];
@@ -99,10 +94,9 @@ void PopVec(gpvec &p) {
 
 gpvec NewVec(unsigned size) {
   gpvec v = (gpvec) malloc ((size+1)*sizeof v[0]);
-  if (v == NULL) {
-    perror("NewVec: malloc failed");
-    exit(2);
-  }
+  if (v == NULL)
+    abortprintf(2, "NewVec: malloc(Vector) failed");
+
   for (unsigned i = 0; i < size; i++)
     coeff_init(v[i].c);
   v->g = EOW;
@@ -124,10 +118,9 @@ void FreeVec(gpvec v) {
 
 gpvec ResizeVec(gpvec v, unsigned length) {
   v = (gpvec) realloc (v, (length+1)*sizeof v[0]);
-  if (v == NULL) {
-    perror("realloc failed");
-    exit(2);
-  }
+  if (v == NULL)
+    abortprintf(2, "ResizeVec: realloc(Vector) failed");
+
   return v;
 }
 

@@ -6,11 +6,27 @@
 */
 
 #include "lienq.h"
+#include <stdarg.h>
 
 /*
 ** This file contains the print routines that are necessary to be able to
 ** print the result in a nice format.
 */
+
+void abortprintf(int errorcode, const char *format, ...) {
+  va_list ap;
+  va_start(ap, format);
+  
+  vfprintf(stderr, format, ap);
+  fprintf(stderr,"\n");
+
+  if (OutputFile != stdout)
+    vfprintf(OutputFile, format, ap), fprintf(OutputFile,"\n");
+
+  va_end(ap);
+  
+  exit(errorcode);
+}
 
 void PrintVec(gpvec gv) {
   for (unsigned i = 0; gv[i].g != EOW; i++)
@@ -33,7 +49,7 @@ void PrintPcPres(void) {
   if (PrintDefs) {
     fprintf(OutputFile, "# The definitions:\n");
     for (unsigned i = 1; i <= NrTotalGens; i++)
-      if (Definitions[i].h > 0) {
+      if (Definitions[i].h != 0) {
 	gen cv[Weight[i] + 1], g = i;
 	for (unsigned pos = Weight[g]; Weight[g] > 1; pos--) {
 	  cv[pos] = Definitions[g].h;
@@ -42,9 +58,13 @@ void PrintPcPres(void) {
 	cv[1] = g;
 	fprintf(OutputFile, "#%10s a%d = [ %d, %d ] = [ ", "", i, Definitions[i].g, Definitions[i].h);
 	for (unsigned j = 1; j <= Weight[i]; j++)
-	  fprintf(OutputFile, "%s%s", Pres.Generators[cv[j]], j == Weight[i] ? " ]\n" : ", ");
+	  fprintf(OutputFile, "%d%s", cv[j], j == Weight[i] ? " ]\n" : ", ");
       } else {
-	fprintf(OutputFile, "#%10s a%d = (%d)epim\n", "", i, Definitions[i].g);
+	gen g = Definitions[i].g;
+	if (0 < (int)g)
+	  fprintf(OutputFile, "#%10s a%d = (%s)^epimorphism\n", "", i, Pres.Generators[g]);
+	else
+	  fprintf(OutputFile, "#%10s a%d = power of %d [should not happen]\n", "", i, -g);
       }
   }
 

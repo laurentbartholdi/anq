@@ -9,6 +9,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <stdio.h>
+#include <stdarg.h>
 
 #if 0
 static const char *TokenName[] = {
@@ -81,9 +82,13 @@ char *GenName(gen g) {
   return Pres.Generators[g];
 }
 
-static void SyntaxError(const char *str) {
-  fprintf(stderr, "%s, line %d, char %d: %s.\n", InFileName, TLine, TChar, str);
-  exit(1);
+static void SyntaxError(const char *format, ...) __attribute__((format(printf, 1, 2)));
+static void SyntaxError(const char *format, ...) {
+  va_list va;
+  va_start (va, format);
+  vfprintf(stderr, format, va);
+  fprintf(stderr, "In file %s, line %d, char %d\n", InFileName, TLine, TChar);
+  exit(3);
 }
 
 static void ReadCh(void) {
@@ -189,7 +194,7 @@ static void NextToken(void) {
   case ':': {
     ReadCh();
     if (Ch != '=')
-      SyntaxError("illegal character");
+      SyntaxError("Illegal character '%c'", Ch);
     Token = DEQUALL;
     ReadCh();
     break;
@@ -263,14 +268,14 @@ static void NextToken(void) {
       Generator();
       break;
     } else
-      SyntaxError("Illegal character");
+      SyntaxError("Illegal character '%c'", Ch);
   }
 }
 
 static void InitParser(const char *InputFileName) {
   InFp = fopen(InputFileName, "r");
   if (InFp == NULL)
-    SyntaxError("Can't open input file");
+    abortprintf(1, "Can't open input file '%s'", InputFileName);
   InFileName = InputFileName;
 
   Ch = '\0';
@@ -353,7 +358,7 @@ static node *Atom(void) {
     n = NewNode(TGEN);
     n->cont.g = GenNumber(Gen, NOCREATE);
     if (n->cont.g == (gen)0)
-      SyntaxError("Unkown generator");
+      SyntaxError("Unkown generator %s", Gen);
     NextToken();
   } else if (Token == LPAREN) {
     NextToken();
@@ -374,7 +379,7 @@ static node *ModuleProduct(void) {
   node *n, *o;
 
   if (Token != PLUS && Token != MINUS && Token != NUMBER)
-    SyntaxError("Integer expected in module-operation");
+    SyntaxError("Integer expected in module operation");
   o = SNumber();
 
   if (Token == MULT) {
@@ -499,11 +504,9 @@ static void GenList() {
     if (Token != GEN)
       SyntaxError("Generator expected");
     
-    if (GenNumber(Gen, CREATE) == (gen) 0) {
-      char s[1000];
-      sprintf(s, "Duplicate generator: %s", Gen);
-      SyntaxError(s);
-    }
+    if (GenNumber(Gen, CREATE) == (gen) 0)
+      SyntaxError("Duplicate generator %s", Gen);
+
     NextToken();
 
     if (Token != COMMA) break;
@@ -633,7 +636,7 @@ void EvalRel(gpvec v, node *rel) {
     PopVec();
     break;
   case TGEN:
-    Copy(v, Epim(rel->cont.g));
+    Copy(v, Epimorphism[rel->cont.g]);
     break;
   case TREL:
   case TDRELL:
@@ -647,7 +650,6 @@ void EvalRel(gpvec v, node *rel) {
     PopVec();
     break;
   default:
-    perror("Shouldn't happen");
-    exit(2);
+    abortprintf(3, "EvalRel: type %d should not occur", rel->type);
   }
 }

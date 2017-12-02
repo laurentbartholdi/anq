@@ -53,10 +53,9 @@ void Tails(void) {
       Tail_ab(tail, j, i);
       unsigned k;
       for (k = 0; Product[j][i][k].g != EOW; k++)
-	if (Product[j][i][k].g != tail[k].g || coeff_cmp(Product[j][i][k].c,tail[k].c)) {
-	  perror("Tail [a,g,h]-[a,h,g]-[a,[g,h]] doesn't lie in centre");
-	  exit(5);
-	}
+	if (Product[j][i][k].g != tail[k].g || coeff_cmp(Product[j][i][k].c,tail[k].c))
+	  abortprintf(5, "Tail [a,g,h]-[a,h,g]-[a,[g,h]] doesn't lie in centre for a=a%d,[g,h]=a%d", j, i);
+
       if (tail[k].g != EOW) {
 	Product[j][i] = ResizeVec(Product[j][i], Length(tail));
 	Copy(Product[j][i]+k, tail+k);
@@ -82,10 +81,9 @@ void GradedTails(void) {
 	Tail_ab(tail, j, i);
 	unsigned k;
 	for (k = 0; Product[j][i][k].g != EOW; k++)
-	  if (Product[j][i][k].g != tail[k].g || coeff_cmp(Product[j][i][k].c,tail[k].c)) {
-	    perror("Tail [a,g,h]-[a,h,g]-[a,[g,h]] doesn't lie in centre");
-	    exit(5);
-	  }
+	  if (Product[j][i][k].g != tail[k].g || coeff_cmp(Product[j][i][k].c,tail[k].c))
+	  abortprintf(5, "Tail [a,g,h]-[a,h,g]-[a,[g,h]] doesn't lie in centre for a=a%d,[g,h]=a%d", j, i);
+	
 	if (tail[k].g != EOW) {
 	  Product[j][i] = ResizeVec(Product[j][i], Length(tail));
 	  Copy(Product[j][i]+k, tail+k);
