@@ -212,6 +212,7 @@ void Collect(gpvec vec0, constgpvec v) {
   
   for (p = (gpvec) v; p->g != EOW;) {
     gen i = p->g;
+    fprintf(stderr,"%ld\n",(long)Coefficients[i].data);
     if(coeff_reduced_p(p->c, Coefficients[i])) {
       coeff_set(vec0->c, p->c), vec0->g = i;
       vec0++;

@@ -17,6 +17,7 @@ inline bool coeff_nz(const coeff &a) {
 }
 
 inline void coeff_init(coeff &a) {
+  a.data = 0;
 }
 
 inline void coeff_init_set(coeff &result, const coeff &a) {
