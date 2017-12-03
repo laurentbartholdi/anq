@@ -141,7 +141,6 @@ void Consistency(void);
 void GradedConsistency(void);
 
 /* print functions */
-extern clock_t ClockStart;
 extern void abortprintf(int, const char *, ...) __attribute__((format(printf, 2, 3)));
 void PrintVec(gpvec);
 void PrintPcPres(void);

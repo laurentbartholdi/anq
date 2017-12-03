@@ -31,9 +31,13 @@ void abortprintf(int errorcode, const char *format, ...) {
 }
 
 void TimeStamp(const char *s) {
+  static clock_t lastclock = 0;
+
   if (Debug) {
-    fprintf(OutputFile, "# %s finished, %.3gs\n", s, (clock()-ClockStart) / (float)CLOCKS_PER_SEC);
+    clock_t newclock = clock();
+    fprintf(OutputFile, "# %s finished, %.3gs\n", s, (newclock-lastclock) / (float)CLOCKS_PER_SEC);
     fflush(OutputFile);
+    lastclock = newclock;
   }
 }
 
