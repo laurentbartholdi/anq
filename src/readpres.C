@@ -41,7 +41,13 @@ static char Gen[128];     /* Contains the generator name. */
 presentation Pres;
 
 void FreeNode(node *n) {
-  if (n->type != TGEN && n->type != TNUM) {
+  switch (n->type) {
+  case TGEN:
+    break;
+  case TNUM:
+    coeff_clear(n->cont.n);
+    break;
+  default:
     FreeNode(n->cont.op.l);
     FreeNode(n->cont.op.r);
   }
@@ -289,6 +295,8 @@ static void InitParser(const char *InputFileName) {
 
 static void CloseParser(void) {
   fclose(InFp);
+
+  coeff_clear(N);
 }
 
 static node *SNumber(void) {

@@ -129,8 +129,7 @@ inline unsigned Length(gpvec vec) {
 gpvec NewVec(unsigned);
 void FreeVec(gpvec, unsigned);
 void FreeVec(gpvec);
-gpvec ResizeVec(gpvec);
-gpvec ResizeVec(gpvec, unsigned);
+gpvec ResizeVec(gpvec, unsigned, unsigned);
 
 /* tails functions */
 void Tails(void);
@@ -158,7 +157,7 @@ extern unsigned NrPcGens, NrCenGens, NrTotalGens;
 void InitPcPres(void);
 void FreePcPres(void);
 void EvalAllRel(void);
-void UpdatePcPres(void);
+unsigned ReducedPcPres(void);
 void ExtendPcPres(void);
 
 /* operation functions */

@@ -57,7 +57,7 @@ void Tails(void) {
 	  abortprintf(5, "Tail [a,g,h]-[a,h,g]-[a,[g,h]] doesn't lie in centre for a=a%d,[g,h]=a%d", j, i);
 
       if (tail[k].g != EOW) {
-	Product[j][i] = ResizeVec(Product[j][i], Length(tail));
+	Product[j][i] = ResizeVec(Product[j][i], k, Length(tail));
 	Copy(Product[j][i]+k, tail+k);
       }
       PopVec();
@@ -84,7 +84,7 @@ void GradedTails(void) {
 	  abortprintf(5, "Tail [a,g,h]-[a,h,g]-[a,[g,h]] doesn't lie in centre for a=a%d,[g,h]=a%d", j, i);
 	
 	if (tail[k].g != EOW) {
-	  Product[j][i] = ResizeVec(Product[j][i], Length(tail));
+	  Product[j][i] = ResizeVec(Product[j][i], k, Length(tail));
 	  Copy(Product[j][i]+k, tail+k);
 	}
 	PopVec();

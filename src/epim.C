@@ -25,7 +25,7 @@ void InitEpim(void) {
   for (unsigned i = 1; i <= Pres.NrGens; i++) {
     Epimorphism[i] = NewVec(1);
     Epimorphism[i][0].g = i;
-    coeff_init_set_si(Epimorphism[i][0].c, 1);
+    coeff_set_si(Epimorphism[i][0].c, 1);
     Epimorphism[i][1].g = EOW;
     Definitions[i] = {.g = i, .h = 0};
   }

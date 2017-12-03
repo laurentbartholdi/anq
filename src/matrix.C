@@ -20,7 +20,7 @@ void InitMatrix(void) {
 
 void FreeMatrix(void) {
   for (unsigned i = 0; i < NrRows; i++)
-    FreeVec(Matrix[i]);
+    FreeVec(Matrix[i], NrTotalGens);
   free(Matrix);
 }
 
@@ -50,7 +50,9 @@ void HermiteNormalForm(void) {
       ReduceRow(Matrix[j], Matrix[i]);
 }
 
-/* a failed attempt to improve the matrix code */
+#if 0
+/* a failed attempt to improve the matrix code -- I tried to put it after
+   each row change, but performance went down */
 void PartialHermite(unsigned row) {
   return;
   for (unsigned j = 0; j < row; j++)
@@ -60,6 +62,7 @@ void PartialHermite(unsigned row) {
     ReduceRow(Matrix[row], Matrix[j]);
   return;
 }
+#endif
 
 bool AddRow(gpvec cv) {
   bool ChangedMatrix = false;
@@ -80,15 +83,14 @@ bool AddRow(gpvec cv) {
       coeff_init(annihilator);
       coeff_unit_annihilator(unit, annihilator, p->c);
 
-      for (unsigned i = NrRows; i > row; i--)
+      for (unsigned i = NrRows++; i > row; i--)
 	Matrix[i] = Matrix[i-1];
       Matrix[row] = NewVec(NrTotalGens);
       Prod(Matrix[row], unit, p);
-PartialHermite(row);
+
       if (Debug >= 3) {
 	printf("ADD ROW %d: ",row); PrintVec(Matrix[row]); printf("\n");
       }
-      NrRows++;
 
       Prod(p, annihilator, p);
       coeff_clear(unit);
@@ -131,7 +133,6 @@ PartialHermite(row);
 	Copy(p, newp);
 	PopVec();
 #endif
-PartialHermite(row);
 	if (Debug >= 3) {
 	  printf("CHANGE ROW %d: ",row); PrintVec(Matrix[row]); printf("\n");
 	}

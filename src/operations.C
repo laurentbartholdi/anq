@@ -190,6 +190,7 @@ void Prod(gpvec vec0, constgpvec vec1, constgpvec vec2) {
 	  parity ^= 1;
 	}
       }
+  coeff_clear(c);
   Copy(vec0, temp[parity]);
   PopVec();
   PopVec();
@@ -201,7 +202,6 @@ void Prod(gpvec vec0, constgpvec vec1, constgpvec vec2) {
 
    We should do it with a container such as <map>
 */
-#if 1 // old method -- used gpvecs to collect
 void Collect(gpvec vec0, constgpvec v) {
   gpvec temp[2], p;
   temp[0] = FreshVec();
@@ -244,41 +244,43 @@ void Collect(gpvec vec0, constgpvec v) {
 */
 void ShrinkCollect(gpvec &v) {
   int shift = 0;
-  gpvec p;
-  for (p = v; p->g != EOW; p++) {
-    gen g = p->g;
-    if(!coeff_reduced_p(p->c, Coefficients[g])) {
+  unsigned pos;
+  for (pos = 0; v[pos].g != EOW; pos++) {
+    gen g = v[pos].g;
+    if(!coeff_reduced_p(v[pos].c, Coefficients[g])) {
       if (Power[g]->g != EOW) { // bad news, collection can become longer
 	gpvec newp = FreshVec();
-	Collect(newp, p);
-	unsigned lenv = Length(v), lennewp = Length(newp);
-	if (v+lenv >= p+shift+lennewp) {
-	  Copy(p+shift, newp);
-	  if (v+lenv != p+shift+lennewp)
-	    v = ResizeVec(v);
+	Collect(newp, v+pos);
+	unsigned lenv = Length(v), lennewv = pos+shift+Length(newp);
+	if (lenv >= lennewv) {
+	  Copy(v+pos+shift, newp);
+	  if (lenv > lennewv)
+	    v = ResizeVec(v, lenv, lennewv);
 	} else {
-	  gpvec newv = NewVec(NrTotalGens);
-	  p[shift].g = EOW;
+	  gpvec newv = NewVec(lennewv);
+	  v[pos+shift].g = EOW; // cut the vector for copy
 	  Copy(newv, v);
-	  Copy(newv+(p-v), newp);
+	  v[pos+shift].g = g; // put it back for deallocation
+	  Copy(newv+pos+shift, newp);
 	  FreeVec(v);
-	  v = ResizeVec(newv);
+	  v = newv;
 	}
 	PopVec();
 	return;
       }
-      coeff_fdiv_r(p->c, p->c, Coefficients[g]);
-      if (!coeff_nz(p->c)) { shift--; continue; }
+      coeff_fdiv_r(v[pos].c, v[pos].c, Coefficients[g]);
+      if (!coeff_nz(v[pos].c)) { shift--; continue; }
     }
     if (shift < 0)
-      coeff_set(p[shift].c, p->c), p[shift].g = g;
+      coeff_set(v[pos+shift].c, v[pos].c), v[pos+shift].g = g;
   }
   if (shift < 0) {
-    p[shift].g = EOW;
-    v = ResizeVec(v);
+    v[pos+shift].g = EOW;
+    v = ResizeVec(v, pos, pos+shift);
   }
 }
-#else
+
+#if 0
 // work-in-progress attempt
 typedef std::map<gen,coeff> sparsevec;
 

@@ -21,10 +21,13 @@ void InitPcPres(void) {
   /*
   ** We initialize the power-relations to be trivial.
   */
-  Coefficients = (coeff *) calloc(Pres.NrGens + 1, sizeof(coeff));
+  Coefficients = (coeff *) malloc((Pres.NrGens + 1) * sizeof(coeff));
   if (Coefficients == NULL)
-    abortprintf(2, "InitPcPres: calloc(Coefficients) failed");
+    abortprintf(2, "InitPcPres: malloc(Coefficients) failed");
 
+  for (unsigned i = 1; i <= Pres.NrGens; i++)
+    coeff_init(Coefficients[i]);
+  
   /*
   ** Suppose the power-relations to be in collected word, so it is enough
   ** to restore their coefficient vectors.
@@ -61,16 +64,16 @@ void InitPcPres(void) {
 }
 
 void FreePcPres(void) {
-  for (unsigned i = 1; i <= NrTotalGens; i++)
+  for (unsigned i = 1; i <= NrTotalGens; i++) {
     if (coeff_nz(Coefficients[i]))
       FreeVec(Power[i]);
-  free(Power);
-  free(Coefficients);
-  for (unsigned i = 1; i <= NrTotalGens; i++) {
+    coeff_clear(Coefficients[i]);
     for (unsigned j = 1; j < i; j++)
       FreeVec(Product[i][j]);
     free(Product[i]);
   }
+  free(Power);
+  free(Coefficients);
   free(Product);
   free(Definitions);
   free(Dimensions);
@@ -88,31 +91,32 @@ void FreePcPres(void) {
 
 void EliminateTrivialGenerators(gpvec &v, int renumber[]) {
   bool copied = false;
-  gpvec p = v;
+  unsigned pos = 0;
 
-  for (; p->g != EOW;) {
-    int newg = renumber[p->g];
+  for (; v[pos].g != EOW;) {
+    int newg = renumber[v[pos].g];
     if (newg >= 1) {
-      p->g = newg;
-      p++;
+      v[pos].g = newg;
+      pos++;
     } else {
       gpvec rel = Matrix[-newg];
       gpvec temp = FreshVec();
-      Diff(temp, p+1, p->c, rel+1);
+      Diff(temp, v+pos+1, v[pos].c, rel+1);
       if (!copied) { /* we should make sure we have enough space */
 	gpvec newv = NewVec(NrTotalGens);
-	p->g = EOW; /* cut original p at this position, copy to newv */
+	v[pos].g = EOW; /* cut original p at this position, copy to newv */
 	Copy(newv, v);
-	p = p-v + newv;
+	v[pos].g = rel->g; /* put it back, so we can free correctly v */
 	FreeVec(v);
 	v = newv;
       }
-      Copy(p, temp);
+      Copy(v+pos, temp);
       PopVec();
       copied = true;
     }
   }
-
+  if (copied)
+    v = ResizeVec(v, NrTotalGens, pos);
   ShrinkCollect(v);
 }
   
@@ -135,7 +139,7 @@ void EvalAllRel(void) {
   TimeStamp("EvalAllRel()");
 }
 
-void UpdatePcPres(void) {
+unsigned ReducedPcPres(void) {
   unsigned trivialgens = 0;
 
   if (Debug >= 2) {
@@ -170,7 +174,7 @@ void UpdatePcPres(void) {
   for (unsigned j = NrTotalGens; j >= 1; j--)
     if (coeff_nz(Coefficients[j]))
       EliminateTrivialGenerators(Power[j], renumber);
-
+  
   /*  Modify the epimorphisms: */
   for (unsigned j = 1; j <= Pres.NrGens; j++)
     EliminateTrivialGenerators(Epimorphism[j], renumber);
@@ -193,10 +197,12 @@ void UpdatePcPres(void) {
     
   delete[] renumber;
 
-  NrCenGens -= trivialgens;
-  NrTotalGens -= trivialgens;
+  for (unsigned i = 0; i < trivialgens; i++)
+    coeff_clear(Coefficients[NrTotalGens - i]);
+  
+  TimeStamp("ReducedPcPres()");
 
-  TimeStamp("UpdatePcPres()");
+  return trivialgens;
 }
 
 void ExtendPcPres(void) {

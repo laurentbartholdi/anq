@@ -5,8 +5,6 @@
 ** defines coefficients as arbitrary-precision integers
 */
 
-#error broken
-
 #include<gmp.h>
 typedef mpz_t coeff;
 
@@ -24,18 +22,34 @@ inline bool coeff_nz(const coeff a) {
 #define coeff_clear mpz_clear
 
 #define coeff_add mpz_add
+inline void coeff_add_si(coeff &result, coeff &a, long l) {
+  if (l >= 0) mpz_add_ui(result, a, l); else mpz_sub_ui(result, a, -l);
+}
 #define coeff_addmul mpz_addmul
 #define coeff_cmp mpz_cmp
 #define coeff_cmp_si mpz_cmp_si
 #define coeff_divexact mpz_divexact
 #define coeff_fdiv_q mpz_fdiv_q
-#define coeff_fdiv_q mpz_fdiv_r
+#define coeff_fdiv_r mpz_fdiv_r
 #define coeff_gcdext mpz_gcdext
 #define coeff_mul mpz_mul
+#define coeff_mul_si mpz_mul_si
 #define coeff_neg mpz_neg
 #define coeff_sgn mpz_sgn
 #define coeff_sub mpz_sub
 #define coeff_submul mpz_submul
+
+/* addition, returns true if a in [0,b) or b=0 */
+inline bool coeff_reduced_p(coeff &a, coeff &b) {
+  return !mpz_sgn(b) || (mpz_sgn(a) >= 0 && mpz_cmp(a, b) < 0);
+}
+
+/* addition, returns unit and generator of annihilator ideal:
+   a*unit is canonical (2^n) and a*annihilator=0 */
+inline void coeff_unit_annihilator(coeff &unit, coeff &annihilator, const coeff &a) {
+  mpz_set_si(unit, mpz_sgn(a));
+  mpz_set_si(annihilator, 0);
+}
 
 /* addition, unused */
 inline void coeff_swap(coeff &a, coeff &b) {

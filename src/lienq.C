@@ -108,17 +108,19 @@ int main(int argc, char **argv) {
 
     HermiteNormalForm();
     
-    UpdatePcPres();
+    unsigned trivialgens = ReducedPcPres();
 
     FreeMatrix();
-    
+    FreeStack();
+
+    NrCenGens -= trivialgens;
+    NrTotalGens -= trivialgens;
+
     if (NrCenGens == 0)
       break;
 
     ExtendPcPres();
   
-    FreeStack();
-
     const char *stndrdth;
     if (Class % 10 == 1 && Class != 11)
       stndrdth = "st";

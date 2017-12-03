@@ -15,14 +15,16 @@
  void FreeStack(void) frees the stack at end of a large chunk of code
  gpvec FreshVec(void) returns a fresh vector from the top of the stack
  void PopVec(void) removes a vector from the top of the stack
+
+#if 0
  void PopVec(gpvec) pops the vector on top of the stack into its
     argument, and uses the argument as new free storage
-
- the vectors all have maximal capacity NrTotalGens, and are created empty.
 
  to be able to pop into a given position, vectors are actually allocated with
  length one greater; the returned vector starts at position 1, and position
  0 remembers the stack position in its gen field.
+#endif
+ the vectors all have maximal capacity NrTotalGens, and are created empty.
 
  except that vectors must be explictly popped, FreshVec() is
  essentially the same as a call to alloca.
@@ -36,19 +38,11 @@ void InitStack(void) {
   MaxStack = 0;
 }
 
-void dumpstack(const char *s) {
-  return;
-  fprintf(stderr,"%s:Stack is",s);
-  for (unsigned i = 0; i < MaxStack; i++) fprintf(stderr," %s[%d]%p", i == NrStack ? "|| " : "", Stack[i][-1].g, Stack[i]);
-  fprintf(stderr,"\n");
-}
-
 void FreeStack(void) {
   if (NrStack != 0)
     abortprintf(4, "FreeStack: stack is not empty");
-  dumpstack("free");
   for (unsigned i = 0; i < MaxStack; i++)
-    FreeVec(Stack[i]-1, NrTotalGens);
+    FreeVec(Stack[i], NrTotalGens);
   free(Stack);
 }
 
@@ -59,21 +53,25 @@ gpvec FreshVec(void) {
     if (Stack == NULL)
       abortprintf(2, "FreshVec: realloc(Stack) failed");
     
-    Stack[NrStack] = NewVec(NrTotalGens+1)+1;
-    dumpstack("freshalloc");
-    Stack[NrStack][-1].g = NrStack;
+    Stack[NrStack] = NewVec(NrTotalGens);
+    //    fprintf(stderr,"(%p fresh)\n",Stack[NrStack]->c);
   }
   Stack[NrStack]->g = EOW;
   
-  //  return Stack[NrStack++];
-  NrStack++; dumpstack("fresh"); return Stack[NrStack-1];
+  return Stack[NrStack++];
 }
 
 void PopVec(void) {
   if (NrStack-- == 0)
     abortprintf(4, "PopVec: stack is already empty");
-  
-  dumpstack("pop");
+}
+
+#if 0
+void dumpstack(const char *s) {
+  return;
+  fprintf(stderr,"%s:Stack is",s);
+  for (unsigned i = 0; i < MaxStack; i++) fprintf(stderr," %s[%d]%p", i == NrStack ? "|| " : "", Stack[i][-1].g, Stack[i]);
+  fprintf(stderr,"\n");
 }
 
 void PopVec(gpvec &p) {
@@ -89,6 +87,7 @@ void PopVec(gpvec &p) {
   Stack[swapwith][-1].g = swapwith;
   dumpstack("afterpop");
 }
+#endif
 
 /****************************************************************/
 
@@ -97,34 +96,42 @@ gpvec NewVec(unsigned size) {
   if (v == NULL)
     abortprintf(2, "NewVec: malloc(Vector) failed");
 
-  for (unsigned i = 0; i < size; i++)
+  for (unsigned i = 0; i < size; i++) /* we don't allocate the coefficient
+					 in the last position, it's only
+					 used for the EOW marker */
     coeff_init(v[i].c);
+  //  fprintf(stderr,"(%p new %d)\n",v[0].c,size);
   v->g = EOW;
   
   return v;
 }
 
 void FreeVec(gpvec v, unsigned size) {
+  //  fprintf(stderr,"(%p free %d)\n",v[0].c,size);
   for (unsigned i = 0; i < size; i++)
     coeff_clear(v[i].c);
   free(v);
 }
 
 void FreeVec(gpvec v) {
+  //  fprintf(stderr,"(%p free)\n",v[0].c);
   for (gpvec p = v; p->g != EOW; p++)
     coeff_clear(p->c);
   free(v);
 }
 
-gpvec ResizeVec(gpvec v, unsigned length) {
-  v = (gpvec) realloc (v, (length+1)*sizeof v[0]);
+gpvec ResizeVec(gpvec v, unsigned oldlength, unsigned newlength) {
+  if (oldlength > newlength)
+    for (unsigned i = newlength; i < oldlength; i++)
+      coeff_clear(v[i].c);
+
+  v = (gpvec) realloc (v, (newlength+1)*sizeof v[0]);
   if (v == NULL)
     abortprintf(2, "ResizeVec: realloc(Vector) failed");
 
-  return v;
-}
+  if (oldlength < newlength)
+    for (unsigned i = oldlength; i < newlength; i++)
+      coeff_init(v[i].c);
 
-/* resize a gpvec to correct length */
-gpvec ResizeVec(gpvec v) {
-  return ResizeVec(v, Length(v));
+  return v;
 }

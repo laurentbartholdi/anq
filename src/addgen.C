@@ -9,9 +9,9 @@
 
 static void AddSingleGenerator(gpvec &v, gen newgen, deftype def) {
   unsigned l = Length(v);
-  v = ResizeVec(v, l + 1);
+  v = ResizeVec(v, l, l + 1);
   v[l].g = newgen;
-  coeff_init_set_si(v[l].c, 1);
+  coeff_set_si(v[l].c, 1);
   v[l+1].g = EOW;
   Definitions[newgen] = def;
 }
@@ -116,7 +116,10 @@ void AddGen(void) {
    check that they DO get eliminated */
   for (unsigned i = 1; i <= NrPcGens; i++)
     if (coeff_nz(Coefficients[i]))
-      AddSingleGenerator(Power[i], ++shift, {.g = -i, .h = 0});
+      {
+	fprintf(stderr,"%p power before, len %d\n",Power[i]->c, Length(Power[i]));
+	AddSingleGenerator(Power[i], ++shift, {.g = -i, .h = 0});
+	fprintf(stderr,"%p power after, len %d\n",Power[i]->c, Length(Power[i]));}
   
   /*  Don't wait more to do our main task!!! */
   for (unsigned i = 1; i <= NrPcGens; i++)
