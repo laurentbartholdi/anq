@@ -54,7 +54,6 @@ gpvec FreshVec(void) {
       abortprintf(2, "FreshVec: realloc(Stack) failed");
     
     Stack[NrStack] = NewVec(NrTotalGens);
-    //    fprintf(stderr,"(%p fresh)\n",Stack[NrStack]->c);
   }
   Stack[NrStack]->g = EOW;
   
@@ -100,21 +99,18 @@ gpvec NewVec(unsigned size) {
 					 in the last position, it's only
 					 used for the EOW marker */
     coeff_init(v[i].c);
-  //  fprintf(stderr,"(%p new %d)\n",v[0].c,size);
   v->g = EOW;
   
   return v;
 }
 
 void FreeVec(gpvec v, unsigned size) {
-  //  fprintf(stderr,"(%p free %d)\n",v[0].c,size);
   for (unsigned i = 0; i < size; i++)
     coeff_clear(v[i].c);
   free(v);
 }
 
 void FreeVec(gpvec v) {
-  //  fprintf(stderr,"(%p free)\n",v[0].c);
   for (gpvec p = v; p->g != EOW; p++)
     coeff_clear(p->c);
   free(v);

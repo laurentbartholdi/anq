@@ -116,10 +116,7 @@ void AddGen(void) {
    check that they DO get eliminated */
   for (unsigned i = 1; i <= NrPcGens; i++)
     if (coeff_nz(Coefficients[i]))
-      {
-	fprintf(stderr,"%p power before, len %d\n",Power[i]->c, Length(Power[i]));
 	AddSingleGenerator(Power[i], ++shift, {.g = -i, .h = 0});
-	fprintf(stderr,"%p power after, len %d\n",Power[i]->c, Length(Power[i]));}
   
   /*  Don't wait more to do our main task!!! */
   for (unsigned i = 1; i <= NrPcGens; i++)
