@@ -9,24 +9,29 @@
 #include <time.h> // for clock
 
 gpvec **Product,  *Power, *Epimorphism;
-coeff *Coefficients;
+coeff *Exponent, *Annihilator;
 
-unsigned *Weight, *Dimensions;
+deftype *Definition;
 
-deftype *Definitions;
-
-unsigned NrCenGens, NrPcGens, NrTotalGens;
+unsigned *Weight, *LastGen, NrCenGens, NrPcGens, NrTotalGens;
 
 void InitPcPres(void) {
   /*
   ** We initialize the power-relations to be trivial.
   */
-  Coefficients = (coeff *) malloc((Pres.NrGens + 1) * sizeof(coeff));
-  if (Coefficients == NULL)
-    abortprintf(2, "InitPcPres: malloc(Coefficients) failed");
+  Exponent = (coeff *) malloc((Pres.NrGens + 1) * sizeof(coeff));
+  if (Exponent == NULL)
+    abortprintf(2, "InitPcPres: malloc(Exponent) failed");
 
   for (unsigned i = 1; i <= Pres.NrGens; i++)
-    coeff_init(Coefficients[i]);
+    coeff_init_set_si(Exponent[i], 0);
+  
+  Annihilator = (coeff *) malloc((Pres.NrGens + 1) * sizeof(coeff));
+  if (Exponent == NULL)
+    abortprintf(2, "InitPcPres: malloc(Annihilator) failed");
+
+  for (unsigned i = 1; i <= Pres.NrGens; i++)
+    coeff_init_set_si(Annihilator[i], 0);
   
   /*
   ** Suppose the power-relations to be in collected word, so it is enough
@@ -41,42 +46,40 @@ void InitPcPres(void) {
   if (Product == NULL)
     abortprintf(2, "InitPcPres: malloc(Product) failed");
 
-  /* We allocate space for the Definitions[]. */
-  Definitions = (deftype *) malloc((Pres.NrGens + 1) * sizeof(deftype));
-  if (Definitions == NULL)
-    abortprintf(2, "InitPcPres: malloc(Definitions) failed");
+  /* We allocate space for the Definition[]. */
+  Definition = (deftype *) malloc((Pres.NrGens + 1) * sizeof(deftype));
+  if (Definition == NULL)
+    abortprintf(2, "InitPcPres: malloc(Definition) failed");
 
-  /*
-  **  And finally the Dimensions will contain the number of the
-  **  generators correspond to a certain weight.
-  */
-  Dimensions = (unsigned *) malloc(1 * sizeof(unsigned));
-  if (Dimensions == NULL)
-    abortprintf(2, "InitPcPres: malloc(Dimensions) failed");
-  Dimensions[0] = 0;
-
+  /* LastGen[c] is the last generator of weight c */
   Weight = (unsigned *) malloc(1 * sizeof(unsigned));
   if (Weight == NULL)
     abortprintf(2, "InitPcPres: malloc(Weight) failed");
 
+  LastGen = (unsigned *) malloc(1 * sizeof(unsigned));
+  if (LastGen == NULL)
+    abortprintf(2, "InitPcPres: malloc(LastGen) failed");
+  LastGen[0] = 0;
   NrCenGens = NrTotalGens = Pres.NrGens;
   NrPcGens = 0;
 }
 
 void FreePcPres(void) {
   for (unsigned i = 1; i <= NrTotalGens; i++) {
-    if (coeff_nz(Coefficients[i]))
+    if (coeff_nz_p(Exponent[i]))
       FreeVec(Power[i]);
-    coeff_clear(Coefficients[i]);
+    coeff_clear(Exponent[i]);
+    coeff_clear(Annihilator[i]);
     for (unsigned j = 1; j < i; j++)
       FreeVec(Product[i][j]);
     free(Product[i]);
   }
   free(Power);
-  free(Coefficients);
+  free(Exponent);
+  free(Annihilator);
   free(Product);
-  free(Definitions);
-  free(Dimensions);
+  free(Definition);
+  free(LastGen);
   free(Weight);
 }
 
@@ -129,6 +132,8 @@ void EvalAllRel(void) {
     PopVec();
     if (Debug >= 2) {
       fprintf(OutputFile, "# relation: ");
+      PrintNode(Pres.Relators[i]);
+      fprintf(OutputFile, "\n");
       PrintVec(v);
       fprintf(OutputFile, "\n");
     }
@@ -159,7 +164,7 @@ unsigned ReducedPcPres(void) {
       continue;
 
     if (coeff_cmp_si(Matrix[i]->c, 1)) { /* k is torsion, nontrivial */
-      coeff_set(Coefficients[newk], Matrix[i]->c);
+      coeff_set(Exponent[newk], Matrix[i]->c);
       Power[newk] = NewVec(Length(Matrix[i]+1));
       Neg(Power[newk], Matrix[i]+1);
     } else { /* k is trivial, and will be eliminated */
@@ -172,7 +177,7 @@ unsigned ReducedPcPres(void) {
   /* Modify the torsions first, in decreasing order, since they're needed
      for Collect */
   for (unsigned j = NrTotalGens; j >= 1; j--)
-    if (coeff_nz(Coefficients[j]))
+    if (coeff_nz_p(Exponent[j]))
       EliminateTrivialGenerators(Power[j], renumber);
   
   /*  Modify the epimorphisms: */
@@ -184,21 +189,20 @@ unsigned ReducedPcPres(void) {
     for (unsigned l = 1; l < j; l++)
       EliminateTrivialGenerators(Product[j][l], renumber);
 
-  /* Let us alter the Definitions as well. Recall that dead generator cannot
+  /* Let us alter the Definition as well. Recall that dead generator cannot
   have definition at all. It is only the right of the living ones. */
   for (unsigned i = NrPcGens + 1; i <= NrTotalGens; i++)
     if (renumber[i] >= 1)
-      Definitions[renumber[i]] = Definitions[i];
+      Definition[renumber[i]] = Definition[i];
+
+  for (unsigned i = 1; i <= NrTotalGens-trivialgens; i++)
+    if (Definition[i].h == 0 && 0 > (int)Definition[i].g)
+      abortprintf(5, "Generator %d is neither image of presentation generator nor defined as a commutator, but is a power of generator %d", i, -Definition[i].g);    
   
-  for (unsigned i = 1; i <= NrTotalGens; i++)
-    if (Definitions[i].h == 0 && 0 > (int)Definitions[i].g) {
-      fprintf(stderr, "\aDefinition of generator %d is neither image of presentation generator nor commutator,\nbut rather power of generator %d. I'm almost surely screwed up, cross your fingers.\n", i, -Definitions[i].g);
-    }
-    
   delete[] renumber;
 
   for (unsigned i = 0; i < trivialgens; i++)
-    coeff_clear(Coefficients[NrTotalGens - i]);
+    coeff_clear(Exponent[NrTotalGens - i]);
   
   TimeStamp("ReducedPcPres()");
 
@@ -206,11 +210,11 @@ unsigned ReducedPcPres(void) {
 }
 
 void ExtendPcPres(void) {
-  Dimensions = (unsigned *) realloc(Dimensions, (Class + 1) * sizeof(unsigned));
-  if (Definitions == NULL)
-    abortprintf(2, "ExtendPcPres: realloc(Definitions) failed");
+  LastGen = (unsigned *) realloc(LastGen, (Class + 1) * sizeof(unsigned));
+  if (LastGen == NULL)
+    abortprintf(2, "ExtendPcPres: realloc(LastGen) failed");
 
-  Dimensions[Class] = NrCenGens;
+  LastGen[Class] = NrTotalGens;
 
   Weight = (unsigned *) realloc(Weight, (NrTotalGens + 1) * sizeof(unsigned));
   if (Weight == NULL)

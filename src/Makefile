@@ -5,11 +5,11 @@
 ##                                                           schcs@math.klte.hu
 ##
 
-# CPPFLAGS = -DVERSION='"3.0 2017-11-24"' -DCOEFF_IS_MPZ
-# CPPFLAGS = -DVERSION='"3.0 2017-11-24"' -DCOEFF_IS_Z
-# CPPFLAGS = -DVERSION='"3.0 2017-11-24"' -DCOEFF_IS_MODp_k -DBASEMODULUS=3 -DLOGMODULUS=4 -DMODULUS=81
+#CPPFLAGS = -DVERSION='"3.0 2017-11-24"' -DCOEFF_IS_MPZ
+#CPPFLAGS = -DVERSION='"3.0 2017-11-24"' -DCOEFF_IS_Z
+#CPPFLAGS = -DVERSION='"3.0 2017-11-24"' -DCOEFF_IS_MODp_k -DMODULUS_PRIME=3 -DMODULUS_EXPONENT=6
 CPPFLAGS = -DVERSION='"3.0 2017-11-27"' -DCOEFF_IS_MOD2_64
-# CPPFLAGS = -DVERSION='"3.0 2017-11-27"' -DCOEFF_IS_LONG
+#CPPFLAGS = -DVERSION='"3.0 2017-11-27"' -DCOEFF_IS_LONG
 OPT = -O0
 DEBUG = -g -ggdb
 CXXFLAGS = -std=gnu++11 -Wall -Werror $(DEBUG) $(OPT)
@@ -36,29 +36,32 @@ lienq: $(LIENQ_OBJ)
 clean:
 	rm -f $(LIENQ_OBJ) lienq
 
-addgen.o: addgen.C $(LIENQ_INCLUDES)  
+addgen.o: addgen.cc $(LIENQ_INCLUDES)  
 
-auxiliary.o: auxiliary.C $(LIENQ_INCLUDES)  
+auxiliary.o: auxiliary.cc $(LIENQ_INCLUDES)  
 
-consistency.o: consistency.C $(LIENQ_INCLUDES)
+consistency.o: consistency.cc $(LIENQ_INCLUDES)
 
-epim.o: epim.C $(LIENQ_INCLUDES)
+epim.o: epim.cc $(LIENQ_INCLUDES)
 
-lienq.o: lienq.C $(LIENQ_INCLUDES)
+lienq.o: lienq.cc $(LIENQ_INCLUDES)
 
-matrix.o: matrix.C $(LIENQ_INCLUDES)
+matrix.o: matrix.cc $(LIENQ_INCLUDES)
 
-operations.o: operations.C $(LIENQ_INCLUDES)  
+operations.o: operations.cc $(LIENQ_INCLUDES)  
 
-presentation.o: presentation.C $(LIENQ_INCLUDES)
+presentation.o: presentation.cc $(LIENQ_INCLUDES)
 
-print.o: print.C $(LIENQ_INCLUDES)  
+print.o: print.cc $(LIENQ_INCLUDES)  
 
-readpres.o: readpres.C $(LIENQ_INCLUDES)
+readpres.o: readpres.cc $(LIENQ_INCLUDES)
 
-tails.o: tails.C $(LIENQ_INCLUDES)
+tails.o: tails.cc $(LIENQ_INCLUDES)
 
-test: test.C
+test: test.cc
 
-smith: smith.C # libraries are compiled with g++, not g++-7!
-	g++ -O3 -march=native -std=c++11 smith.C -o smith -lgivaro -lgmp -lgmpxx -lntl -llinbox
+test.s: test.cc
+	g++-7 -O3 -march=native -std=c++11 -S -DMODULUS_PRIME=3 -DMODULUS_EXPONENT=6 @< -o $@
+
+smith: smith.cc # libraries are compiled with g++, not g++-7!
+	g++ -O3 -march=native -std=c++11 $< -o $@ -lgivaro -lgmp -lgmpxx -lntl -llinbox

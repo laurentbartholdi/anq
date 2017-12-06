@@ -31,7 +31,7 @@ void ReduceRow(gpvec &v, gpvec &w) {
       coeff q;
       coeff_init (q);
       coeff_fdiv_q(q, p->c, w->c);
-      if (coeff_nz(q)) {
+      if (coeff_nz_p(q)) {
 	gpvec temp = FreshVec();
 	Diff(temp, v, q, w);
 	Copy(v, temp);

@@ -41,7 +41,7 @@ void Sum(gpvec vec0, constgpvec vec1, constgpvec vec2) {
       vec2++;
     } else {
       coeff_add(vec0->c, vec1->c, vec2->c);
-      if (coeff_nz(vec0->c))
+      if (coeff_nz_p(vec0->c))
 	vec0->g = vec1->g, vec0++;
       vec1++;
       vec2++;
@@ -51,7 +51,7 @@ void Sum(gpvec vec0, constgpvec vec1, constgpvec vec2) {
 
 /* vec0 = vec1 + x2*vec2 */
 void Sum(gpvec vec0, constgpvec vec1, const coeff x2, constgpvec vec2) {
-  if (!coeff_nz(x2)) {
+  if (coeff_z_p(x2)) {
     Copy(vec0, vec1);
     return;
   }
@@ -71,13 +71,13 @@ void Sum(gpvec vec0, constgpvec vec1, const coeff x2, constgpvec vec2) {
       vec1++;
     } else if (vec1->g > vec2->g) {
       coeff_mul(vec0->c, x2, vec2->c);
-      if (coeff_nz(vec0->c))
+      if (coeff_nz_p(vec0->c))
 	vec0->g = vec2->g, vec0++;
       vec2++;
     } else {
       coeff_set(vec0->c, vec1->c);
       coeff_addmul(vec0->c, x2, vec2->c);
-      if (coeff_nz(vec0->c))
+      if (coeff_nz_p(vec0->c))
 	vec0->g = vec1->g, vec0++;
       vec1++;
       vec2++;
@@ -87,11 +87,11 @@ void Sum(gpvec vec0, constgpvec vec1, const coeff x2, constgpvec vec2) {
 
 /* vec0 = x1*vec1 + x2*vec2 */
 void Sum(gpvec vec0, const coeff x1, constgpvec vec1, const coeff x2, constgpvec vec2) {
-  if (!coeff_nz(x1)) {
+  if (coeff_z_p(x1)) {
     Prod(vec0, x2, vec2);
     return;
   }
-  if (!coeff_nz(x2)) {
+  if (coeff_z_p(x2)) {
     Prod(vec0, x1, vec1);
     return;
   }
@@ -107,18 +107,18 @@ void Sum(gpvec vec0, const coeff x1, constgpvec vec1, const coeff x2, constgpvec
     }
     if (vec1->g < vec2->g) {
       coeff_mul(vec0->c, x1, vec1->c);
-      if (coeff_nz(vec0->c))
+      if (coeff_nz_p(vec0->c))
 	vec0->g = vec1->g, vec0++;
       vec1++;
     } else if (vec1->g > vec2->g) {
       coeff_mul(vec0->c, x2, vec2->c);
-      if (coeff_nz(vec0->c))
+      if (coeff_nz_p(vec0->c))
 	vec0->g = vec2->g, vec0++;
       vec2++;
     } else {
       coeff_mul(vec0->c, x1, vec1->c);
       coeff_addmul(vec0->c, x2, vec2->c);
-      if (coeff_nz(vec0->c))
+      if (coeff_nz_p(vec0->c))
 	vec0->g = vec1->g, vec0++;
       vec1++;
       vec2++;
@@ -147,7 +147,7 @@ void Diff(gpvec vec0, constgpvec vec1, constgpvec vec2) {
       vec2++;
     } else {
       coeff_sub(vec0->c, vec1->c, vec2->c);
-      if (coeff_nz(vec0->c))
+      if (coeff_nz_p(vec0->c))
 	vec0->g = vec1->g, vec0++;
       vec1++;
       vec2++;
@@ -212,15 +212,15 @@ void Collect(gpvec vec0, constgpvec v) {
   
   for (p = (gpvec) v; p->g != EOW;) {
     gen i = p->g;
-    if(coeff_reduced_p(p->c, Coefficients[i])) {
+    if(coeff_reduced_p(p->c, Exponent[i])) {
       coeff_set(vec0->c, p->c), vec0->g = i;
       vec0++;
       p++;
     } else {
-      coeff_fdiv_q(mp, p->c, Coefficients[i]);
+      coeff_fdiv_q(mp, p->c, Exponent[i]);
       coeff_set(vec0->c, p->c);
-      coeff_submul(vec0->c, mp, Coefficients[i]);
-      if (coeff_nz(vec0->c))
+      coeff_submul(vec0->c, mp, Exponent[i]);
+      if (coeff_nz_p(vec0->c))
 	vec0->g = i, vec0++;
       p++;
       if (Power[i]->g != EOW) {
@@ -247,7 +247,7 @@ void ShrinkCollect(gpvec &v) {
   unsigned pos;
   for (pos = 0; v[pos].g != EOW; pos++) {
     gen g = v[pos].g;
-    if(!coeff_reduced_p(v[pos].c, Coefficients[g])) {
+    if(!coeff_reduced_p(v[pos].c, Exponent[g])) {
       if (Power[g]->g != EOW) { // bad news, collection can become longer
 	gpvec newp = FreshVec();
 	Collect(newp, v+pos);
@@ -268,8 +268,8 @@ void ShrinkCollect(gpvec &v) {
 	PopVec();
 	return;
       }
-      coeff_fdiv_r(v[pos].c, v[pos].c, Coefficients[g]);
-      if (!coeff_nz(v[pos].c)) { shift--; continue; }
+      coeff_fdiv_r(v[pos].c, v[pos].c, Exponent[g]);
+      if (coeff_z_p(v[pos].c)) { shift--; continue; }
     }
     if (shift < 0)
       coeff_set(v[pos+shift].c, v[pos].c), v[pos+shift].g = g;
@@ -291,10 +291,10 @@ void Collect(gpvec &vec, bool resize) {
   coeff_init(mp);
   for (pos = shift = 0; vec[pos].g != EOW; pos++) {
     gen g = vec[pos].g;
-    if(!coeff_reduced_p(vec[pos].c, Coefficients[g])) {
-      coeff_fdiv_q(mp, vec[pos].c, Coefficients[g]);
-      coeff_submul(vec[pos].c, mp, Coefficients[g]);
-      if (coeff_nz(vec[pos].c) && Power[g]->g == EOW)
+    if(!coeff_reduced_p(vec[pos].c, Exponent[g])) {
+      coeff_fdiv_q(mp, vec[pos].c, Exponent[g]);
+      coeff_submul(vec[pos].c, mp, Exponent[g]);
+      if (coeff_nz_p(vec[pos].c) && Power[g]->g == EOW)
 	goto next;  // just reduce the coeff, trivial power
       if (Power[g]->g == EOW) {
 	shift++; // we're about to shrink the vector, a coefficient vanished
@@ -351,11 +351,11 @@ void Collect(coeffvec ev) {
   coeff mp;
   coeff_init(mp);
   for (unsigned i = 1; i <= NrTotalGens; i++) {
-    if (!coeff_nz(Coefficients[i]))
+    if (coeff_z_p(Exponent[i]))
       continue;
-    coeff_fdiv_q(mp, ev[i], Coefficients[i]);
-    if (coeff_nz(mp)) {
-      coeff_submul(ev[i], mp, Coefficients[i]);
+    coeff_fdiv_q(mp, ev[i], Exponent[i]);
+    if (coeff_nz_p(mp)) {
+      coeff_submul(ev[i], mp, Exponent[i]);
       for (constgpvec p = Power[i]; p->g != EOW; p++)
         coeff_addmul(ev[p->g], mp, p->c);
     }

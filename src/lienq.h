@@ -92,15 +92,6 @@ struct deftype {
   gen h;
 };
 
-/* useful macros */
-#define MAX(x, y) ((x) < (y) ? (y) : (x))
-#define SUM(a, n, s)                                                           \
-  {									\
-    unsigned i;								\
-    for (i = 1, s = 0; i <= (n); s += a[i], i++)			\
-      ;									\
-  }
-
 /****************************************************************
  * global variables dictating the behaviour of lienq
  ****************************************************************/
@@ -148,10 +139,12 @@ void TimeStamp(const char *);
   
 /* presentation functions */
 extern gpvec **Product, *Power, *Epimorphism;
-extern coeff *Coefficients;
-extern unsigned *Weight, *Dimensions;
-extern deftype *Definitions;
-extern unsigned NrPcGens, NrCenGens, NrTotalGens;
+extern coeff *Exponent, *Annihilator;
+extern deftype *Definition;
+extern unsigned *Weight, *LastGen;
+extern unsigned NrPcGens, // = LastGen[Class-1]
+  NrCenGens, // = LastGen[Class]-LastGen[Class-1]
+  NrTotalGens; // = LastGen[Class]
 
 void InitPcPres(void);
 void FreePcPres(void);
@@ -179,10 +172,10 @@ inline void Diff(gpvec vec0, const coeff x1, constgpvec vec1, const coeff x2, co
   coeff_clear(y2);
 }
 inline void Prod(gpvec vec0, const coeff n, constgpvec vec) {
-  if (coeff_nz(n))
+  if (coeff_nz_p(n))
     for (; vec->g != EOW; vec++) {
       coeff_mul(vec0->c, vec->c, n);
-      if (coeff_nz(vec0->c))
+      if (coeff_nz_p(vec0->c))
 	vec0->g = vec->g, vec0++;
     }
   vec0->g = EOW;
@@ -206,6 +199,7 @@ extern presentation Pres;
 void ReadPresentation(const char *);
 void FreePresentation(void);
 void EvalRel(gpvec, node *);
+void PrintNode(node *);
 
 /* addgen functions */
 void AddGen(void);

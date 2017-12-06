@@ -49,8 +49,14 @@ void PrintVec(gpvec gv) {
 void PrintPcPres(void) {
   fprintf(OutputFile, "<");
 
-  for (unsigned i = 1; i <= NrPcGens; i++)
+  unsigned curclass = 0;
+  for (unsigned i = 1; i <= NrPcGens; i++) {
+    if (Weight[i] > curclass) {
+      curclass = Weight[i];
+      fprintf(OutputFile, "\n# Weight %d:\n", curclass);
+    }
     fprintf(OutputFile, " a%d%s", i, i < NrPcGens ? "," : "");
+  }
   fprintf(OutputFile, " |\n");
   
   fprintf(OutputFile, "# The epimorphism:\n");
@@ -62,18 +68,21 @@ void PrintPcPres(void) {
   if (PrintDefs) {
     fprintf(OutputFile, "# The definitions:\n");
     for (unsigned i = 1; i <= NrTotalGens; i++)
-      if (Definitions[i].h != 0) {
+      if (Definition[i].h != 0) {
 	gen cv[Weight[i] + 1], g = i;
 	for (unsigned pos = Weight[g]; Weight[g] > 1; pos--) {
-	  cv[pos] = Definitions[g].h;
-	  g = Definitions[g].g;
+	  if (Definition[g].h == 0)
+	    abortprintf(5, "Iterated definition of generator %d does not involve commutators and weight-1 generators", i);
+
+	  cv[pos] = Definition[g].h;
+	  g = Definition[g].g;
 	}
 	cv[1] = g;
-	fprintf(OutputFile, "#%10s a%d = [ %d, %d ] = [ ", "", i, Definitions[i].g, Definitions[i].h);
+	fprintf(OutputFile, "#%10s a%d = [ %d, %d ] = [ ", "", i, Definition[i].g, Definition[i].h);
 	for (unsigned j = 1; j <= Weight[i]; j++)
 	  fprintf(OutputFile, "%d%s", cv[j], j == Weight[i] ? " ]\n" : ", ");
       } else {
-	gen g = Definitions[i].g;
+	gen g = Definition[i].g;
 	if (0 < (int)g)
 	  fprintf(OutputFile, "#%10s a%d = (%s)^epimorphism\n", "", i, Pres.Generators[g]);
 	else
@@ -84,11 +93,11 @@ void PrintPcPres(void) {
   bool first = true;
   fprintf(OutputFile, "# The torsion relations:\n");
   for (unsigned i = 1; i <= NrPcGens; i++) {
-    if (coeff_nz(Coefficients[i])) {
+    if (coeff_nz_p(Exponent[i])) {
       if (!first)
 	  fprintf(OutputFile, ",\n");
-      fprintf(OutputFile, "%10s%ld*a%d", "", coeff_get_si(Coefficients[i]), i);
-      if (Power[i][0].g != EOW) {
+      fprintf(OutputFile, "%10s%ld*a%d", "", coeff_get_si(Exponent[i]), i);
+      if (Power[i]->g != EOW) {
         fprintf(OutputFile, " = ");
         PrintVec(Power[i]);
       }
@@ -98,19 +107,21 @@ void PrintPcPres(void) {
 
   first = true;
   for (unsigned j = 1; j <= NrPcGens; j++)
-    for (unsigned i = 1; i < j; i++)
-      if (PrintZeros || Product[j][i][0].g != EOW) {
+    for (unsigned i = 1; i < j; i++) {
+      gen g = Product[j][i]->g;
+      if (PrintZeros || g != EOW) {
 	fprintf(OutputFile, ",\n");
 	if (first)
 	  fprintf(OutputFile, "# The product relations:\n");
         fprintf(OutputFile, "%10s[ a%d, a%d ]", "", j, i);
-        if (Product[j][i][0].g != EOW) {
-          fprintf(OutputFile, " = ");
+        if (g != EOW) {
+	  fprintf(OutputFile, " =%s ", Definition[g].g == j && Definition[g].h == i ? ":" : "");
           PrintVec(Product[j][i]);
         }
 	first = false;
-      }    
-
+      }
+    }
+  
   if (Pres.NrExtraRels > 0) {
     fprintf(OutputFile, " |\n# The extra elements:\n");
     first = true;

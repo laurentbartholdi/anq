@@ -9,8 +9,12 @@
 typedef mpz_t coeff;
 
 /* addition */
-inline bool coeff_nz(const coeff a) {
+inline bool coeff_nz_p(const coeff a) {
   return mpz_sgn(a) != 0;
+}
+
+inline bool coeff_z_p(const coeff a) {
+  return mpz_sgn(a) == 0;
 }
 
 #define coeff_init mpz_init

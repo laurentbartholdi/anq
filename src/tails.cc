@@ -6,6 +6,7 @@
 */
 
 #include "lienq.h"
+#include <algorithm>
 
 /*
 **  Some of the newly introduced generators strictly depend on one another
@@ -26,7 +27,7 @@ static void Tail_ab(gpvec v, gen a, gen b) {
   if (Weight[a] + Weight[b] > Class)
     return;
 
-  gen g = Definitions[b].g, h = Definitions[b].h;
+  gen g = Definition[b].g, h = Definition[b].h;
   
   gpvec agh = FreshVec();
   TripleProduct(agh, a, g, h);
@@ -40,14 +41,14 @@ static void Tail_ab(gpvec v, gen a, gen b) {
   PopVec();
 
   if (Debug >= 2) {
-    fprintf(OutputFile, "# tail: [ %d, %d ] = ", a, b);
+    fprintf(OutputFile, "# tail: [a%d,a%d] = ", a, b);
     PrintVec(v);
     fprintf(OutputFile, "\n");
   }
 }
 
 void Tails(void) {
-  for (unsigned i = Dimensions[1] + 1; i <= NrPcGens; i++)
+  for (unsigned i = LastGen[1] + 1; i <= NrPcGens; i++)
     for (unsigned j = i + 1; j <= NrPcGens; j++) {
       gpvec tail = FreshVec();
       Tail_ab(tail, j, i);
@@ -67,15 +68,9 @@ void Tails(void) {
 }
 
 void GradedTails(void) {
-  unsigned lwbd, lwbd1, upbd, upbd1;
-
-  for (unsigned k = 2; k <= Class / 2; k++) {
-    SUM(Dimensions, k - 1, lwbd);
-    SUM(Dimensions, k, upbd);
-    for (unsigned i = lwbd + 1; i <= upbd; i++) {
-      SUM(Dimensions, Class - k - 1, lwbd1);
-      SUM(Dimensions, Class - k, upbd1);
-      for (unsigned j = MAX(i + 1, lwbd1 + 1); j <= upbd1; j++) {
+  for (unsigned k = 2; k <= Class / 2; k++)
+    for (unsigned i = LastGen[k-1] + 1; i <= LastGen[k]; i++)
+      for (unsigned j = std::max(i + 1, LastGen[Class-k-1] + 1); j <= LastGen[Class-k]; j++) {
 	gpvec tail = FreshVec();
 	Tail_ab(tail, j, i);
 	unsigned k;
@@ -89,8 +84,6 @@ void GradedTails(void) {
 	}
 	PopVec();
       }
-    }
-  }
 
   TimeStamp("GradedTails()");
 }

@@ -27,7 +27,7 @@ void InitEpim(void) {
     Epimorphism[i][0].g = i;
     coeff_set_si(Epimorphism[i][0].c, 1);
     Epimorphism[i][1].g = EOW;
-    Definitions[i] = {.g = i, .h = 0};
+    Definition[i] = {.g = i, .h = 0};
   }
 }
 

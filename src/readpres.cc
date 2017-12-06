@@ -93,7 +93,7 @@ static void SyntaxError(const char *format, ...) {
   va_list va;
   va_start (va, format);
   vfprintf(stderr, format, va);
-  fprintf(stderr, "In file %s, line %d, char %d\n", InFileName, TLine, TChar);
+  fprintf(stderr, " in file %s, line %d, char %d\n", InFileName, TLine, TChar);
   exit(3);
 }
 
@@ -419,7 +419,8 @@ node *Elem(void) {
   else if (Token == GEN || Token == LPAREN || Token == LBRACK)
     o = Atom();
   else
-    SyntaxError("Error in Sum");
+    SyntaxError("Element expected");
+
   while (Token == PLUS) {
     NextToken();
     n = o;
@@ -446,27 +447,22 @@ node *Elem(void) {
 **    with integer (ring-element).
 */
 static node *Relation(void) {
-  node *n, *o;
-
-  if (Token != GEN && Token != LPAREN && Token != LBRACK && Token != NUMBER)
-    SyntaxError("Relation expected");
-
-  o = Elem();
+  node *o = Elem();
   if (Token == EQUAL) {
     NextToken();
-    n = o;
+    node *n = o;
     o = NewNode(TREL);
     o->cont.op.l = n;
     o->cont.op.r = Elem();
   } else if (Token == DEQUALL) {
     NextToken();
-    n = o;
+    node *n = o;
     o = NewNode(TDRELL);
     o->cont.op.l = n;
     o->cont.op.r = Elem();
   } else if (Token == DEQUALR) {
     NextToken();
-    n = o;
+    node *n = o;
     o = NewNode(TDRELR);
     o->cont.op.l = n;
     o->cont.op.r = Elem();
@@ -489,7 +485,7 @@ static int RelList(node **&rellist) {
   unsigned n = 0;
 
   rellist = (node **) malloc(sizeof(node *));
-  if (Token == GEN || Token == LPAREN || Token == LBRACK || Token == NUMBER) {
+  if (Token == GEN || Token == LPAREN || Token == LBRACK || Token == NUMBER || Token == MINUS || Token == PLUS) {
     rellist = (node **) realloc(rellist, 2 * sizeof(node *));
     rellist[n++] = Relation();
     while (Token == COMMA) {
@@ -571,40 +567,42 @@ void FreePresentation(void) {
 void PrintNode(node *n) {
   switch (n->type) {
   case TNUM:
-    fprintf(OutputFile, "%ld  ", coeff_get_si(n->cont.n));
+    fprintf(OutputFile, "%ld", coeff_get_si(n->cont.n));
     break;
   case TGEN:
-    fprintf(OutputFile, "%s  ", Pres.Generators[n->cont.g]);
+    fprintf(OutputFile, "%s", Pres.Generators[n->cont.g]);
     break;
   case TSUM:
     PrintNode(n->cont.op.l);
+    fprintf(OutputFile, " + ");
     PrintNode(n->cont.op.r);
-    fprintf(OutputFile, "+  ");
     break;
   case TMPROD:
     PrintNode(n->cont.op.l);
+    fprintf(OutputFile, "*");
     PrintNode(n->cont.op.r);
-    fprintf(OutputFile, "*  ");
     break;
   case TLPROD:
+    fprintf(OutputFile, "[");
     PrintNode(n->cont.op.l);
+    fprintf(OutputFile, ",");
     PrintNode(n->cont.op.r);
-    fprintf(OutputFile, "[]  ");
+    fprintf(OutputFile, "]");
     break;
   case TREL:
     PrintNode(n->cont.op.l);
+    fprintf(OutputFile, " = ");
     PrintNode(n->cont.op.r);
-    fprintf(OutputFile, "=  ");
     break;
   case TDRELL:
     PrintNode(n->cont.op.l);
+    fprintf(OutputFile, " := ");
     PrintNode(n->cont.op.r);
-    fprintf(OutputFile, ":=  ");
     break;
   case TDRELR:
     PrintNode(n->cont.op.l);
+    fprintf(OutputFile, " =: ");
     PrintNode(n->cont.op.r);
-    fprintf(OutputFile, "=:  ");
     break;
   }
 }

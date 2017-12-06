@@ -2,8 +2,9 @@
 **
 **               Nilpotent Quotient for Lie Algebras
 ** coeff_z.h
-** defines coefficients as arbitrary-precision integers, with fast code for
-** integers fitting in 63 bits
+**
+** defines coefficients as arbitrary-precision gmp integers, with fast
+** code for integers fitting in 63 bits
 */
 
 #error broken
@@ -14,6 +15,10 @@ typedef z_t coeff;
 /* addition */
 inline bool coeff_nz(const coeff a) {
   return mpz_sgn(a) != 0;
+}
+
+inline bool coeff_z(const coeff a) {
+  return mpz_sgn(a) == 0;
 }
 
 #define coeff_init z_init

@@ -9,9 +9,13 @@ struct coeff {
   int64_t data;
 };
 
-/* addition, it seems that GCC does not optimize as well if(coeff_sgn(x)) as if(coeff_nz(x)) */
-inline bool coeff_nz(const coeff &a) {
+/* addition, it seems that GCC does not optimize as well if(coeff_sgn(x)) as if(coeff_nz_p(x)) */
+inline bool coeff_nz_p(const coeff &a) {
   return a.data != 0;
+}
+
+inline bool coeff_z_p(const coeff &a) {
+  return a.data == 0;
 }
 
 inline void coeff_init(coeff &a) {
@@ -33,7 +37,7 @@ inline void coeff_set_si(coeff &result, const long a) {
   result.data = a;
 }
 
-inline long coeff_get_si(coeff &a) {
+inline long coeff_get_si(const coeff &a) {
   return a.data;
 }
 
