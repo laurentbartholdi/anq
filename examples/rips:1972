@@ -1,0 +1,30 @@
+< z0, z1, z2, z3, b1, b2, b3, c |
+	64*b1, 16*b2, 4*b3, 256*c,
+	[b2,b1], [b3,b1], [b3,b2], [b1,c], [b2,c], [b3,c],
+	64*z0 = 32*b1, 64*z1 = -4*b2 + -2*b3, 16*z2 = 4*b1 + -1*b3, 4*z3 = 2*b1 + b2,
+	[z1,z0] = b1 + 2*c, [z2,z0] = b2 + 8*c, [z3,z0] = b3 + 32*c,
+	[z2,z1] = c, [z3,z1] = 2*c, [z3,z2] = 4*c,
+	[b1,z0], [b1,z1] = 4*c, [b1,z2], [b1,z3],
+	[b2,z0], [b2,z1], [b2,z2] = 16*c, [b2,z3],
+	[b3,z0], [b3,z1], [b3,z2], [b3,z3] = 64*c,
+	[c,z0], [c,z1], [c,z2] |
+	128*c >
+
+free := FreeLieRing(Integers, ["z0", "z1", "z2", "z3", "b1", "b2", "b3", "c"]);
+z0 := free.1; z1 := free.2; z2 := free.3; z3 := free.4;
+b1 := free.5; b2 := free.6; b3 := free.7; c := free.8;
+rels := [
+	64*b1, 16*b2, 4*b3, 256*c,
+	b2*b1, b3*b1, b3*b2, b1*c, b2*c, b3*c,
+	-64*z0 + 32*b1, -64*z1 + -4*b2 + -2*b3, -16*z2 + 4*b1 + -1*b3, -4*z3 + 2*b1 + b2,
+	-z1*z0 + b1 + 2*c, -z2*z0 + b2 + 8*c, -z3*z0 + b3 + 32*c,
+	-z2*z1 + c, -z3*z1 + 2*c, -z3*z2 + 4*c,
+	b1*z0, -b1*z1 + 4*c, b1*z2, b1*z3,
+	b2*z0, b2*z1, -b2*z2 + 16*c, b2*z3,
+	b3*z0, b3*z1, b3*z2, -b3*z3 + 64*c,
+	c*z0, c*z1, c*z2 ];
+elm := 128*c;
+
+quotient := FpLieRing( free, rels : maxdeg := 3 );
+pi := CanonicalProjection(quotient);
+pi(elm);
