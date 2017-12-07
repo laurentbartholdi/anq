@@ -1,0 +1,434 @@
+# The Lie algebra Nilpotent Quotient Program
+# for calculating nilpotent quotients in finitely presented Lie rings by Csaba Schneider.
+# Program:    ./lienq, version 3.0 2017-11-27
+# Machine:    wf146.di.ens.fr
+# Input file: ../examples/schneider:l2.lq
+# Time:       Thu Dec  7 10:35:03 2017
+# Class:      14
+# Flags:      -D 
+
+# initialization finished, 0.00428s
+# EvalAllRel() finished, 3.1e-05s
+# ReducedPcPres() finished, 1e-05s
+# The 1st factor has 2 generators of relative orders 0, 0
+# AddGen() finished, 1.1e-05s
+# Tails() finished, 3e-06s
+# Consistency() finished, 3e-06s
+# EvalAllRel() finished, 6e-06s
+# ReducedPcPres() finished, 3e-06s
+# The 2st factor has 1 generators of relative orders 0
+# AddGen() finished, 8e-06s
+# Tails() finished, 3e-06s
+# Consistency() finished, 2e-06s
+# EvalAllRel() finished, 6e-06s
+# ReducedPcPres() finished, 4e-06s
+# The 3rd factor has 1 generators of relative orders 0
+# AddGen() finished, 8e-06s
+# Tails() finished, 3e-06s
+# Consistency() finished, 4e-06s
+# EvalAllRel() finished, 5e-06s
+# ReducedPcPres() finished, 4e-06s
+# The 4th factor has 1 generators of relative orders 0
+# AddGen() finished, 9e-06s
+# Tails() finished, 4e-06s
+# Consistency() finished, 3e-06s
+# EvalAllRel() finished, 7e-06s
+# ReducedPcPres() finished, 4e-06s
+# The 5th factor has 2 generators of relative orders 0, 0
+# AddGen() finished, 1.1e-05s
+# Tails() finished, 5e-06s
+# Consistency() finished, 4e-06s
+# EvalAllRel() finished, 4e-06s
+# ReducedPcPres() finished, 6e-06s
+# The 6th factor has 1 generators of relative orders 0
+# AddGen() finished, 1e-05s
+# Tails() finished, 6e-06s
+# Consistency() finished, 5e-06s
+# EvalAllRel() finished, 6e-06s
+# ReducedPcPres() finished, 6e-06s
+# The 7th factor has 2 generators of relative orders 0, 0
+# AddGen() finished, 1.2e-05s
+# Tails() finished, 7e-06s
+# Consistency() finished, 6e-06s
+# EvalAllRel() finished, 5e-06s
+# ReducedPcPres() finished, 9e-06s
+# The 8th factor has 3 generators of relative orders 5, 4, 0
+# AddGen() finished, 1.5e-05s
+# Tails() finished, 8e-06s
+# Consistency() finished, 1.2e-05s
+# EvalAllRel() finished, 6e-06s
+# ReducedPcPres() finished, 1.3e-05s
+# The 9th factor has 5 generators of relative orders 5, 5, 4, 0, 6
+# AddGen() finished, 2.3e-05s
+# Tails() finished, 1.1e-05s
+# Consistency() finished, 2.3e-05s
+# EvalAllRel() finished, 9e-06s
+# ReducedPcPres() finished, 2.3e-05s
+# The 10th factor has 6 generators of relative orders 5, 5, 4, 0, 10, 6
+# AddGen() finished, 3e-05s
+# Tails() finished, 1.7e-05s
+# Consistency() finished, 4.6e-05s
+# EvalAllRel() finished, 8e-06s
+# ReducedPcPres() finished, 3.2e-05s
+# The 11th factor has 10 generators of relative orders 5, 5, 5, 2, 4, 0, 0, 10, 6, 6
+# AddGen() finished, 4.8e-05s
+# Tails() finished, 3e-05s
+# Consistency() finished, 0.000118s
+# EvalAllRel() finished, 1.2e-05s
+# ReducedPcPres() finished, 4.4e-05s
+# The 12th factor has 13 generators of relative orders 5, 5, 5, 2, 4, 3, 5, 0, 10, 10, 6, 6, 6
+# AddGen() finished, 6.2e-05s
+# Tails() finished, 4e-05s
+# Consistency() finished, 0.000176s
+# EvalAllRel() finished, 1.5e-05s
+# ReducedPcPres() finished, 7.6e-05s
+# The 13th factor has 18 generators of relative orders 5, 5, 5, 5, 5, 2, 4, 4, 5, 0, 0, 10, 10, 10, 6, 6, 6, 6
+# AddGen() finished, 9.9e-05s
+# Tails() finished, 6.9e-05s
+# Consistency() finished, 0.000382s
+# EvalAllRel() finished, 1.7e-05s
+# ReducedPcPres() finished, 0.000135s
+# The 14th factor has 24 generators of relative orders 5, 5, 5, 5, 5, 5, 2, 4, 2, 5, 10, 20, 0, 5, 10, 10, 10, 6, 6, 6, 2, 6, 6, 6
+<
+# Weight 1:
+ a1, a2,
+# Weight 2:
+ a3,
+# Weight 3:
+ a4,
+# Weight 4:
+ a5,
+# Weight 5:
+ a6, a7,
+# Weight 6:
+ a8,
+# Weight 7:
+ a9, a10,
+# Weight 8:
+ a11, a12, a13,
+# Weight 9:
+ a14, a15, a16, a17, a18,
+# Weight 10:
+ a19, a20, a21, a22, a23, a24,
+# Weight 11:
+ a25, a26, a27, a28, a29, a30, a31, a32, a33, a34,
+# Weight 12:
+ a35, a36, a37, a38, a39, a40, a41, a42, a43, a44, a45, a46, a47,
+# Weight 13:
+ a48, a49, a50, a51, a52, a53, a54, a55, a56, a57, a58, a59, a60, a61, a62, a63, a64, a65,
+# Weight 14:
+ a66, a67, a68, a69, a70, a71, a72, a73, a74, a75, a76, a77, a78, a79, a80, a81, a82, a83, a84, a85, a86, a87, a88, a89 |
+# The epimorphism:
+#          x |--> 1*a1
+#          y |--> 1*a2
+# The torsion relations:
+          5*a11,
+          4*a12 = 2*a13,
+          5*a14,
+          5*a15,
+          4*a16 = 2*a17,
+          6*a18,
+          5*a19,
+          5*a20,
+          4*a21 = 2*a22,
+          10*a23 = 2*a24,
+          6*a24,
+          5*a25,
+          5*a26,
+          5*a27,
+          2*a28 = 1*a30,
+          4*a29 = 2*a31,
+          10*a32 = 2*a33,
+          6*a33,
+          6*a34,
+          5*a35,
+          5*a36,
+          5*a37,
+          2*a38 = 1*a41,
+          4*a39 = 2*a42,
+          3*a40,
+          5*a41 = 10*a42 + 1*a45,
+          10*a43 = 2*a45,
+          10*a44 = 2*a46,
+          6*a45,
+          6*a46,
+          6*a47,
+          5*a48,
+          5*a49,
+          5*a50,
+          5*a51,
+          5*a52,
+          2*a53 = 1*a56,
+          4*a54 = 2*a57,
+          4*a55 = 2*a58,
+          5*a56 = 10*a57 + 1*a62,
+          10*a59 = 2*a62,
+          10*a60 = 2*a63 + 2*a64,
+          10*a61 = 2*a63,
+          6*a62,
+          6*a63,
+          6*a64,
+          6*a65,
+          5*a66,
+          5*a67,
+          5*a68,
+          5*a69,
+          5*a70,
+          5*a71,
+          2*a72 = 1*a75,
+          4*a73 = 2*a77,
+          2*a74 = 10*a77 + -4*a78 + 3*a84 + 4*a85 + 4*a87,
+          5*a75 = 1*a83,
+          10*a76,
+          20*a77 = 10*a78 + 4*a85 + 4*a87,
+          5*a79 = 1*a83,
+          10*a80 = 2*a84,
+          10*a81 = 2*a85 + 2*a87,
+          10*a82 = 2*a85,
+          6*a83,
+          6*a84,
+          6*a85,
+          2*a86 = 2*a88 + 4*a89,
+          6*a87,
+          6*a88,
+          6*a89,
+# The product relations:
+          [ a2, a1 ] =: 1*a3,
+          [ a3, a1 ] =: 1*a4,
+          [ a4, a1 ] =: 1*a5,
+          [ a4, a3 ] = -1*a7,
+          [ a5, a1 ] =: 1*a6,
+          [ a5, a2 ] =: 1*a7,
+          [ a5, a3 ] = -1*a8,
+          [ a5, a4 ] = -3*a9,
+          [ a6, a2 ] = 2*a8,
+          [ a6, a3 ] = 2*a9,
+          [ a6, a4 ] = 2*a11,
+          [ a6, a5 ] = 2*a14,
+          [ a7, a1 ] =: 1*a8,
+          [ a7, a3 ] = -1*a10,
+          [ a7, a4 ] = 1*a12 + -2*a13,
+          [ a7, a5 ] = 4*a15 + 3*a16 + -3*a17,
+          [ a7, a6 ] = 1*a19 + 1*a20 + 2*a21 + -2*a22,
+          [ a8, a1 ] =: 1*a9,
+          [ a8, a2 ] =: 1*a10,
+          [ a8, a3 ] = 3*a12 + -1*a13,
+          [ a8, a4 ] = 1*a15 + 2*a16 + -1*a17,
+          [ a8, a5 ] = 4*a19 + 3*a20 + 1*a21 + -1*a22,
+          [ a8, a6 ] = 1*a25 + 1*a26 + -1*a30,
+          [ a8, a7 ] = 1*a27 + 1*a29 + 3*a32 + 3*a33,
+          [ a9, a1 ] =: 1*a11,
+          [ a9, a2 ] =: 1*a12,
+          [ a9, a3 ] = 4*a15 + 1*a16,
+          [ a9, a4 ] = 1*a19 + 3*a20 + 1*a21,
+          [ a9, a5 ] = 3*a25 + 2*a26 + 1*a28,
+          [ a9, a6 ] = 1*a35 + 1*a36 + 2*a40,
+          [ a9, a7 ] = 1*a37 + 1*a39 + 3*a43 + 3*a45,
+          [ a9, a8 ] = 3*a49 + 3*a51 + 1*a54 + 1*a56 + -2*a57 + 1*a59 + 2*a62,
+          [ a10, a1 ] =: 1*a13,
+          [ a10, a3 ] = 5*a18,
+          [ a10, a4 ] = 1*a23 + 4*a24,
+          [ a10, a5 ] = -1*a31 + 3*a32 + 3*a33,
+          [ a10, a6 ] = 1*a41 + -4*a42 + 6*a43 + 2*a45,
+          [ a10, a7 ] = 1*a44 + 3*a46 + 2*a47,
+          [ a10, a8 ] = -1*a58 + 3*a60 + 9*a61 + 2*a63 + 5*a64,
+          [ a10, a9 ] = 7*a77 + -4*a78 + 2*a80 + 3*a81 + 2*a82 + 5*a84 + 5*a85 + 4*a87,
+          [ a11, a1 ] =: 1*a14,
+          [ a11, a2 ] =: 1*a15,
+          [ a11, a3 ] = 4*a19 + 1*a20,
+          [ a11, a4 ] = 3*a25 + 1*a26,
+          [ a11, a5 ] = 2*a35 + 1*a36,
+          [ a11, a6 ] = 1*a48 + 1*a50,
+          [ a11, a7 ] = 2*a49 + 2*a51 + 1*a52 + 4*a56 + -8*a57 + 2*a59,
+          [ a11, a8 ] = 3*a67 + 3*a69 + 1*a75 + 6*a76 + 1*a79 + 2*a83,
+          [ a12, a1 ] =: 1*a16,
+          [ a12, a2 ] = 2*a18,
+          [ a12, a3 ] = 7*a23 + 2*a24,
+          [ a12, a4 ] = 1*a29 + 4*a32 + 4*a33,
+          [ a12, a5 ] = 1*a38 + 3*a39 + 4*a41 + -10*a42 + 1*a43 + 5*a45,
+          [ a12, a6 ] = 2*a54 + 3*a56 + -8*a57 + 8*a59 + 1*a62,
+          [ a12, a7 ] = 1*a55 + 1*a60 + 6*a61 + 4*a63 + 4*a64,
+          [ a12, a8 ] = 1*a73 + 11*a77 + -6*a78 + 9*a80 + 5*a81 + 6*a82 + 3*a85 + 4*a87,
+          [ a13, a1 ] =: 1*a17,
+          [ a13, a2 ] =: 1*a18,
+          [ a13, a3 ] = 9*a23 + 5*a24,
+          [ a13, a4 ] = 1*a31 + 8*a32 + 5*a33,
+          [ a13, a5 ] = 4*a41 + -7*a42 + 7*a43 + 4*a45,
+          [ a13, a6 ] = 1*a56 + -4*a57 + 6*a59 + 2*a62,
+          [ a13, a7 ] = 1*a58 + 7*a60 + 2*a61 + 3*a63 + 1*a64,
+          [ a13, a8 ] = 13*a77 + -7*a78 + 8*a80 + 7*a82 + 5*a84 + 5*a85 + 3*a87,
+          [ a14, a2 ] =: 1*a19,
+          [ a14, a3 ] = 1*a25,
+          [ a14, a4 ] = 1*a35,
+          [ a14, a5 ] = 1*a48,
+          [ a14, a6 ] = 1*a66,
+          [ a14, a7 ] = 4*a67 + 4*a69 + 1*a70 + 3*a75 + 6*a76 + 1*a79 + 4*a83,
+          [ a15, a1 ] =: 1*a20,
+          [ a15, a2 ] = 6*a23,
+          [ a15, a3 ] = 4*a27 + 6*a32,
+          [ a15, a4 ] = 2*a37 + 2*a41 + -4*a42 + 2*a45,
+          [ a15, a5 ] = 4*a51 + 4*a52 + 1*a56 + -2*a57 + 8*a59 + 3*a62,
+          [ a15, a6 ] = 1*a68 + 1*a69 + 2*a75 + 6*a76 + 2*a83,
+          [ a15, a7 ] = 1*a71 + 16*a77 + -8*a78 + 6*a80 + 8*a81 + 6*a82,
+          [ a16, a1 ] =: 1*a21,
+          [ a16, a2 ] = 3*a23 + 4*a24,
+          [ a16, a3 ] = 3*a29 + -2*a31 + 3*a32 + 4*a33,
+          [ a16, a4 ] = 1*a38 + 2*a39 + -2*a42 + 3*a43 + 4*a45,
+          [ a16, a5 ] = 1*a53 + 1*a54 + 1*a56 + -2*a57 + 3*a59 + 2*a62,
+          [ a16, a6 ] = 3*a75 + 8*a76 + 3*a79 + 2*a83,
+          [ a16, a7 ] = 3*a73 + 1*a74 + 7*a77 + -4*a78 + 1*a80 + 6*a81 + 4*a84 + 1*a85,
+          [ a17, a1 ] =: 1*a22,
+          [ a17, a2 ] =: 1*a23,
+          [ a17, a3 ] = -1*a31 + 1*a32,
+          [ a17, a4 ] = 1*a41 + -2*a42 + 1*a43,
+          [ a17, a5 ] = 3*a56 + -3*a57 + 1*a59 + 2*a62,
+          [ a17, a6 ] = 1*a75 + 6*a76 + 1*a79 + 3*a83,
+          [ a17, a7 ] = 7*a77 + -2*a78 + 2*a80 + 7*a81 + 5*a82 + 5*a84 + 4*a85,
+          [ a18, a1 ] =: 1*a24,
+          [ a18, a3 ] = 5*a34,
+          [ a18, a4 ] = 1*a46 + 4*a47,
+          [ a18, a5 ] = 5*a63 + 5*a64,
+          [ a18, a6 ] = 1*a84 + 2*a85 + 4*a87,
+          [ a18, a7 ] = 1*a86 + 3*a88 + 2*a89,
+          [ a19, a1 ] =: 1*a25,
+          [ a19, a2 ] = 2*a27 + 4*a32 + 4*a33,
+          [ a19, a3 ] = 1*a37 + 2*a43 + 2*a45,
+          [ a19, a4 ] = 1*a49,
+          [ a19, a5 ] = 2*a67 + 3*a69 + 4*a70 + 1*a75 + 2*a76 + 1*a79 + 2*a83,
+          [ a20, a1 ] =: 1*a26,
+          [ a20, a2 ] =: 1*a27,
+          [ a20, a3 ] = 2*a37 + 3*a41 + -6*a42 + 6*a43 + 3*a45,
+          [ a20, a4 ] = 1*a51 + 3*a52 + 1*a56 + -2*a57 + 2*a59 + 3*a62,
+          [ a20, a5 ] = 4*a68 + 3*a69 + 4*a70 + 4*a75 + 2*a76 + 3*a79 + 1*a83,
+          [ a21, a1 ] =: 1*a28,
+          [ a21, a2 ] =: 1*a29,
+          [ a21, a3 ] = 1*a38 + 1*a39 + 4*a41 + -10*a42 + 5*a45,
+          [ a21, a4 ] = 1*a54 + 4*a56 + -10*a57 + 1*a62,
+          [ a21, a5 ] = 1*a72 + 3*a75 + 8*a76 + 5*a83,
+          [ a22, a1 ] =: 1*a30,
+          [ a22, a2 ] =: 1*a31,
+          [ a22, a3 ] = 4*a41 + -9*a42 + 5*a45,
+          [ a22, a4 ] = 3*a56 + -9*a57 + 3*a62,
+          [ a22, a5 ] = 2*a75 + 1*a76 + 5*a83,
+          [ a23, a1 ] =: 1*a32,
+          [ a23, a2 ] = 2*a34,
+          [ a23, a3 ] = 9*a44 + 4*a46 + 2*a47,
+          [ a23, a4 ] = 1*a60 + 8*a61 + 4*a63 + 2*a64,
+          [ a23, a5 ] = 9*a80 + 3*a81 + 7*a82 + 4*a84 + 4*a85 + 2*a87,
+          [ a24, a1 ] =: 1*a33,
+          [ a24, a2 ] =: 1*a34,
+          [ a24, a3 ] = 5*a46 + 1*a47,
+          [ a24, a4 ] = 2*a63 + 5*a64,
+          [ a24, a5 ] = 5*a84 + 3*a85 + 1*a87,
+          [ a25, a1 ] =: 1*a35,
+          [ a25, a2 ] = 1*a37 + 2*a43 + 2*a45,
+          [ a25, a3 ] = 4*a49 + 1*a52 + 2*a59 + 2*a62,
+          [ a25, a4 ] = 4*a67 + 2*a69 + 1*a70 + 4*a75 + 8*a76 + 4*a79 + 2*a83,
+          [ a26, a1 ] =: 1*a36,
+          [ a26, a2 ] = 4*a37 + 2*a41 + -4*a42 + 4*a43,
+          [ a26, a3 ] = 4*a51 + 4*a52 + 2*a56 + -4*a57 + 4*a59,
+          [ a26, a4 ] = 1*a68 + 3*a69 + 4*a70 + 2*a75 + 6*a76 + 4*a79,
+          [ a27, a1 ] =: 1*a37,
+          [ a27, a2 ] = 2*a44 + 2*a46,
+          [ a27, a3 ] = 2*a60 + 6*a61 + 2*a63 + 2*a64,
+          [ a27, a4 ] = 1*a71 + 4*a81 + 4*a85 + 4*a87,
+          [ a28, a1 ] = 2*a40,
+          [ a28, a2 ] =: 1*a38,
+          [ a28, a3 ] = 1*a53 + 4*a62,
+          [ a28, a4 ] = 1*a72 + 2*a83,
+          [ a29, a1 ] =: 1*a39,
+          [ a29, a2 ] = 6*a44 + 2*a46 + 2*a47,
+          [ a29, a3 ] = 3*a55 + -2*a58 + 6*a61 + 2*a63 + 2*a64,
+          [ a29, a4 ] = 1*a73 + 10*a77 + -6*a78 + 6*a82 + 3*a84,
+          [ a30, a1 ] =: 1*a40,
+          [ a30, a2 ] =: 1*a41,
+          [ a30, a3 ] = 1*a56 + 2*a62,
+          [ a30, a4 ] = 1*a75 + 4*a83,
+          [ a31, a1 ] =: 1*a42,
+          [ a31, a2 ] = 2*a44 + 4*a47,
+          [ a31, a3 ] = -1*a58 + 2*a61 + 4*a64,
+          [ a31, a4 ] = 1*a77 + -2*a78 + 2*a82 + 4*a87,
+          [ a32, a1 ] =: 1*a43,
+          [ a32, a2 ] =: 1*a44,
+          [ a32, a3 ] = 9*a60 + 1*a61 + 4*a63 + 4*a64,
+          [ a32, a4 ] = 1*a80 + 8*a81 + 1*a82 + 4*a85 + 4*a87,
+          [ a33, a1 ] =: 1*a45,
+          [ a33, a2 ] =: 1*a46,
+          [ a33, a3 ] = 3*a63 + 2*a64,
+          [ a33, a4 ] = 1*a84 + 5*a85 + 4*a87,
+          [ a34, a1 ] =: 1*a47,
+          [ a34, a3 ] = 5*a65,
+          [ a34, a4 ] = 1*a88 + 4*a89,
+          [ a35, a1 ] =: 1*a48,
+          [ a35, a2 ] =: 1*a49,
+          [ a35, a3 ] = 3*a69 + 1*a75 + 2*a76 + 3*a79 + 4*a83,
+          [ a36, a1 ] =: 1*a50,
+          [ a36, a2 ] =: 1*a51,
+          [ a36, a3 ] = 4*a68 + 1*a69,
+          [ a37, a1 ] =: 1*a52,
+          [ a37, a2 ] = 8*a60 + 6*a61 + 2*a63 + 2*a64,
+          [ a37, a3 ] = 4*a71 + 8*a81 + 6*a82 + 2*a85 + 2*a87,
+          [ a38, a1 ] =: 1*a53,
+          [ a38, a2 ] = 2*a55 + 4*a61 + 2*a63 + 4*a64,
+          [ a38, a3 ] = 2*a73 + 1*a74 + 19*a77 + -10*a78 + 5*a80 + 5*a81 + 7*a82 + 1*a84 + 1*a85,
+          [ a39, a1 ] =: 1*a54,
+          [ a39, a2 ] =: 1*a55,
+          [ a39, a3 ] = 3*a73 + 1*a74 + 18*a77 + -10*a78 + 2*a85 + 2*a87,
+          [ a40, a2 ] = 4*a62,
+          [ a40, a3 ] = 4*a83,
+          [ a41, a1 ] =: 1*a56,
+          [ a41, a2 ] = 2*a58 + 8*a61 + 4*a63 + 2*a64,
+          [ a41, a3 ] = 10*a77 + -4*a78 + 4*a82 + 1*a84 + 2*a87,
+          [ a42, a1 ] =: 1*a57,
+          [ a42, a2 ] =: 1*a58,
+          [ a42, a3 ] = 19*a77 + -9*a78 + 2*a85 + 2*a87,
+          [ a43, a1 ] =: 1*a59,
+          [ a43, a2 ] =: 1*a60,
+          [ a43, a3 ] = 9*a80 + 1*a81 + 4*a84,
+          [ a44, a1 ] =: 1*a61,
+          [ a44, a2 ] = 4*a65,
+          [ a44, a3 ] = 1*a88,
+          [ a45, a1 ] =: 1*a62,
+          [ a45, a2 ] = 4*a63 + 4*a64,
+          [ a45, a3 ] = 5*a84 + 4*a85 + 4*a87,
+          [ a46, a1 ] =: 1*a63,
+          [ a46, a2 ] = 2*a65,
+          [ a46, a3 ] = 1*a86 + 4*a88 + 4*a89,
+          [ a47, a1 ] =: 1*a64,
+          [ a47, a2 ] =: 1*a65,
+          [ a47, a3 ] = 5*a88 + 1*a89,
+          [ a48, a1 ] =: 1*a66,
+          [ a48, a2 ] = 1*a67 + 2*a69 + 4*a75 + 8*a76 + 2*a79,
+          [ a49, a1 ] =: 1*a67,
+          [ a49, a2 ] = 2*a71 + 4*a80 + 4*a82 + 4*a84 + 4*a85,
+          [ a50, a2 ] =: 1*a68,
+          [ a51, a1 ] =: 1*a69,
+          [ a51, a2 ] = 3*a71 + 12*a77 + -6*a78 + 8*a80 + 4*a81 + 6*a82 + 2*a84 + 4*a85 + 4*a87,
+          [ a52, a1 ] =: 1*a70,
+          [ a52, a2 ] =: 1*a71,
+          [ a53, a1 ] =: 1*a72,
+          [ a53, a2 ] = 2*a73 + 1*a74 + 19*a77 + -10*a78 + 5*a80 + 5*a81 + 7*a82 + 3*a84 + 1*a85,
+          [ a54, a1 ] = 8*a76,
+          [ a54, a2 ] =: 1*a73,
+          [ a55, a1 ] =: 1*a74,
+          [ a55, a2 ] = 2*a88 + 2*a89,
+          [ a56, a1 ] =: 1*a75,
+          [ a56, a2 ] = 10*a77 + -4*a78 + 4*a82 + 5*a84 + 2*a87,
+          [ a57, a1 ] =: 1*a76,
+          [ a57, a2 ] =: 1*a77,
+          [ a58, a1 ] =: 1*a78,
+          [ a58, a2 ] = 4*a88 + 4*a89,
+          [ a59, a1 ] =: 1*a79,
+          [ a59, a2 ] =: 1*a80,
+          [ a60, a1 ] =: 1*a81,
+          [ a60, a2 ] = 4*a88 + 4*a89,
+          [ a61, a1 ] =: 1*a82,
+          [ a61, a2 ] = 5*a88 + 4*a89,
+          [ a62, a1 ] =: 1*a83,
+          [ a62, a2 ] =: 1*a84,
+          [ a63, a1 ] =: 1*a85,
+          [ a63, a2 ] =: 1*a86,
+          [ a64, a1 ] =: 1*a87,
+          [ a64, a2 ] =: 1*a88,
+          [ a65, a1 ] =: 1*a89 >
+# main() finished, 0.000406s

@@ -1,0 +1,166 @@
+# The Lie algebra Nilpotent Quotient Program
+# for calculating nilpotent quotients in finitely presented Lie rings by Csaba Schneider.
+# Program:    ./lienq, version 3.0 2017-11-27
+# Machine:    wf146.di.ens.fr
+# Input file: ../examples/schneider:l5.lq
+# Time:       Thu Dec  7 10:37:05 2017
+# Class:      6
+# Flags:      -D 
+
+# initialization finished, 0.00436s
+# EvalAllRel() finished, 3.7e-05s
+# ReducedPcPres() finished, 1e-05s
+# The 1st factor has 10 generators of relative orders 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+# AddGen() finished, 2.7e-05s
+# Tails() finished, 3e-06s
+# Consistency() finished, 4e-06s
+# EvalAllRel() finished, 2.9e-05s
+# ReducedPcPres() finished, 3.1e-05s
+# The 2st factor has 9 generators of relative orders 0, 0, 0, 0, 0, 0, 0, 0, 0
+# AddGen() finished, 6.7e-05s
+# Tails() finished, 4e-06s
+# Consistency() finished, 9.6e-05s
+# EvalAllRel() finished, 7.8e-05s
+# ReducedPcPres() finished, 6.1e-05s
+# The 3rd factor has 8 generators of relative orders 0, 0, 0, 0, 0, 0, 0, 0
+# AddGen() finished, 7.3e-05s
+# Tails() finished, 1.2e-05s
+# Consistency() finished, 0.000215s
+# EvalAllRel() finished, 0.000113s
+# ReducedPcPres() finished, 0.000113s
+# The 4th factor has 7 generators of relative orders 0, 0, 0, 0, 0, 0, 0
+# AddGen() finished, 8.3e-05s
+# Tails() finished, 1.9e-05s
+# Consistency() finished, 0.000276s
+# EvalAllRel() finished, 0.00014s
+# ReducedPcPres() finished, 0.000169s
+# The 5th factor has 6 generators of relative orders 0, 0, 0, 0, 0, 0
+# AddGen() finished, 9.7e-05s
+# Tails() finished, 3.8e-05s
+# Consistency() finished, 0.000476s
+# EvalAllRel() finished, 0.000117s
+# ReducedPcPres() finished, 0.000235s
+# The 6th factor has 5 generators of relative orders 0, 0, 0, 0, 0
+<
+# Weight 1:
+ a1, a2, a3, a4, a5, a6, a7, a8, a9, a10,
+# Weight 2:
+ a11, a12, a13, a14, a15, a16, a17, a18, a19,
+# Weight 3:
+ a20, a21, a22, a23, a24, a25, a26, a27,
+# Weight 4:
+ a28, a29, a30, a31, a32, a33, a34,
+# Weight 5:
+ a35, a36, a37, a38, a39, a40,
+# Weight 6:
+ a41, a42, a43, a44, a45 |
+# The epimorphism:
+#         e1 |--> 1*a1
+#         e2 |--> 1*a2
+#         e3 |--> 1*a3
+#         e4 |--> 1*a4
+#         e5 |--> 1*a5
+#         e6 |--> 1*a6
+#         e7 |--> 1*a7
+#         e8 |--> 1*a8
+#         e9 |--> 1*a9
+#        e10 |--> 1*a10
+# The torsion relations:
+,
+# The product relations:
+          [ a2, a1 ] =: 1*a11,
+          [ a3, a2 ] =: 1*a12,
+          [ a4, a3 ] =: 1*a13,
+          [ a5, a4 ] =: 1*a14,
+          [ a6, a5 ] =: 1*a15,
+          [ a7, a6 ] =: 1*a16,
+          [ a8, a7 ] =: 1*a17,
+          [ a9, a8 ] =: 1*a18,
+          [ a10, a9 ] =: 1*a19,
+          [ a11, a3 ] = -1*a20,
+          [ a12, a1 ] =: 1*a20,
+          [ a12, a4 ] = -1*a21,
+          [ a13, a2 ] =: 1*a21,
+          [ a13, a5 ] = -1*a22,
+          [ a13, a11 ] = 1*a28,
+          [ a14, a3 ] =: 1*a22,
+          [ a14, a6 ] = -1*a23,
+          [ a14, a12 ] = 1*a29,
+          [ a15, a4 ] =: 1*a23,
+          [ a15, a7 ] = -1*a24,
+          [ a15, a13 ] = 1*a30,
+          [ a16, a5 ] =: 1*a24,
+          [ a16, a8 ] = -1*a25,
+          [ a16, a14 ] = 1*a31,
+          [ a17, a6 ] =: 1*a25,
+          [ a17, a9 ] = -1*a26,
+          [ a17, a15 ] = 1*a32,
+          [ a18, a7 ] =: 1*a26,
+          [ a18, a10 ] = -1*a27,
+          [ a18, a16 ] = 1*a33,
+          [ a19, a8 ] =: 1*a27,
+          [ a19, a17 ] = 1*a34,
+          [ a20, a4 ] = -1*a28,
+          [ a20, a14 ] = -1*a35,
+          [ a21, a1 ] =: 1*a28,
+          [ a21, a5 ] = -1*a29,
+          [ a21, a15 ] = -1*a36,
+          [ a22, a2 ] =: 1*a29,
+          [ a22, a6 ] = -1*a30,
+          [ a22, a11 ] = 1*a35,
+          [ a22, a16 ] = -1*a37,
+          [ a23, a3 ] =: 1*a30,
+          [ a23, a7 ] = -1*a31,
+          [ a23, a12 ] = 1*a36,
+          [ a23, a17 ] = -1*a38,
+          [ a23, a20 ] = 1*a41,
+          [ a24, a4 ] =: 1*a31,
+          [ a24, a8 ] = -1*a32,
+          [ a24, a13 ] = 1*a37,
+          [ a24, a18 ] = -1*a39,
+          [ a24, a21 ] = 1*a42,
+          [ a25, a5 ] =: 1*a32,
+          [ a25, a9 ] = -1*a33,
+          [ a25, a14 ] = 1*a38,
+          [ a25, a19 ] = -1*a40,
+          [ a25, a22 ] = 1*a43,
+          [ a26, a6 ] =: 1*a33,
+          [ a26, a10 ] = -1*a34,
+          [ a26, a15 ] = 1*a39,
+          [ a26, a23 ] = 1*a44,
+          [ a27, a7 ] =: 1*a34,
+          [ a27, a16 ] = 1*a40,
+          [ a27, a24 ] = 1*a45,
+          [ a28, a5 ] = -1*a35,
+          [ a28, a15 ] = -1*a41,
+          [ a29, a1 ] =: 1*a35,
+          [ a29, a6 ] = -1*a36,
+          [ a29, a16 ] = -1*a42,
+          [ a30, a2 ] =: 1*a36,
+          [ a30, a7 ] = -1*a37,
+          [ a30, a11 ] = 1*a41,
+          [ a30, a17 ] = -1*a43,
+          [ a31, a3 ] =: 1*a37,
+          [ a31, a8 ] = -1*a38,
+          [ a31, a12 ] = 1*a42,
+          [ a31, a18 ] = -1*a44,
+          [ a32, a4 ] =: 1*a38,
+          [ a32, a9 ] = -1*a39,
+          [ a32, a13 ] = 1*a43,
+          [ a32, a19 ] = -1*a45,
+          [ a33, a5 ] =: 1*a39,
+          [ a33, a10 ] = -1*a40,
+          [ a33, a14 ] = 1*a44,
+          [ a34, a6 ] =: 1*a40,
+          [ a34, a15 ] = 1*a45,
+          [ a35, a6 ] = -1*a41,
+          [ a36, a1 ] =: 1*a41,
+          [ a36, a7 ] = -1*a42,
+          [ a37, a2 ] =: 1*a42,
+          [ a37, a8 ] = -1*a43,
+          [ a38, a3 ] =: 1*a43,
+          [ a38, a9 ] = -1*a44,
+          [ a39, a4 ] =: 1*a44,
+          [ a39, a10 ] = -1*a45,
+          [ a40, a5 ] =: 1*a45 >
+# main() finished, 0.000121s
