@@ -1,0 +1,28 @@
+# we do it for n=1, l=3, k=8
+< x1, x2, x3, x4, x5, xi1, xi2, xi3, w1, w2 |
+	x1^4 * xi1,
+	x2^8 * xi2, # exponent = 2^l
+	x3^256 * xi3, # exponent = 2^k
+	[x5,x4,x1]^4 * [x5,x4,x3,x3]^128, # exponent = 2^(k-1)
+	xi1^64 * xi2^64, # exponents = 2^(k-2), 2^(k-l+1)
+
+	xi1 = [x5,x4,x3]^2 * [x5,x4,x2] * [x5,x4,x4]^2,
+	xi2 = [x5,x4,x3]^2 * [x5,x4,x1]^-1 * [x5,x4,x4]^2, # exponent = 2^(l-2)
+	xi3 = [x5,x4,x2]^-2 * [x5,x4,x1]^-2, # exponent = 2^(l-2)
+	w1 = [x1,x2]^16 * [x1,x3]^256 * [x2,x3]^512, # exponents = 2^(l+1), 2^k, 2^(k+1)
+	w2 = [x1,x2^16] * [x1,x3^256] * [x2,x3^512] > # exponents = 2^(l+1), 2^k, 2^(k+1)
+
+# we do it for n=1, l=2, k=5
+< x1, x2, x3, x4, x5, xi1, xi2, xi3, w1, w2 |
+	x1^4 * xi1,
+	x2^4 * xi2, # exponent = 2^l
+	x3^32 * xi3, # exponent = 2^k
+	[x5,x4,x1]^4 * [x5,x4,x3,x3]^16, # exponent = 2^(k-1)
+	xi1^8 * xi2^16, # exponents = 2^(k-2), 2^(k-l+1)
+
+	xi1 = [x5,x4,x3]^2 * [x5,x4,x2] * [x5,x4,x4]^2,
+	xi2 = [x5,x4,x3]^1 * [x5,x4,x1]^-1 * [x5,x4,x4]^2, # exponent = 2^(l-2)
+	xi3 = [x5,x4,x2]^-1 * [x5,x4,x1]^-2, # exponent = 2^(l-2)
+	w1 = [x1,x2]^8 * [x1,x3]^32 * [x2,x3]^64, # exponents = 2^(l+1), 2^k, 2^(k+1)
+	w2 = [x1,x2^8] * [x1,x3^32] * [x2,x3^64] > # exponents = 2^(l+1), 2^k, 2^(k+1)
+
