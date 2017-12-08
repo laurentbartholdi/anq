@@ -92,7 +92,7 @@ inline void coeff_neg(coeff &result, const coeff &a) {
 
 /* unused */
 inline int coeff_sgn(const coeff &a) {
-  return a.data > 0;
+  return a.data != 0;
 }
 
 inline void coeff_sub(coeff &result, const coeff &a, const coeff &b) {

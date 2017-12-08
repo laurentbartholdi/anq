@@ -65,10 +65,14 @@ void PartialHermite(unsigned row) {
 #endif
 
 bool AddRow(gpvec cv) {
+  if (cv->g == EOW) // easy case: trivial relation, change nothing
+    return false;
+  
+  if (cv->g <= NrPcGens)
+    abortprintf(5, "AddRow: vector has a term a%d not in the centre", cv->g);
+
   bool ChangedMatrix = false;
 
-  if (cv->g != EOW && cv->g <= NrPcGens)
-    abortprintf(5, "AddRow: vector has a coefficient a%d not in the centre", cv->g);
 
   gpvec p = FreshVec();
   Copy(p, cv);

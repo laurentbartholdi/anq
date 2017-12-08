@@ -139,8 +139,8 @@ inline void coeff_clear(coeff &a) {
 
 inline void coeff_add(coeff &result, const coeff &a, const coeff &b) {
   uint128_t sum = (uint128_t) a.data + b.data;
-  if (sum > MONTGOMERY_N)
-    result.data = sum-MONTGOMERY_N;
+  if (sum >= MONTGOMERY_N)
+    result.data = sum - MONTGOMERY_N;
   else
     result.data = sum;
 }
@@ -164,7 +164,7 @@ inline int coeff_cmp_si(const coeff &a, long b) {
 }
 
 inline void coeff_divexact(coeff &result, const coeff &a, const coeff &b) {
-  result = uint64_t2coeff(coeff2uint64_t(a) / coeff2uint64_t(b));
+  result.data = a.data / coeff2uint64_t(b);
 }
 
 inline void coeff_fdiv_q(coeff &result, const coeff &a, const coeff &b) {
@@ -192,13 +192,11 @@ inline void coeff_neg(coeff &result, const coeff &a) {
 
 /* unused */
 inline int coeff_sgn(const coeff &a) {
-  return a.data > 0;
+  return a.data != 0;
 }
 
 inline void coeff_sub(coeff &result, const coeff &a, const coeff &b) {
-  coeff c;
-  coeff_neg(c, b);
-  coeff_add(result, a, c);
+  coeff_add(result, a, { .data = MONTGOMERY_N - b.data });
 }
 
 inline void coeff_submul(coeff &result, const coeff &a, const coeff &b) {
