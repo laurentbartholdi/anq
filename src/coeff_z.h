@@ -9,6 +9,8 @@
 
 #error broken
 
+#define COEFF_ID "Z as z_t"
+
 #include "z.h"
 typedef z_t coeff;
 

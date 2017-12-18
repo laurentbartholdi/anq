@@ -7,6 +7,8 @@
 
 #include <inttypes.h>
 
+#define COEFF_ID "Z/2^64 as uint64_t"
+
 struct coeff {
   uint64_t data;
 };

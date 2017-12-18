@@ -5,6 +5,8 @@
 ** defines coefficients as arbitrary-precision integers
 */
 
+#define COEFF_ID "Z as mpz_t"
+
 #include<gmp.h>
 typedef mpz_t coeff;
 

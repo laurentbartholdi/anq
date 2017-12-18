@@ -5,6 +5,8 @@
 ** defines coefficients as signed 64-bit integers
 */
 
+#define COEFF_ID "Z as int64_t"
+
 struct coeff {
   int64_t data;
 };

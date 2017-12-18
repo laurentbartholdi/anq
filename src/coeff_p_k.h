@@ -12,6 +12,8 @@
 #include </> // abort
 #endif
 
+#define COEFF_ID "Z/" ## MODULUS_PRIME ## "^" ## MODULUS_EXPONENT ## " as uint64_t"
+
 #if 0 // nice exercise in template programming
 const uint64_t PRIME = MODULUS_PRIME;
 const uint64_t EXPONENT = MODULUS_EXPONENT;

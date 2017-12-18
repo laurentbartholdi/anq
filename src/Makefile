@@ -7,8 +7,8 @@
 
 #CPPFLAGS = -DVERSION='"3.0 2017-11-24"' -DCOEFF_IS_MPZ
 #CPPFLAGS = -DVERSION='"3.0 2017-11-24"' -DCOEFF_IS_Z
-CPPFLAGS = -DVERSION='"3.0 2017-11-24"' -DCOEFF_IS_MODp_k -DMODULUS_PRIME=3 -DMODULUS_EXPONENT=16
-#CPPFLAGS = -DVERSION='"3.0 2017-11-27"' -DCOEFF_IS_MOD2_64
+#CPPFLAGS = -DVERSION='"3.0 2017-11-24"' -DCOEFF_IS_MODp_k -DMODULUS_PRIME=3 -DMODULUS_EXPONENT=16
+CPPFLAGS = -DVERSION='"3.0 2017-11-27"' -DCOEFF_IS_MOD2_64
 #CPPFLAGS = -DVERSION='"3.0 2017-11-27"' -DCOEFF_IS_LONG
 OPT = -O0
 DEBUG = -g -ggdb
@@ -30,6 +30,8 @@ endif
 LIENQ_OBJ = presentation.o print.o readpres.o operations.o matrix.o epim.o addgen.o consistency.o tails.o auxiliary.o lienq.o
 
 LIENQ_INCLUDES = lienq.h coeff_long.h coeff_z.h coeff_mpz.h coeff_2_64.h coeff_p_k.h
+
+all: lienq rips
 
 lienq: $(LIENQ_OBJ)
 
@@ -61,7 +63,12 @@ tails.o: tails.cc $(LIENQ_INCLUDES)
 test: test.cc
 
 test.s: test.cc
-	g++-7 -O3 -march=native -std=c++11 -S -DMODULUS_PRIME=3 -DMODULUS_EXPONENT=6 @< -o $@
+	g++-7 -O3 -march=native -std=c++11 -S $< -o $@
 
-smith: smith.cc # libraries are compiled with g++, not g++-7!
-	g++ -O3 -march=native -std=c++11 $< -o $@ -lgivaro -lgmp -lgmpxx -lntl -llinbox
+rips: rips.cc rref.o
+	g++-7 -g rips.cc rref.o -o rips -lgmp -lflint
+
+mat: mat.cc rref.o
+	g++-7 -std=c++14 -g mat.cc rref.o -o mat -lgmp -lflint # -lntl # -lgivaro -lgmp -lgmpxx -llinbox
+
+rref.o: rref.cc

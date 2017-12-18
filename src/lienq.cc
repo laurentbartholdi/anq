@@ -72,12 +72,13 @@ int main(int argc, char **argv) {
   gethostname(hostname, 128);
   fprintf(OutputFile, "# The Lie algebra Nilpotent Quotient Program\n"
 	  "# for calculating nilpotent quotients in finitely presented Lie rings by Csaba Schneider.\n");
-  fprintf(OutputFile, "# Program:    %s, version %s\n", argv[0], VERSION);
-  fprintf(OutputFile, "# Machine:    %s\n", hostname);
-  fprintf(OutputFile, "# Input file: %s\n", InputFileName);
-  fprintf(OutputFile, "# Time:       %s", timestring);
-  fprintf(OutputFile, "# Class:      %d\n", UpToClass);
-  fprintf(OutputFile, "# Flags:      %s\n\n", flags);
+  fprintf(OutputFile, "# Program:\t%s, version %s\n", argv[0], VERSION);
+  fprintf(OutputFile, "# Machine:\t%s\n", hostname);
+  fprintf(OutputFile, "# Coefficients:\t%s\n", COEFF_ID);
+  fprintf(OutputFile, "# Input file:\t%s\n", InputFileName);
+  fprintf(OutputFile, "# Start time:\t%s", timestring);
+  fprintf(OutputFile, "# Class:\t%d\n", UpToClass);
+  fprintf(OutputFile, "# Flags:\t'%s'\n\n", flags);
 
   InitPcPres();
   InitEpim();
