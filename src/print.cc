@@ -46,7 +46,7 @@ void PrintVec(gpvec gv) {
     fprintf(OutputFile, "%s%ld*a%d", i ? " + " : "", coeff_get_si(gv[i].c), gv[i].g);
 }
 
-void PrintPcPres(void) {
+void PrintPcPres(presentation &Pres) {
   fprintf(OutputFile, "<");
 
   unsigned curclass = 0;

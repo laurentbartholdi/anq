@@ -3,6 +3,9 @@
  * based on linbox.
  ****************************************************************/
 
+#define USE_FLINT
+#define USE_IML
+
 #include "rref.h"
 
 constexpr inline uint64_t powint(uint64_t x, uint64_t p) {
@@ -119,11 +122,45 @@ template<class T> std::pair<std::vector<T>,sparse_mat<T>> sparse_mat<T>::rref(si
 
 }
 
-#else // USE_FLINT
+#elif defined(USE_FLINT)
 
 #include <flint/flint.h>
 #include <flint/fmpz.h>
 #include <flint/fmpz_mat.h>
+
+#ifdef USE_IML // if possible, FLINT is too slow.
+
+#include <gmp.h>
+#include <iml.h>
+
+template<class T> sparse_mat<T> sparse_mat<T>::nullspace(void) {
+  mpz_t *ns;
+
+  long A[nrrows*nrcols];
+
+  for (size_t i = 0; i < nrrows*nrcols; i++)
+    A[i] = 0;
+
+  for (auto row: mat)
+    for (auto col: row.second)
+      A[row.first*nrcols+nrcols-1-col.first] = col.second;
+
+  size_t nullity = kernelLong(nrrows, nrcols, A, &ns, false);
+
+  sparse_mat<T> result;
+
+  for (size_t i = 0; i < nullity; i++)
+    for (size_t j = 0; j < nrcols; j++)
+      result(i,j) = -mpz_get_si(ns[(nullity-1-i)+(nrcols-1-j)*nullity]);
+  result.setsize(nullity,nrcols);
+
+  for (size_t i = 0; i < nullity*nrcols; i++)
+    mpz_clear(ns[i]);
+  
+  return result;    
+}
+
+#else // back to USE_FLINT
 
 template<class T> sparse_mat<T> sparse_mat<T>::nullspace(void) {
   fmpz_mat_t A;
@@ -154,6 +191,8 @@ template<class T> sparse_mat<T> sparse_mat<T>::nullspace(void) {
   return result;  
 }
 
+#endif
+
 template<class T> sparse_mat<T> sparse_mat<T>::image(void) {
   fmpz_mat_t A;
   fmpz_mat_init(A, nrrows, nrcols);
@@ -177,7 +216,7 @@ template<class T> sparse_mat<T> sparse_mat<T>::image(void) {
   
   return result;  
 }
-  
+
 #endif
 
 template class sparse_mat<short>;

@@ -12,7 +12,9 @@
 #include </> // abort
 #endif
 
-#define COEFF_ID "Z/" ## MODULUS_PRIME ## "^" ## MODULUS_EXPONENT ## " as uint64_t"
+#define __COEFF_ID(x) #x
+#define _COEFF_ID(x,y) "Z/" __COEFF_ID(x) "^" __COEFF_ID(y) " as uint64_t"
+#define COEFF_ID _COEFF_ID(MODULUS_PRIME,MODULUS_EXPONENT)
 
 #if 0 // nice exercise in template programming
 const uint64_t PRIME = MODULUS_PRIME;

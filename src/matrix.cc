@@ -7,8 +7,8 @@
 
 #include "lienq.h"
 
-unsigned NrRows;
-gpvec *Matrix;
+static unsigned NrRows;
+static gpvec *Matrix;
 
 void InitMatrix(void) {
   Matrix = (gpvec *) malloc(NrCenGens * sizeof(gpvec));
@@ -43,11 +43,14 @@ void ReduceRow(gpvec &v, gpvec &w) {
     }
 }
 
-void HermiteNormalForm(void) {
+void HermiteNormalForm(gpvec **rels, unsigned *numrels) {
   /* reduce all the head columns, to achieve Hermite normal form. */
   for (unsigned i = 1; i < NrRows; i++)
     for (unsigned j = 0; j < i; j++)
       ReduceRow(Matrix[j], Matrix[i]);
+
+  *rels = Matrix;
+  *numrels = NrRows;
 }
 
 #if 0

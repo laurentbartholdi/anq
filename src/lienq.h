@@ -98,7 +98,6 @@ struct deftype {
 extern bool Graded, PrintZeros, PrintDefs;
 extern unsigned Debug;
 extern FILE *OutputFile;
-extern unsigned Class;
 
 /* auxiliary functions */
 void InitStack(void);
@@ -134,7 +133,7 @@ void GradedConsistency(void);
 /* print functions */
 extern void abortprintf(int, const char *, ...) __attribute__((format(printf, 2, 3)));
 void PrintVec(gpvec);
-void PrintPcPres(void);
+void PrintPcPres(presentation &);
 void TimeStamp(const char *);
   
 /* presentation functions */
@@ -142,14 +141,15 @@ extern gpvec **Product, *Power, *Epimorphism;
 extern coeff *Exponent, *Annihilator;
 extern deftype *Definition;
 extern unsigned *Weight, *LastGen;
-extern unsigned NrPcGens, // = LastGen[Class-1]
+extern unsigned Class,
+  NrPcGens, // = LastGen[Class-1]
   NrCenGens, // = LastGen[Class]-LastGen[Class-1]
   NrTotalGens; // = LastGen[Class]
 
-void InitPcPres(void);
-void FreePcPres(void);
-void EvalAllRel(void);
-unsigned ReducedPcPres(void);
+void InitPcPres(presentation &);
+void FreePcPres(presentation &);
+void EvalAllRel(presentation &);
+unsigned ReducedPcPres(presentation &, gpvec *, unsigned);
 void ExtendPcPres(void);
 
 /* operation functions */
@@ -189,26 +189,18 @@ void Prod(gpvec, constgpvec, constgpvec);
 void Collect(gpvec, constgpvec);
 void ShrinkCollect(gpvec &);
 
-/* epim functions */
-void InitEpim(void);
-void FreeEpim(void);
-
 /* readpres functions */
-extern presentation Pres;
-
-void ReadPresentation(const char *);
-void FreePresentation(void);
+unsigned ReadPresentation(presentation &, const char *);
+void FreePresentation(presentation &);
 void EvalRel(gpvec, node *);
 void PrintNode(node *);
 
 /* addgen functions */
-void AddGen(void);
+void AddGen(presentation &);
 void GradedAddGen(void);
 
 /* matrix functions */
-extern unsigned NrRows;
-extern gpvec *Matrix;
-void HermiteNormalForm(void);
+void HermiteNormalForm(gpvec **, unsigned *);
 bool AddRow(gpvec);
 void InitMatrix(void);
 void FreeMatrix(void);

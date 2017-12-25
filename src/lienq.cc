@@ -16,10 +16,8 @@ const char USAGE[] = "Usage: lienq [-G] [-D] [-A] [-Z] [-P] [-F <outputfile>] <i
 
 bool PrintZeros = false, Graded = false, Gap = false, PrintDefs = false;
 unsigned Debug = 0;
-unsigned Class;
 
 int main(int argc, char **argv) {
-  unsigned UpToClass = -1;
   char flags[24] = "";
   int c;
   
@@ -59,7 +57,8 @@ int main(int argc, char **argv) {
     abortprintf(1, "I need at least one name as input file\n%s", USAGE);
 
   char *InputFileName = argv[optind++];
-  ReadPresentation(InputFileName);
+  presentation Pres;
+  unsigned UpToClass = ReadPresentation(Pres, InputFileName);
   
   if (optind < argc)
     UpToClass = atoi(argv[optind]);
@@ -80,8 +79,7 @@ int main(int argc, char **argv) {
   fprintf(OutputFile, "# Class:\t%d\n", UpToClass);
   fprintf(OutputFile, "# Flags:\t'%s'\n\n", flags);
 
-  InitPcPres();
-  InitEpim();
+  InitPcPres(Pres);
 
   TimeStamp("initialization");
   
@@ -89,7 +87,7 @@ int main(int argc, char **argv) {
     unsigned OldNrPcGens = NrPcGens;
 
     if (Class >= 2) {
-      if (Graded) GradedAddGen(); else AddGen();
+      if (Graded) GradedAddGen(); else AddGen(Pres);
     }
 
     InitStack();
@@ -104,11 +102,13 @@ int main(int argc, char **argv) {
       if (Graded) GradedConsistency(); else Consistency();
     }
     
-    EvalAllRel();
+    EvalAllRel(Pres);
 
-    HermiteNormalForm();
+    gpvec *rels;
+    unsigned numrels;
+    HermiteNormalForm(&rels, &numrels);
     
-    unsigned trivialgens = ReducedPcPres();
+    unsigned trivialgens = ReducedPcPres(Pres, rels, numrels);
 
     FreeMatrix();
     FreeStack();
@@ -127,14 +127,13 @@ int main(int argc, char **argv) {
   }
 
   InitStack();
-  PrintPcPres();
+  PrintPcPres(Pres);
   FreeStack();
 
   TimeStamp("main()");
 
-  FreePresentation();
-  FreeEpim();
-  FreePcPres();
+  FreePcPres(Pres);
+  FreePresentation(Pres);
 
   return 0;
 }

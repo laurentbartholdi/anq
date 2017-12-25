@@ -5,16 +5,11 @@
 ##                                                           schcs@math.klte.hu
 ##
 
-#CPPFLAGS = -DVERSION='"3.0 2017-11-24"' -DCOEFF_IS_MPZ
-#CPPFLAGS = -DVERSION='"3.0 2017-11-24"' -DCOEFF_IS_Z
-#CPPFLAGS = -DVERSION='"3.0 2017-11-24"' -DCOEFF_IS_MODp_k -DMODULUS_PRIME=3 -DMODULUS_EXPONENT=16
-CPPFLAGS = -DVERSION='"3.0 2017-11-27"' -DCOEFF_IS_MOD2_64
-#CPPFLAGS = -DVERSION='"3.0 2017-11-27"' -DCOEFF_IS_LONG
+LIENQVERSION = -DVERSION='"3.0 2017-11-24"'
 OPT = -O0
 DEBUG = -g -ggdb
 CXXFLAGS = -std=gnu++11 -Wall -Werror $(DEBUG) $(OPT)
 CFLAGS = -Wall -Werror $(DEBUG) $(OPT)
-LDLIBS = -lgmp
 LDFLAGS = $(DEBUG)
 
 ## LieNQ prefers GNU C compiler.
@@ -27,38 +22,40 @@ else
     CXX = g++
 endif
 
-LIENQ_OBJ = presentation.o print.o readpres.o operations.o matrix.o epim.o addgen.o consistency.o tails.o auxiliary.o lienq.o
-
-LIENQ_INCLUDES = lienq.h coeff_long.h coeff_z.h coeff_mpz.h coeff_2_64.h coeff_p_k.h
+LIENQ_OBJ = presentation.o print.o readpres.o operations.o matrix.o addgen.o consistency.o tails.o auxiliary.o lienq.o
 
 all: lienq rips
 
-lienq: $(LIENQ_OBJ)
 
 clean:
-	rm -f $(LIENQ_OBJ) lienq
+	rm -f *.o lienq
 
-addgen.o: addgen.cc $(LIENQ_INCLUDES)  
+lienq_mpz: $(subst .o,_mpz.o,$(LIENQ_OBJ))
+	$(CXX) -o $@ $^ -lgmp
 
-auxiliary.o: auxiliary.cc $(LIENQ_INCLUDES)  
+%_mpz.o: %.cc lienq.h coeff_mpz.h
+	$(CXX) -c -DCOEFF_IS_MPZ $(CXXFLAGS) $(LIENQVERSION) $< -o $@
 
-consistency.o: consistency.cc $(LIENQ_INCLUDES)
+lienq_z: $(subst .o,_z.o,$(LIENQ_OBJ))
+	$(CXX) -o $@ $^ -lgmp
 
-epim.o: epim.cc $(LIENQ_INCLUDES)
+%_z.o: %.cc lienq.h coeff_z.h
+	$(CXX) -c -DCOEFF_IS_Z $(CXXFLAGS) $(LIENQVERSION) $< -o $@
 
-lienq.o: lienq.cc $(LIENQ_INCLUDES)
+lienq_long: $(subst .o,_long.o,$(LIENQ_OBJ))
 
-matrix.o: matrix.cc $(LIENQ_INCLUDES)
+%_long.o: %.cc lienq.h coeff_long.h
+	$(CXX) -c -DCOEFF_IS_LONG $(CXXFLAGS) $(LIENQVERSION) $< -o $@
 
-operations.o: operations.cc $(LIENQ_INCLUDES)  
+lienq_2_64: $(subst .o,_2_64.o,$(LIENQ_OBJ))
 
-presentation.o: presentation.cc $(LIENQ_INCLUDES)
+%_2_64.o: %.cc lienq.h coeff_2_64.h
+	$(CXX) -c -DCOEFF_IS_MOD2_64 $(CXXFLAGS) $(LIENQVERSION) $< -o $@
 
-print.o: print.cc $(LIENQ_INCLUDES)  
+lienq_3_16: $(subst .o,_3_16.o,$(LIENQ_OBJ))
 
-readpres.o: readpres.cc $(LIENQ_INCLUDES)
-
-tails.o: tails.cc $(LIENQ_INCLUDES)
+%_3_16.o: %.cc lienq.h coeff_p_k.h
+	$(CXX) -c -DCOEFF_IS_MODp_k -DMODULUS_PRIME=3 -DMODULUS_EXPONENT=16 $(CXXFLAGS) $(LIENQVERSION) $< -o $@
 
 test: test.cc
 
@@ -66,9 +63,9 @@ test.s: test.cc
 	g++-7 -O3 -march=native -std=c++11 -S $< -o $@
 
 rips: rips.cc rref.o
-	g++-7 -g rips.cc rref.o -o rips -lgmp -lflint
+	g++-7 -g rips.cc rref.o -o rips -lgmp -lflint -liml -lcblas
 
 mat: mat.cc rref.o
-	g++-7 -std=c++14 -g mat.cc rref.o -o mat -lgmp -lflint # -lntl # -lgivaro -lgmp -lgmpxx -llinbox
+	g++-7 -std=c++14 -g mat.cc rref.o -o mat -lgmp -lflint -liml -lcblas # -lntl # -lgivaro -lgmp -lgmpxx -llinbox
 
 rref.o: rref.cc

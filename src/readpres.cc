@@ -11,19 +11,11 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-#if 0
-static const char *TokenName[] = {
-  "LParen", "RParen", "LBrack", "RBrack",  "LBrace",  "RBrace",
-  "Mult",   "Power",  "Equal",  "DEqualL", "DEqualR", "Plus",
-  "Minus",  "LAngle", "RAngle", "Pipe",    "Comma",   "Number",
-  "Gen"};
-#endif
-
 enum token {
-  LPAREN, RPAREN, LBRACK, RBRACK, LBRACE, RBRACE,
-  MULT, POWER, EQUAL, DEQUALL, DEQUALR, PLUS,
-  MINUS, LANGLE, RANGLE, PIPE, COMMA, SEMICOLON, NUMBER,
-  GEN };
+  LPAREN, RPAREN, LBRACK, RBRACK, LBRACE, RBRACE, LANGLE, RANGLE,
+  MULT, DIV, POWER, PLUS, MINUS,
+  EQUAL, DEQUALL, DEQUALR,
+  PIPE, COMMA, SEMICOLON, NUMBER, GEN };
   
 static char Ch;           /* Contains the next char on the input. */
 static token Token;       /* Contains the current token. */
@@ -35,10 +27,7 @@ static const char *InFileName;  /* Current input file name. */
 static FILE *InFp;        /* Current input file pointer. */
 static coeff N;           /* Contains the integer just read. */
 static char Gen[128];     /* Contains the generator name. */
-
-/* The following structure will carry the presentation given by the user. */
-
-presentation Pres;
+static presentation *Pres;
 
 void FreeNode(node *n) {
   switch (n->type) {
@@ -63,10 +52,10 @@ static node *NewNode(nodetype type) {
 enum genstatus { NOCREATE, CREATE };
 
 static gen GenNumber(char *gname, genstatus status) {
-  if (status == CREATE && Pres.NrGens == 0)
-    Pres.Generators = (char **) malloc(2 * sizeof(char *));
-  for (unsigned i = 1; i <= Pres.NrGens; i++) {
-    if (!strcmp(gname, Pres.Generators[i])) {
+  if (status == CREATE && Pres->NrGens == 0)
+    Pres->Generators = (char **) malloc(2 * sizeof(char *));
+  for (unsigned i = 1; i <= Pres->NrGens; i++) {
+    if (!strcmp(gname, Pres->Generators[i])) {
       if (status == CREATE)
         return (gen) 0;
       return (gen) i;
@@ -74,18 +63,18 @@ static gen GenNumber(char *gname, genstatus status) {
   }
   if (status == NOCREATE)
     return (gen) 0;
-  Pres.NrGens++;
-  Pres.Generators = (char **) realloc(Pres.Generators, (Pres.NrGens + 1) * sizeof(char *));
-  Pres.Generators[Pres.NrGens] = new char[strlen(gname) + 1];
-  strcpy(Pres.Generators[Pres.NrGens], gname);
+  Pres->NrGens++;
+  Pres->Generators = (char **) realloc(Pres->Generators, (Pres->NrGens + 1) * sizeof(char *));
+  Pres->Generators[Pres->NrGens] = new char[strlen(gname) + 1];
+  strcpy(Pres->Generators[Pres->NrGens], gname);
 
-  return Pres.NrGens;
+  return Pres->NrGens;
 }
 
 char *GenName(gen g) {
-  if (g > Pres.NrGens)
+  if (g > Pres->NrGens)
     return (char *) NULL;
-  return Pres.Generators[g];
+  return Pres->Generators[g];
 }
 
 static void SyntaxError(const char *format, ...) __attribute__((format(printf, 1, 2)));
@@ -192,6 +181,11 @@ static void NextToken(void) {
     ReadCh();
     break;
   }
+  case '/': {
+    Token = DIV;
+    ReadCh();
+    break;
+  }
   case '^': {
     Token = POWER;
     ReadCh();
@@ -276,27 +270,6 @@ static void NextToken(void) {
     } else
       SyntaxError("Illegal character '%c'", Ch);
   }
-}
-
-static void InitParser(const char *InputFileName) {
-  InFp = fopen(InputFileName, "r");
-  if (InFp == NULL)
-    abortprintf(1, "Can't open input file '%s'", InputFileName);
-  InFileName = InputFileName;
-
-  Ch = '\0';
-  Char = 0;
-  Line = 1;
-
-  coeff_init(N);
-  
-  NextToken();
-}
-
-static void CloseParser(void) {
-  fclose(InFp);
-
-  coeff_clear(N);
 }
 
 static node *SNumber(void) {
@@ -519,9 +492,32 @@ static void GenList() {
   }
 }
 
-void ReadPresentation(const char *InputFileName) {
-  InitParser(InputFileName);
-  Pres.NrGens = 0;
+unsigned ReadPresentation(presentation &Pres0, const char *InputFileName) {
+  bool readstdin = !strcmp(InputFileName, "-");
+  unsigned uptoclass = -1;
+  
+  if (readstdin)
+    InFp = stdin;
+  else
+    InFp = fopen(InputFileName, "r");
+  if (InFp == NULL)
+    abortprintf(1, "Can't open input file '%s'", InputFileName);
+  InFileName = InputFileName;
+
+  Pres = &Pres0;  
+  Pres->NrGens = 0;
+  
+  Ch = '\0';
+  Char = 0;
+  Line = 1;
+  coeff_init(N);
+  
+  NextToken();
+
+  if (Token == NUMBER) {
+    uptoclass = coeff_get_si(N);
+    NextToken();
+  }
   
   if (Token != LANGLE)
     SyntaxError("Presentation expected");
@@ -536,21 +532,26 @@ void ReadPresentation(const char *InputFileName) {
     SyntaxError("Vertical bar expected");
   NextToken();
 
-  Pres.NrRels = RelList(Pres.Relators);
+  Pres->NrRels = RelList(Pres->Relators);
 
   if (Token == PIPE) {
     NextToken();
-    Pres.NrExtraRels = RelList(Pres.ExtraRelators);
+    Pres->NrExtraRels = RelList(Pres->ExtraRelators);
   } else
-    Pres.NrExtraRels = 0, Pres.ExtraRelators = NULL;
+    Pres->NrExtraRels = 0, Pres->ExtraRelators = NULL;
 
   if (Token != RANGLE)
     SyntaxError("Presentation has to be closed by '>'");
 
-  CloseParser();
+  if (!readstdin)
+    fclose(InFp);
+
+  coeff_clear(N);
+
+  return uptoclass;
 }
 
-void FreePresentation(void) {
+void FreePresentation(presentation &Pres) {
   for (unsigned i = 1; i <= Pres.NrGens; i++)
     free(Pres.Generators[i]);
   free(Pres.Generators);
@@ -570,7 +571,7 @@ void PrintNode(node *n) {
     fprintf(OutputFile, "%ld", coeff_get_si(n->cont.n));
     break;
   case TGEN:
-    fprintf(OutputFile, "%s", Pres.Generators[n->cont.g]);
+    fprintf(OutputFile, "%s", Pres->Generators[n->cont.g]);
     break;
   case TSUM:
     PrintNode(n->cont.op.l);

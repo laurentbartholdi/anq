@@ -4,6 +4,7 @@
  ****************************************************************/
 
 #include <iostream>
+#include <sstream>
 #include <iterator>
 #include <vector>
 #include <map>
@@ -18,12 +19,33 @@ typedef sparse_mat<long> mat_t;
  * a Lie algebra with generators x[0],x[1],...,x[d]
  * and relations C[i]*x[j] = sum A[i][j]*[x[j],x[d]]
  ****************************************************************/
+#if 1 // original Rips example
 const unsigned d = 3;
 const int A[d][d] = {
   { 0, -4, -2 },
   { 4,  0, -1 },
   { 2,  1,  0 } };
 const unsigned C[d] = { 64, 16, 4 };
+#endif
+
+#if 0
+const unsigned d = 3;
+int A[d][d] = {
+  { 0, -4, -2 },
+  { 4,  0, -1 },
+  { 2,  1,  0 } };
+const unsigned C[d] = { 729, 81, 9 };
+#endif
+
+#if 0
+const unsigned d = 4;
+int A[d][d] = {
+  { 0, -128, -64, -16 },
+  { 128, 0, -32, -8 },
+  { 64, 32,  0, -1 },
+  { 16, 8,  1,  0 } };
+const unsigned C[d] = { 4096, 512, 64, 8 };
+#endif
 
 /****************************************************************
  * we do computations in Z / prime^exponent
@@ -84,10 +106,10 @@ void add_dynkin(mat_t::row_t &eq, unsigned t, int sign, size_t r, size_t s) {
 }
 
 void print_eq(mat_t::row_t e) {
-  for (size_t i = 0; i < e.size(); i++)
-    if (e[i] != 0) {
-      std::cout << e[i] << "*(";
-      std::copy(pos2tuple[i].begin(), pos2tuple[i].end(), std::ostream_iterator<unsigned>(std::cout, " "));
+  for (auto col: e)
+    if (col.second != 0) {
+      std::cout << col.second << "*(";
+      std::copy(pos2tuple[col.first].begin(), pos2tuple[col.first].end(), std::ostream_iterator<unsigned>(std::cout, " "));
       std::cout << ") ";
     }
   std::cout << std::endl;
@@ -97,17 +119,16 @@ void print_eq(mat_t::row_t e) {
 mat_t rips(size_t r, size_t k, size_t numpart, size_t numtuple, size_t c) {
   mat_t eq;
 
+  // compute left-normed commutators
+  mat_t lie(numtuple, numtuple);
+  for (size_t t = 0; t < numtuple; t++)
+    add_dynkin(lie(t), t, -1, r, 1);
+  
   // put equation that B_0 is a Lie element
-  {
-    mat_t lie(numtuple, numtuple);
-    for (size_t t = 0; t < numtuple; t++)
-      add_dynkin(lie(t), t, -1, r, 1);
-    lie = lie.nullspace();
-    for (auto row: lie.mat)
-      for(auto col: row.second)
-	eq(row.first,col.first) = col.second;
-    eq.nrrows += numtuple;
-  }
+  for (auto row: lie.nullspace().mat)
+    for(auto col: row.second)
+      eq(row.first,col.first) = col.second;
+  eq.nrrows += numtuple;
 
   // put equations B_p = sum_s C *_s X_{p,s}
   for (size_t t = 0; t < numtuple; t++) {
@@ -151,8 +172,6 @@ mat_t rips(size_t r, size_t k, size_t numpart, size_t numtuple, size_t c) {
 
   eq.setsize();
 
-  //  std::cout << eq << std::endl;
-  
   mat_t sol0 = eq.nullspace();
   mat_t sol1; // kill all entries beyond the first, B_0
   for (auto row: sol0.mat)
@@ -160,7 +179,48 @@ mat_t rips(size_t r, size_t k, size_t numpart, size_t numtuple, size_t c) {
       if (col.first < numtuple)
 	sol1(row.first,col.first) = col.second;
   sol1.setsize(sol0.nrrows,numtuple);
-  return sol1.image();
+  mat_t sol2 = sol1.image(), sol3;
+
+  for (size_t row = 0; row < sol2.nrrows; row++) {
+  restart: // super-inefficient!
+    for (auto col: sol2(row))
+      if (col.second != 0) {
+	for (auto lierow: lie.mat)
+	  for (auto liecol: lierow.second)
+	    if (liecol.first == col.first && liecol.second != 0 && col.second % liecol.second == 0) { // can do reduction
+	      sol3(row,lierow.first) += col.second / liecol.second;
+	      add_dynkin(sol2(row), lierow.first, col.second / liecol.second, r, 1);
+	      goto restart;
+	    }
+      }
+  }
+  sol3.setsize(sol2.nrrows,numtuple);
+  return sol3;
+}
+
+void printpres(std::ostream &os, mat_t b, size_t c) {
+  os << c << " < ";
+  for (size_t i = 0; i < d; i++)
+    os << "x" << i+1 << ", ";
+  os << "z |\n";
+  for (size_t i = 0; i < d; i++) {
+    os << "\t" << C[i] << "*x" << i+1;
+    for (size_t j = 0; j < d; j++)
+      os << (j == 0 ? " = " : " + ") << A[i][j] << "*[x" << j+1 << ",z]";
+    os << (i == d-1 ? " |" : ",") << std::endl;
+  }
+  for (size_t i = 0; i < b.nrrows; i++) {
+    bool first = true;
+    for (auto col: b(i)) {
+      os << (first ? "\t" : " + ");
+      first = true;
+      os << col.second << "*[";
+      for (auto j: pos2tuple[col.first])
+	os << (first ? "" : ",") << "x" << j+1, first = false;
+      os << "]";
+    }
+    os << (i == b.nrrows-1 ? " >" : ",") << std::endl;
+  }
 }
 
 int main (int argc, char *argv[]) {
@@ -179,41 +239,45 @@ int main (int argc, char *argv[]) {
   unsigned numpart = pos2part.size();
   unsigned numtuple = pos2tuple.size();
 
-  mat_t b = rips(r, k, numpart, numtuple, c);
+#if true
+  {
+#else
+#if d == 4
+  for (int i01 = 1; i01 <= 64; i01 *= 2)
+    for (int i02 = 1; i02 <= i01; i02 *= 2)
+      for (int i03 = 1; i03 <= i02; i03 *= 2)
+	for (int i12 = 1; i12 <= i02; i12 *= 2)
+	  for (int i13 = 1; i13 <= i12 && i13 <= i03; i13 *= 2)
+	    for (int i23 = 1; i23 <= i13; i23 *= 2) {
+#else
+  for (int i01 = 1; i01 <= 243; i01 *= 3)
+    for (int i02 = 1; i02 <= i01; i02 *= 3)
+      for (int i12 = 1; i12 <= i02; i12 *= 3) {
+#endif
+	      A[0][1] = -i01; A[1][0] = i01;
+	      A[0][2] = -i02; A[2][0] = i02;
+	      A[1][2] = -i12; A[2][1] = i12;
+#if d == 4
+	      A[0][3] = -i03; A[3][0] = i03;
+	      A[1][3] = -i13; A[3][1] = i13;
+	      A[2][3] = -i23; A[3][2] = i23;
+#endif
+#endif
+	      mat_t b = rips(r, k, numpart, numtuple, c);
 
-  std::cout << b << std::endl;
+	      std::stringstream pres;
+  
+	      printpres(pres, b, c);
 
-  for (size_t i = 0; i < b.nrrows; i++)
-    print_eq(b(i));
+	      std::cerr << pres.str();
+	      
+	      std::cout << pres.str();
+	      std::cout.flush();
+	
+	      FILE *pipe = popen("./lienq - | awk '$3 == \"extra\" {on=1}; on{print;}'", "w");
+	      fputs(pres.str().c_str(), pipe);
+	      pclose(pipe);
+	    }
   
   return 0;
-
-  std::cout << "pos2tuple:" << std::endl;
-  for (unsigned i = 0; i < pos2tuple.size(); i++) {
-    std::cout << i << " -> ";
-    std::copy(pos2tuple[i].begin(), pos2tuple[i].end(), std::ostream_iterator<unsigned>(std::cout, " "));
-    std::cout << std::endl;
-  }
-
-  std::cout << "tuple2pos:" << std::endl;
-  for (auto p: tuple2pos) {
-    std::copy(p.first.begin(), p.first.end(), std::ostream_iterator<unsigned>(std::cout, " "));
-    std::cout << " -> " << p.second << std::endl;
-  }
 }
-#if 0
-liesolve := function(file,A,C,maxk)
-    local mats, n, i, j;
-    n := Length(A);
-    mats := ripssolve(A,C,maxk);
-    PrintTo(file,"< ",JoinStringsWithSeparator(List([1..n],i->Concatenation("x",String(i))),","),",x0 |\n");
-    for i in [1..n] do
-        AppendTo(file,"\t",C[i,i],"*x",i," = ",JoinStringsWithSeparator(List([1..n],j->Concatenation(String(A[i,j]),"*[x",String(j),",x0]"))," + "));
-        if i=n then AppendTo(file," |\n"); else AppendTo(file,",\n"); fi;
-    od;
-    for i in [1..Length(mats)] do
-        AppendTo(file,"\t",JoinStringsWithSeparator(List(Combinations([1..n],2),p->Concatenation(String(mats[i][p[1],p[2]]),"*[x",String(p[1]),",x",String(p[2]),"]"))," + "));
-        if i=Length(mats) then AppendTo(file, ">\n"); else AppendTo(file,",\n"); fi;
-    od;
-end;
-#endif

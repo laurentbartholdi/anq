@@ -1,4 +1,6 @@
 *~
 *.o
-src/lienq
+src/lienq_*
+src/mat
+src/rips
 *.dSYM

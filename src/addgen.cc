@@ -50,7 +50,7 @@ static void ExtendPower(void) {
 **  In order to do that we define new generators for the images
 **  of the generators of the finite presentation which are not definitions.
 */
-void AddGen(void) {
+void AddGen(presentation &Pres) {
   /*
   **  We want to know in advance the number of the newly introduced generators.
   **  And also don't hesitate to refer this number as 'NrCenGens'.
@@ -147,7 +147,7 @@ void AddGen(void) {
 
 void GradedAddGen(void) {
   /*
-  **  We want t know in advance the number of the newly introduced generators.
+  **  We want to know in advance the number of the newly introduced generators.
   **  And also don't hazitate to refer this number as 'NrCenGens'.
   */
   if (Class == 2)
