@@ -11,6 +11,12 @@ struct coeff {
   int64_t data;
 };
 
+__attribute__((unused)) static int coeff_overflow(const char *name) {
+  volatile int zero = 0;
+  fprintf(stderr, "%s: integer overflow\n", name);
+  return zero / zero;
+}
+  
 /* addition, it seems that GCC does not optimize as well if(coeff_sgn(x)) as if(coeff_nz_p(x)) */
 inline bool coeff_nz_p(const coeff &a) {
   return a.data != 0;
@@ -47,15 +53,31 @@ inline void coeff_clear(coeff &a) {
 }
 
 inline void coeff_add(coeff &result, const coeff &a, const coeff &b) {
+#ifdef COEFF_UNSAFE
   result.data = a.data + b.data;
+#else
+  if (__builtin_expect(__builtin_saddll_overflow(a.data, b.data, &result.data), false))
+    coeff_overflow("coeff_add");
+#endif
 }
 
 inline void coeff_add_si(coeff &result, const coeff &a, long b) {
+#ifdef COEFF_UNSAFE
   result.data = a.data + b;
+#else
+  if (__builtin_expect(__builtin_saddll_overflow(a.data, b, &result.data), false))
+    coeff_overflow("coeff_add_si");
+#endif
 }
 
 inline void coeff_addmul(coeff &result, const coeff &a, const coeff &b) {
+#ifdef COEFF_UNSAFE
   result.data += a.data * b.data;
+#else
+  int64_t m;
+  if (__builtin_expect(__builtin_smulll_overflow(a.data, b.data, &m) || __builtin_saddll_overflow(result.data, m, &result.data), false))
+    coeff_overflow("coeff_addmul");
+#endif
 }
 
 inline int coeff_cmp(const coeff &a, const coeff &b) {
@@ -83,15 +105,30 @@ inline void coeff_fdiv_r(coeff &result, const coeff &a, const coeff &b) {
 }
 
 inline void coeff_mul(coeff &result, const coeff &a, const coeff &b) {
+#ifdef COEFF_UNSAFE
   result.data = a.data * b.data;
+#else
+  if (__builtin_expect(__builtin_smulll_overflow(a.data, b.data, &result.data), false))
+    coeff_overflow("coeff_mul");
+#endif
 }
 
 inline void coeff_mul_si(coeff &result, const coeff &a, long b) {
+#ifdef COEFF_UNSAFE
   result.data = a.data * b;
+#else
+  if (__builtin_expect(__builtin_smulll_overflow(a.data, b, &result.data), false))
+    coeff_overflow("coeff_mul_si");
+#endif 
 }
 
 inline void coeff_neg(coeff &result, const coeff &a) {
+#ifdef COEFF_UNSAFE
   result.data = -a.data;
+#else
+  if (__builtin_expect(__builtin_ssubll_overflow(0, a.data, &result.data), false))
+    coeff_overflow("coeff_neg");
+#endif
 }
 
 inline int coeff_sgn(const coeff &a) {
@@ -99,11 +136,22 @@ inline int coeff_sgn(const coeff &a) {
 }
 
 inline void coeff_sub(coeff &result, const coeff &a, const coeff &b) {
+#ifdef COEFF_UNSAFE
   result.data = a.data - b.data;
+#else
+  if (__builtin_expect(__builtin_ssubll_overflow(a.data, b.data, &result.data), false))
+    coeff_overflow("coeff_sub");
+#endif
 }
 
 inline void coeff_submul(coeff &result, const coeff &a, const coeff &b) {
+#ifdef COEFF_UNSAFE
   result.data -= a.data * b.data;
+#else
+  int64_t m;
+  if (__builtin_expect(__builtin_smulll_overflow(a.data, b.data, &m) || __builtin_ssubll_overflow(result.data, m, &result.data), false))
+    coeff_overflow("coeff_submul");
+#endif
 }
 
 /* addition, unused */
