@@ -4,3 +4,5 @@ src/lienq_*
 src/mat
 src/rips
 *.dSYM
+OLD/
+roman/
