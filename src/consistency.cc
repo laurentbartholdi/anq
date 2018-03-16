@@ -71,7 +71,7 @@ static void CheckJacobi(gen a, gen b, gen c) {
   Collect(temp1, temp2);
 
   if (Debug >= 2) {
-    fprintf(OutputFile, "# consistency: [a%d,a%d,a%d] = ", a, b, c);
+    fprintf(OutputFile, "# consistency: jacobi(a%d,a%d,a%d) = ", a, b, c);
     PrintVec(temp1);
     fprintf(OutputFile, "\n");
   }
@@ -110,7 +110,7 @@ static void CheckPower(gen a, gen b) {
   Collect(temp[!parity], temp[parity]), parity ^= 1;
 
   if (Debug >= 2) {
-    fprintf(OutputFile, "# consistency: [%ld*a%d,a%d] = ", coeff_get_si(Exponent[a]), a, b);
+    fprintf(OutputFile, "# consistency: %ld*[a%d,a%d]-[%ld*a%d,a%d] = ", coeff_get_si(Exponent[a]), a, b, coeff_get_si(Exponent[a]), a, b);
     PrintVec(temp[parity]);
     fprintf(OutputFile, "\n");
   }

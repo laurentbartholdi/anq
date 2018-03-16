@@ -11,78 +11,102 @@
 /*
 **  Some of the newly introduced generators strictly depend on one another
 **  hence we can compute them proceeding on an induction method.
-**  The following couple of function stand for that staff.
 */
 
-/*
-**  The following function is for computing the tail of the
-**  product [ a, b ] where "a" > "b" and "b" is of weight > 1. We
-**  suppose that the tails for [ d, c ] are already computed where
-**  "d" > "c" and "c" < "b" for all "d".
-**  Hence [ a, b ] = [ a, g, h ] - [ a, h, g ] where "b" := [ g, h ]
-**  is the definition of "b".
-*/
+/* compute the correct tail for [aj,ai]:
+ *
+ * - if i is defined as [g,h], compute [j,i] = [j,g,h]-[j,h,g]
+ * - if i is defined as N*g, compute [j,i] = N*[j,g]
+ * - if j is defined as N*g, compute [j,i] = N*[g,i] or -N*[i,g]
+ */
+bool AdjustTail(gen j, gen i) {
+  if (i <= LastGen[1] && !ispowergen(j)) /* nothing to do, it's a fresh gen */
+    return true;
 
-static void Tail_ab(gpvec v, gen a, gen b) {
-  if (Weight[a] + Weight[b] > Class)
-    return;
+  if (Weight[j] + Weight[i] > Class) /* the tail would go too far out */
+    return true;
 
-  gen g = Definition[b].g, h = Definition[b].h;
-  
-  gpvec agh = FreshVec();
-  TripleProduct(agh, a, g, h);
-  gpvec ahg = FreshVec();
-  TripleProduct(ahg, a, h, g);
   gpvec tail = FreshVec();
-  Diff(tail, agh, ahg);
-  Collect(v, tail);
-  PopVec();
-  PopVec();
-  PopVec();
+
+  if (iscommgen(i)) { /* ai = [g,h] */
+    gen g = Definition[i].g, h = Definition[i].h;
+
+    gpvec agh = FreshVec();
+    TripleProduct(agh, j, g, h);
+    gpvec ahg = FreshVec();
+    TripleProduct(ahg, j, h, g);
+    gpvec v = FreshVec();
+    Diff(v, agh, ahg);
+    Collect(tail, v);
+    PopVec();
+    PopVec();
+    PopVec();
+
+    if (Debug >= 2)
+      fprintf(OutputFile, "# tail: [a%d,a%d] = [a%d,[a%d,a%d]] = ", j, i, j, g, h);
+  } else if (ispowergen(i)) { /* ai=N*g */
+    gen g = -Definition[i].g;
+    gpvec v = FreshVec();
+    Prod(v, Exponent[g], Product[j][g]);
+    Collect(tail, v);
+    PopVec();
+
+    if (Debug >= 2)
+      fprintf(OutputFile, "# tail: [a%d,a%d] = %ld*[a%d,a%d] = ", j, i, coeff_get_si(Exponent[g]), j, g);
+  } else { /* aj = N*g */
+    gen g = -Definition[j].g;
+    gpvec v = FreshVec();
+    if (g > i)
+      Prod(v, Exponent[g], Product[g][i]);
+    else if (g < i) {
+      Prod(v, Exponent[g], Product[i][g]);
+      Neg(v);
+    }
+    Collect(tail, v);
+    PopVec();
+
+    if (Debug >= 2)
+      fprintf(OutputFile, "# tail: [a%d,a%d] = %ld*[a%d,a%d] = ", j, i, coeff_get_si(Exponent[g]), g, i);
+  }
 
   if (Debug >= 2) {
-    fprintf(OutputFile, "# tail: [a%d,a%d] = ", a, b);
-    PrintVec(v);
+    PrintVec(tail);
     fprintf(OutputFile, "\n");
   }
+
+  unsigned k;
+  for (k = 0; Product[j][i][k].g != EOW; k++)
+    if (Product[j][i][k].g != tail[k].g || coeff_cmp(Product[j][i][k].c,tail[k].c))
+      return false;
+
+  if (tail[k].g != EOW) {
+    Product[j][i] = ResizeVec(Product[j][i], k, Length(tail));
+    Copy(Product[j][i]+k, tail+k);
+  }
+
+  PopVec(); /* tail */
+  return true;
 }
 
 void Tails(void) {
-  for (unsigned i = LastGen[1] + 1; i <= NrPcGens; i++)
+  for (unsigned i = 1; i <= NrPcGens; i++) {
     for (unsigned j = i + 1; j <= NrPcGens; j++) {
-      gpvec tail = FreshVec();
-      Tail_ab(tail, j, i);
-      unsigned k;
-      for (k = 0; Product[j][i][k].g != EOW; k++)
-	if (Product[j][i][k].g != tail[k].g || coeff_cmp(Product[j][i][k].c,tail[k].c))
-	  abortprintf(5, "Tail [a,g,h]-[a,h,g]-[a,[g,h]] doesn't lie in centre for a=a%d,[g,h]=a%d", j, i);
-
-      if (tail[k].g != EOW) {
-	Product[j][i] = ResizeVec(Product[j][i], k, Length(tail));
-	Copy(Product[j][i]+k, tail+k);
-      }
-      PopVec();
+      if (!AdjustTail(j, i))
+	abortprintf(5, "Adjustment to tail of [a%d,a%d] doesn't lie in centre", j, i);
     }
-
+  }
+  
   TimeStamp("Tails()");
 }
 
 void GradedTails(void) {
+  /* TODO!!! add powers */
+  
   for (unsigned k = 2; k <= Class / 2; k++)
     for (unsigned i = LastGen[k-1] + 1; i <= LastGen[k]; i++)
       for (unsigned j = std::max(i + 1, LastGen[Class-k-1] + 1); j <= LastGen[Class-k]; j++) {
-	gpvec tail = FreshVec();
-	Tail_ab(tail, j, i);
-	unsigned k;
-	for (k = 0; Product[j][i][k].g != EOW; k++)
-	  if (Product[j][i][k].g != tail[k].g || coeff_cmp(Product[j][i][k].c,tail[k].c))
+	if (!AdjustTail(j, i))
 	  abortprintf(5, "Tail [a,g,h]-[a,h,g]-[a,[g,h]] doesn't lie in centre for a=a%d,[g,h]=a%d", j, i);
-	
-	if (tail[k].g != EOW) {
-	  Product[j][i] = ResizeVec(Product[j][i], k, Length(tail));
-	  Copy(Product[j][i]+k, tail+k);
-	}
-	PopVec();
       }
 
   TimeStamp("GradedTails()");

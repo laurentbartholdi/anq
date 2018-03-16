@@ -16,9 +16,19 @@ void InitMatrix(void) {
   if (Matrix == NULL)
     abortprintf(2, "InitMatrix: malloc(Matrix) failed");
 
-  Matrix[0] = NewVec(NrTotalGens); // scratch row
+  if (TorsionExp == 0)
+    NrRows = 0;
+  else {
+    NrRows = NrCenGens;
+    for (unsigned i = 0; i < NrCenGens; i++) {
+      Matrix[i] = NewVec(NrTotalGens);
+      Matrix[i][0].g = NrPcGens + i + 1;
+      coeff_set_si(Matrix[i][0].c, TorsionExp);
+      Matrix[i][1].g = EOW;
+    }
+  }
 
-  NrRows = 0;
+  Matrix[NrRows] = NewVec(NrTotalGens); // scratch row
 }
 
 void FreeMatrix(void) {
@@ -125,6 +135,7 @@ bool AddRow(gpvec cv) {
 	coeff_divexact(d, p[parity]->c, d);
 	Diff(p[!parity], p[parity], d, Matrix[row]);
 	parity ^= 1;	
+	//ReduceRow(row, p[parity]); // actually slows down the code
 #ifdef COEFF_IS_MPZ // check coefficient explosion
       if (Debug >= 1) {
 	long maxsize = 0;
@@ -143,6 +154,7 @@ bool AddRow(gpvec cv) {
 	Diff(p[!parity], c, Matrix[row], d, p[parity]);
 	SwapRows(row, NrRows);
 	parity ^= 1;
+	//ReduceRow(row, p[parity]); // actually slows down the code
 
 	if (Debug >= 3) {
 	  printf("CHANGE ROW %d: ",row); PrintVec(Matrix[row]); printf("\n");

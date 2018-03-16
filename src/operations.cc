@@ -223,7 +223,7 @@ void Collect(gpvec vec0, constgpvec v) {
       if (coeff_nz_p(vec0->c))
 	vec0->g = i, vec0++;
       p++;
-      if (Power[i]->g != EOW) {
+      if (Power[i] != NULL && Power[i]->g != EOW) {
 	Sum(temp[!parity], p, mp, Power[i]);
 	parity ^= 1;
 	p = temp[parity];
@@ -248,7 +248,7 @@ void ShrinkCollect(gpvec &v) {
   for (pos = 0; v[pos].g != EOW; pos++) {
     gen g = v[pos].g;
     if(!coeff_reduced_p(v[pos].c, Exponent[g])) {
-      if (Power[g]->g != EOW) { // bad news, collection can become longer
+      if (Power[g] != NULL && Power[g]->g != EOW) { // bad news, collection can become longer
 	gpvec newp = FreshVec();
 	Collect(newp, v+pos);
 	unsigned lenv = Length(v), lennewv = pos+shift+Length(newp);
@@ -294,9 +294,9 @@ void Collect(gpvec &vec, bool resize) {
     if(!coeff_reduced_p(vec[pos].c, Exponent[g])) {
       coeff_fdiv_q(mp, vec[pos].c, Exponent[g]);
       coeff_submul(vec[pos].c, mp, Exponent[g]);
-      if (coeff_nz_p(vec[pos].c) && Power[g]->g == EOW)
+      if (coeff_nz_p(vec[pos].c) && (Power[g] == NULL || Power[g]->g == EOW))
 	goto next;  // just reduce the coeff, trivial power
-      if (Power[g]->g == EOW) {
+      if (Power[g] == NULL || Power[g]->g == EOW) {
 	shift++; // we're about to shrink the vector, a coefficient vanished
 	continue;
       }
@@ -318,48 +318,5 @@ void Collect(gpvec v0, constgpvec v1) {
 
 void ShrinkCollect(gpvec &v) {
   Collect(v, true);
-}
-#endif
-
-#if 0
-/* vec0 += [ vec1, vec2 ] */
-void Prod(coeffvec vec0, constgpvec vec1, constgpvec vec2) {
-  coeff c;
-  coeff_init(c);
-  
-  for (constgpvec p1 = vec1; p1->g != EOW; p1++)
-    for (constgpvec p2 = vec2; p2->g != EOW; p2++)
-      if (p1->g <= NrPcGens && p2->g <= NrPcGens && Weight[p1->g] + Weight[p2->g] <= Class) {
-        if (p1->g > p2->g) {
-	  coeff_mul(c, p1->c, p2->c);
-	  Sum(vec0, c, Product[p1->g][p2->g]);
-	} else if (p2->g > p1->g) {
-	  coeff_mul(c, p1->c, p2->c);
-	  coeff_neg(c, c);
-	  Sum(vec0, c, Product[p2->g][p1->g]);
-	}
-      }
-  coeff_clear(c);
-}
-
-/*
-**  The following function writes a coeffvec in normal form i.e. cancels the
-**  coefficients that are not allowed becausee of the power relations. The
-**  result remains in <ev>.
-*/
-void Collect(coeffvec ev) {
-  coeff mp;
-  coeff_init(mp);
-  for (unsigned i = 1; i <= NrTotalGens; i++) {
-    if (coeff_z_p(Exponent[i]))
-      continue;
-    coeff_fdiv_q(mp, ev[i], Exponent[i]);
-    if (coeff_nz_p(mp)) {
-      coeff_submul(ev[i], mp, Exponent[i]);
-      for (constgpvec p = Power[i]; p->g != EOW; p++)
-        coeff_addmul(ev[p->g], mp, p->c);
-    }
-  }
-  coeff_clear(mp);
 }
 #endif

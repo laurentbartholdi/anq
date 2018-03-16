@@ -6,7 +6,7 @@
 ##
 
 LIENQVERSION = -DVERSION='"3.1.1 2017-12-31"'
-OPT = -O3
+OPT = -O0 #3
 DEBUG = -g -ggdb
 CXXFLAGS = -std=gnu++11 -Wall -Werror $(DEBUG) $(OPT)
 CFLAGS = -Wall -Werror $(DEBUG) $(OPT)
@@ -22,9 +22,9 @@ else
     CXX = g++
 endif
 
-LIENQ_OBJ = presentation.o print.o readpres.o operations.o matrix.o addgen.o consistency.o tails.o auxiliary.o lienq.o
+LIENQ_OBJ = presentation.o print.o readpres.o operations.o matrix.o consistency.o tails.o auxiliary.o lienq.o
 
-all: lienq_long lienq_2_64 lienq_mpz rips
+all: lienq_long lienq_2_64 lienq_3_38 lienq_3_39 lienq_mpz
 
 
 clean:
@@ -56,6 +56,11 @@ lienq_3_39: $(subst .o,_3_39.o,$(LIENQ_OBJ))
 
 %_3_39.o: %.cc lienq.h coeff_p_k.h
 	$(CXX) -c -DCOEFF_IS_MODp_k -DMODULUS_PRIME=3 -DMODULUS_EXPONENT=39 $(CXXFLAGS) $(LIENQVERSION) $< -o $@
+
+lienq_3_38: $(subst .o,_3_38.o,$(LIENQ_OBJ))
+
+%_3_38.o: %.cc lienq.h coeff_p_k.h
+	$(CXX) -c -DCOEFF_IS_MODp_k -DMODULUS_PRIME=3 -DMODULUS_EXPONENT=38 $(CXXFLAGS) $(LIENQVERSION) $< -o $@
 
 test: test.cc
 

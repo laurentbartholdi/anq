@@ -12,42 +12,55 @@
 
 FILE *OutputFile = stdout;
 
-const char USAGE[] = "Usage: lienq [-G] [-D] [-A] [-Z] [-P] [-F <outputfile>] <inputfile> [<class>]";
+const char USAGE[] = "Usage: lienq [-A]\ttoggle GAP output, default false\n"
+  "\t[-D]\tincrease debug level\n"
+  "\t[-F <outputfile>]\n"
+  "\t[-G]toggle graded Lie algebra, default false\n"
+  "\t[-P]\ttoggle printing definitions of basic commutators, default false\n"
+  "\t[-X <exponent>]\tset exponent for p-central series, default 0\n"
+  "\t[-Z]\ttoggle printing of zeros in multiplication table, default false\n"
+  "\t<inputfile>\n"
+  "\t[<maximal class>]";
 
 bool PrintZeros = false, Graded = false, Gap = false, PrintDefs = false;
 unsigned Debug = 0;
+unsigned long TorsionExp = 0;
 
 int main(int argc, char **argv) {
   char flags[24] = "";
   int c;
   
-  while ((c = getopt (argc, argv, "GDAZF:P")) != -1)
+  while ((c = getopt (argc, argv, "ADF:GPX:Z")) != -1)
     switch (c) {
-    case 'G':
-      Graded = !Graded;
-      strcat(flags, "-G ");
+    case 'A':
+      Gap = !Gap;
+      strcat(flags, "-A ");
       break;
     case 'D':
       Debug++;
       strcat(flags, "-D ");
       break;
-    case 'A':
-      Gap = !Gap;
-      strcat(flags, "-A ");
-      break;
     case 'F':
       OutputFile = fopen(optarg, "w");
       if (OutputFile == NULL)
 	abortprintf(1, "I can't open the output file '%s'", optarg);
-      strcat(flags, "-F ");
+      sprintf(flags + strlen(flags), "-F '%s' ", optarg);
       break;
-    case 'Z':
-      PrintZeros = !PrintZeros;
-      strcat(flags, "-Z ");
+    case 'G':
+      Graded = !Graded;
+      strcat(flags, "-G ");
       break;
     case 'P':
       PrintDefs = !PrintDefs;
       strcat(flags, "-P ");
+      break;
+    case 'X':
+      TorsionExp = atol(optarg);
+      sprintf(flags + strlen(flags), "-X %lu ", TorsionExp);
+      break;
+    case 'Z':
+      PrintZeros = !PrintZeros;
+      strcat(flags, "-Z ");
       break;
     default:
       abortprintf(1, "Undefined flag '%c'\n%s", c, USAGE);

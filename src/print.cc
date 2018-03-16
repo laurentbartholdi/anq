@@ -68,25 +68,25 @@ void PrintPcPres(presentation &Pres) {
   if (PrintDefs) {
     fprintf(OutputFile, "# The definitions:\n");
     for (unsigned i = 1; i <= NrTotalGens; i++)
-      if (Definition[i].h != 0) {
+      if (iscommgen(i)) {
 	gen cv[Weight[i] + 1], g = i;
 	for (unsigned pos = Weight[g]; Weight[g] > 1; pos--) {
-	  if (Definition[g].h == 0)
+	  if (!iscommgen(g))
 	    abortprintf(5, "Iterated definition of generator %d does not involve commutators and weight-1 generators", i);
 
 	  cv[pos] = Definition[g].h;
 	  g = Definition[g].g;
 	}
 	cv[1] = g;
-	fprintf(OutputFile, "#%10s a%d = [ %d, %d ] = [ ", "", i, Definition[i].g, Definition[i].h);
+	fprintf(OutputFile, "#%10s a%d = [a%d,a%d] = [", "", i, Definition[i].g, Definition[i].h);
 	for (unsigned j = 1; j <= Weight[i]; j++)
-	  fprintf(OutputFile, "%d%s", cv[j], j == Weight[i] ? " ]\n" : ", ");
+	  fprintf(OutputFile, "a%d%s", cv[j], j == Weight[i] ? "]\n" : ",");
       } else {
 	gen g = Definition[i].g;
 	if (0 < (int)g)
 	  fprintf(OutputFile, "#%10s a%d = (%s)^epimorphism\n", "", i, Pres.Generators[g]);
 	else
-	  fprintf(OutputFile, "#%10s a%d = power of %d [should not happen]\n", "", i, -g);
+	  fprintf(OutputFile, "#%10s a%d = %ld*a%d\n", "", i, coeff_get_si(Exponent[-g]), -g);
       }
   }
 
@@ -97,8 +97,8 @@ void PrintPcPres(presentation &Pres) {
       if (!first)
 	  fprintf(OutputFile, ",\n");
       fprintf(OutputFile, "%10s%ld*a%d", "", coeff_get_si(Exponent[i]), i);
-      if (Power[i]->g != EOW) {
-        fprintf(OutputFile, " = ");
+      if (Power[i] != NULL && Power[i]->g != EOW) {
+        fprintf(OutputFile, " =%s ", ispowergen(Power[i]->g) ? ":" : "");
         PrintVec(Power[i]);
       }
       first = false;

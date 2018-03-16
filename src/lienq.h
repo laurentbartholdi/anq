@@ -95,8 +95,9 @@ struct deftype {
 /****************************************************************
  * global variables dictating the behaviour of lienq
  ****************************************************************/
-extern bool Graded, PrintZeros, PrintDefs;
+extern bool PrintZeros, Graded, Gap, PrintDefs;
 extern unsigned Debug;
+extern unsigned long TorsionExp;
 extern FILE *OutputFile;
 
 /* auxiliary functions */
@@ -140,6 +141,16 @@ void TimeStamp(const char *);
 extern gpvec **Product, *Power, *Epimorphism;
 extern coeff *Exponent, *Annihilator;
 extern deftype *Definition;
+inline bool isimggen(gen g) { /* g is defined as an image of original generator */
+  return Definition[g].h == 0 && 0 < (int) Definition[g].g;
+}
+inline bool ispowergen(gen g) { /* g is defined as power of a pc generator */
+  return Definition[g].h == 0 && 0 > (int) Definition[g].g;
+}
+inline bool iscommgen(gen g) { /* g is defined as commutator */
+  return Definition[g].h != 0;
+}
+
 extern unsigned *Weight, *LastGen;
 extern unsigned Class,
   NrPcGens, // = LastGen[Class-1]
@@ -151,6 +162,8 @@ void FreePcPres(presentation &);
 void EvalAllRel(presentation &);
 unsigned ReducedPcPres(presentation &, gpvec *, unsigned);
 void ExtendPcPres(void);
+void AddGen(presentation &);
+void GradedAddGen(void);
 
 /* operation functions */
 void Sum(gpvec, constgpvec, constgpvec);
@@ -185,6 +198,10 @@ inline void Neg(gpvec vec1, constgpvec vec2) {
     coeff_neg(vec1->c, vec2->c), vec1->g = vec2->g;
   vec1->g = EOW;
 }
+inline void Neg(gpvec vec1) {
+  for (; vec1->g != EOW; vec1++)
+    coeff_neg(vec1->c, vec1->c);
+}
 void Prod(gpvec, constgpvec, constgpvec);
 void Collect(gpvec, constgpvec);
 void ShrinkCollect(gpvec &);
@@ -194,10 +211,6 @@ unsigned ReadPresentation(presentation &, const char *);
 void FreePresentation(presentation &);
 void EvalRel(gpvec, node *);
 void PrintNode(node *);
-
-/* addgen functions */
-void AddGen(presentation &);
-void GradedAddGen(void);
 
 /* matrix functions */
 void HermiteNormalForm(gpvec **, unsigned *);
