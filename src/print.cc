@@ -122,15 +122,15 @@ void PrintPcPres(presentation &Pres) {
       first = false;
     }
   }
+  fprintf(OutputFile, "%s# The product relations:\n", first ? "" : ",\n");
 
   first = true;
   for (unsigned j = 1; j <= NrPcGens; j++)
     for (unsigned i = 1; i < j; i++) {
       gen g = Product[j][i]->g;
       if (PrintZeros || g != EOW) {
-	fprintf(OutputFile, ",\n");
-	if (first)
-	  fprintf(OutputFile, "# The product relations:\n");
+	if (!first)
+          fprintf(OutputFile, ",\n");
         fprintf(OutputFile, "%10s[ a%d, a%d ]", "", j, i);
         if (g != EOW) {
 	  if (Definition[g].g == j && Definition[g].h == i)

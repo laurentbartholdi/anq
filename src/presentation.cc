@@ -100,7 +100,7 @@ void InitPcPres(presentation &Pres) {
     coeff_init_set_si(Exponent[i], TorsionExp);
   
   Annihilator = (coeff *) malloc((NrTotalGens + 1) * sizeof(coeff));
-  if (Exponent == NULL)
+  if (Annihilator == NULL)
     abortprintf(2, "InitPcPres: malloc(Annihilator) failed");
 
   for (unsigned i = 1; i <= NrTotalGens; i++)
@@ -296,8 +296,10 @@ unsigned ReducedPcPres(presentation &Pres, gpvec *rels, unsigned numrels) {
   
   delete[] renumber;
 
-  for (unsigned i = 0; i < trivialgens; i++)
+  for (unsigned i = 0; i < trivialgens; i++) {
     coeff_clear(Exponent[NrTotalGens - i]);
+    coeff_clear(Annihilator[NrTotalGens - i]);
+  }
   
   TimeStamp("ReducedPcPres()");
 
