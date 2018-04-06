@@ -9,6 +9,9 @@
 #include <string.h>
 #include <sys/types.h>
 #include <unistd.h>
+#ifdef MEMCHECK
+#include <mcheck.h>
+#endif
 
 FILE *OutputFile = stdout;
 
@@ -91,6 +94,10 @@ int main(int argc, char **argv) {
   fprintf(OutputFile, "# Start time:\t%s", timestring);
   fprintf(OutputFile, "# Class:\t%d\n", UpToClass);
   fprintf(OutputFile, "# Flags:\t'%s'\n\n", flags);
+
+#ifdef MEMCHECK
+  mtrace();
+#endif
 
   InitPcPres(Pres);
 
