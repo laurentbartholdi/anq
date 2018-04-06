@@ -196,5 +196,5 @@ inline void coeff_unit_annihilator(coeff &unit, coeff &annihilator, const coeff 
 
 inline int coeff_out_str(FILE *f, const coeff &a)
 {
-  return fprintf(f, "%lld", a.data);
+  return fprintf(f, "%ld", (long) a.data);
 }
