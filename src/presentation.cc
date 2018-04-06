@@ -51,54 +51,6 @@ static bool *DefGenerators(presentation &Pres) {
 /* initialize Pc presentation, at class 1. No products or powers are set yet. */
 void InitPcPres(presentation &Pres) {
   /*
-  ** We initialize the power-relations to be trivial.
-  */
-  Exponent = (coeff *) malloc((Pres.NrGens + 1) * sizeof(coeff));
-  if (Exponent == NULL)
-    abortprintf(2, "InitPcPres: malloc(Exponent) failed");
-
-  for (unsigned i = 1; i <= Pres.NrGens; i++)
-    coeff_init_set_si(Exponent[i], TorsionExp);
-  
-  Annihilator = (coeff *) malloc((Pres.NrGens + 1) * sizeof(coeff));
-  if (Exponent == NULL)
-    abortprintf(2, "InitPcPres: malloc(Annihilator) failed");
-
-  for (unsigned i = 1; i <= Pres.NrGens; i++)
-    coeff_init_set_si(Annihilator[i], 0);
-  
-  /*
-  ** Suppose the power-relations to be in collected word, so it is enough
-  ** to restore their coefficient vectors.
-  */
-  Power = (gpvec *) malloc((Pres.NrGens + 1) * sizeof(gpvec));
-  if (Power == NULL)
-    abortprintf(2, "InitPcPres: malloc(Power) failed");
-  for (unsigned i = 1; i <= Pres.NrGens; i++)
-    Power[i] = NULL;
-
-  /* The product relations are trivial too (yet).*/
-  Product = (gpvec **) malloc((Pres.NrGens + 1) * sizeof(gpvec *));
-  if (Product == NULL)
-    abortprintf(2, "InitPcPres: malloc(Product) failed");
-
-  /* We allocate space for the Definition[]. */
-  Definition = (deftype *) malloc((Pres.NrGens + 1) * sizeof(deftype));
-  if (Definition == NULL)
-    abortprintf(2, "InitPcPres: malloc(Definition) failed");
-
-  /* LastGen[c] is the last generator of weight c */
-  Weight = (unsigned *) malloc(1 * sizeof(unsigned));
-  if (Weight == NULL)
-    abortprintf(2, "InitPcPres: malloc(Weight) failed");
-
-  LastGen = (unsigned *) malloc(1 * sizeof(unsigned));
-  if (LastGen == NULL)
-    abortprintf(2, "InitPcPres: malloc(LastGen) failed");
-  LastGen[0] = 0;
-  NrPcGens = 0;
-
-  /*
   ** The epimorphism maps from the Lie-algebra given by finite presentation to
   ** the nilpotent factor-algebra computed by the LieNQ algorithm.
   */
@@ -108,10 +60,15 @@ void InitPcPres(presentation &Pres) {
   ** (abelian) factor. It is rather trivial at the beginning, actually a
   ** one-to-one map between the two generator set.
 */
+  NrPcGens = NrCenGens = 0;
 
   Epimorphism = (gpvec *) malloc((Pres.NrGens + 1) * sizeof(gpvec));
   if (Epimorphism == NULL)
     abortprintf(2, "InitPcPres: malloc(Epimorphism) failed");
+
+  Definition = (deftype *) malloc((Pres.NrGens + 1) * sizeof(deftype));
+  if (Definition == NULL)
+    abortprintf(2, "InitPcPres: malloc(Definition) failed");
 
   bool *IsDefIm = DefGenerators(Pres);
   for (unsigned i = 1; i <= Pres.NrGens; i++)
@@ -124,6 +81,47 @@ void InitPcPres(presentation &Pres) {
 
   NrTotalGens = NrCenGens;
 
+  LastGen = (unsigned *) malloc(1 * sizeof(unsigned));
+  if (LastGen == NULL)
+    abortprintf(2, "InitPcPres: malloc(LastGen) failed");
+  LastGen[0] = 0;
+
+  /* LastGen[c] is the last generator of weight c */
+  Weight = (unsigned *) malloc(1 * sizeof(unsigned));
+  if (Weight == NULL)
+    abortprintf(2, "InitPcPres: malloc(Weight) failed");
+
+  /* we initialize the exponents and annihilators of our pc generators */
+  Exponent = (coeff *) malloc((NrTotalGens + 1) * sizeof(coeff));
+  if (Exponent == NULL)
+    abortprintf(2, "InitPcPres: malloc(Exponent) failed");
+
+  for (unsigned i = 1; i <= NrTotalGens; i++)
+    coeff_init_set_si(Exponent[i], TorsionExp);
+  
+  Annihilator = (coeff *) malloc((NrTotalGens + 1) * sizeof(coeff));
+  if (Exponent == NULL)
+    abortprintf(2, "InitPcPres: malloc(Annihilator) failed");
+
+  for (unsigned i = 1; i <= NrTotalGens; i++)
+    coeff_init_set_si(Annihilator[i], 0);
+
+  /* we reserve some space for the powers and commutators of generators,
+     as well as the definitions of generators in terms of powers or
+     commutators of previous ones.
+
+     The actual values will be filled in later. */
+  Power = (gpvec *) malloc((NrTotalGens + 1) * sizeof(gpvec));
+  if (Power == NULL)
+    abortprintf(2, "InitPcPres: malloc(Power) failed");
+  for (unsigned i = 1; i <= NrTotalGens; i++)
+    Power[i] = NULL;
+
+  Product = (gpvec **) malloc((NrTotalGens + 1) * sizeof(gpvec *));
+  if (Product == NULL)
+    abortprintf(2, "InitPcPres: malloc(Product) failed");
+
+  /* Finally we set the epimorphism images from the defining relations */
   InitStack();
   for (unsigned i = 0; i < Pres.NrDefs; i++) {
     gen g = Pres.Definitions[i]->cont.bin.l->cont.g;

@@ -153,7 +153,7 @@ inline void coeff_unit_annihilator(coeff &unit, coeff &annihilator, const coeff 
 
 inline int coeff_out_str(FILE *f, const coeff &a)
 {
-  return fprintf(f, "%llu", a.data); /* maybe we should print in binary or hex? */
+  return fprintf(f, "%lu", (unsigned long) a.data); /* maybe we should print in binary or hex? */
 }
 
 #define coeff_base 2
