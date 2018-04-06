@@ -5,6 +5,12 @@
 ** defines coefficients as signed 64-bit integers
 */
 
+/* COEFF_UNSAFE turns off coefficient overflow detection. It's generally a bad idea to
+   disable it, but it's only present in GCC >= 5 */
+#if !defined(__GNUC__) || __GNUC__ <= 4
+#define COEFF_UNSAFE
+#endif
+
 #define COEFF_ID "Z as int64_t"
 
 struct coeff {
