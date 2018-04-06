@@ -134,7 +134,7 @@ int main(int argc, char **argv) {
 
     ExtendPcPres();
 
-    fprintf(OutputFile, "# The %d%s factor has %d generators of relative orders ", Class, (Class % 10 == 1 && Class != 11) ? "st" : (Class % 10 == 2 && Class != 12) ? "st" : (Class % 10 == 3 && Class != 13) ? "rd" : "th", LastGen[Class]-LastGen[Class-1]);
+    fprintf(OutputFile, "# The %d%s factor has %d generators of relative orders ", Class, (Class % 10 == 1 && Class != 11) ? "st" : (Class % 10 == 2 && Class != 12) ? "nd" : (Class % 10 == 3 && Class != 13) ? "rd" : "th", LastGen[Class]-LastGen[Class-1]);
     for (unsigned i = OldNrPcGens + 1; i <= NrPcGens; i++) {
       coeff_out_str(OutputFile, Exponent[i]);
       fprintf(OutputFile, i == NrPcGens ? "\n" : ", ");

@@ -60,9 +60,9 @@ struct node {
 };
 
 struct presentation {
-  unsigned NrGens, NrRels, NrExtra;
+  unsigned NrGens, NrRels, NrDefs, NrExtra;
   char **GeneratorName;
-  node **Relators, **Extra;
+  node **Relators, **Definitions, **Extra;
 };
 
 /****************************************************************

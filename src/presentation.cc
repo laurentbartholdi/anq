@@ -31,6 +31,23 @@ static void AddSingleGenerator(gpvec &v, gen newgen, deftype def) {
   Definition[newgen] = def;
 }
 
+static bool *DefGenerators(presentation &Pres) {
+  bool *IsDefIm = new bool[Pres.NrGens + 1];
+
+  for (unsigned i = 1; i <= Pres.NrGens; i++)
+    IsDefIm[i] = false;
+
+  /* generators admitting a definition as relator don't need a tail */
+  for (unsigned i = 0; i < Pres.NrDefs; i++) {
+    gen g = Pres.Definitions[i]->cont.bin.l->cont.g;
+    if (IsDefIm[g])
+      abortprintf(3, "(At least) two definitions for generator %d", g);
+    IsDefIm[g] = true;
+  }
+
+  return IsDefIm;
+}
+
 /* initialize Pc presentation, at class 1. No products or powers are set yet. */
 void InitPcPres(presentation &Pres) {
   /*
@@ -79,7 +96,6 @@ void InitPcPres(presentation &Pres) {
   if (LastGen == NULL)
     abortprintf(2, "InitPcPres: malloc(LastGen) failed");
   LastGen[0] = 0;
-  NrCenGens = NrTotalGens = Pres.NrGens;
   NrPcGens = 0;
 
   /*
@@ -96,9 +112,29 @@ void InitPcPres(presentation &Pres) {
   Epimorphism = (gpvec *) malloc((Pres.NrGens + 1) * sizeof(gpvec));
   if (Epimorphism == NULL)
     abortprintf(2, "InitPcPres: malloc(Epimorphism) failed");
-  
+
+  bool *IsDefIm = DefGenerators(Pres);
   for (unsigned i = 1; i <= Pres.NrGens; i++)
-    Epimorphism[i] = NULL, AddSingleGenerator(Epimorphism[i], i, {.g = i, .h = 0});
+    if (!IsDefIm[i]) {
+      NrCenGens++;
+      Epimorphism[i] = NULL;
+      AddSingleGenerator(Epimorphism[i], NrCenGens, {.g = NrCenGens, .h = 0});
+    }
+  delete[] IsDefIm;
+
+  NrTotalGens = NrCenGens;
+
+  InitStack();
+  for (unsigned i = 0; i < Pres.NrDefs; i++) {
+    gen g = Pres.Definitions[i]->cont.bin.l->cont.g;
+    gpvec v = FreshVec();
+    EvalRel(v, Pres.Definitions[i]->cont.bin.r);
+    Epimorphism[g] = NewVec(Length(v));
+    Copy(Epimorphism[g], v);
+    PopVec();
+    ShrinkCollect(Epimorphism[g]);
+  }
+  FreeStack();
 }
 
 void FreePcPres(presentation &Pres) {
@@ -171,25 +207,22 @@ void EliminateTrivialGenerators(gpvec *rels, gpvec &v, int renumber[]) {
 void EvalAllRel(presentation &Pres) {
   gpvec v = FreshVec();
 
-  for (unsigned i = 0; i < Pres.NrRels; i++) {
-    if (Pres.Relators[i]->type != TDREL)
-      continue;
-    EvalRel(v, Pres.Relators[i]->cont.bin.r);
-    gen g = Pres.Relators[i]->cont.bin.l->cont.g;
-    ResizeVec(Epimorphism[g], Length(Epimorphism[g]), Length(v));
-    Collect(Epimorphism[g], v);    
+  for (unsigned i = 0; i < Pres.NrDefs; i++) {
+    gpvec temp = FreshVec();
+    EvalRel(temp, Pres.Definitions[i]->cont.bin.r);
+    Collect(v, temp);
+    PopVec();
     if (Debug >= 2) {
       fprintf(OutputFile, "# defining relation: ");
-      PrintNode(Pres.Relators[i]);
-      fprintf(OutputFile, "\n");
-      PrintVec(v);
-      fprintf(OutputFile, "\n");
+      PrintNode(Pres.Definitions[i]);
+      fprintf(OutputFile, " ("); PrintVec(v); fprintf(OutputFile, ")\n");
     }
+    gen g = Pres.Definitions[i]->cont.bin.l->cont.g;
+    Epimorphism[g] = ResizeVec(Epimorphism[g], Length(Epimorphism[g]), Length(v));
+    Copy(Epimorphism[g], v);
   }
   
   for (unsigned i = 0; i < Pres.NrRels; i++) {
-    if (Pres.Relators[i]->type == TDREL)
-      continue;
     gpvec temp = FreshVec();
     EvalRel(temp, Pres.Relators[i]);
     Collect(v, temp);
@@ -197,9 +230,7 @@ void EvalAllRel(presentation &Pres) {
     if (Debug >= 2) {
       fprintf(OutputFile, "# relation: ");
       PrintNode(Pres.Relators[i]);
-      fprintf(OutputFile, "\n");
-      PrintVec(v);
-      fprintf(OutputFile, "\n");
+      fprintf(OutputFile, " ("); PrintVec(v); fprintf(OutputFile, ")\n");
     }
     AddRow(v);
   }
@@ -316,7 +347,7 @@ void AddGen(presentation &Pres) {
   **  We want to know in advance the number of the newly introduced generators.
   **  And also don't hesitate to refer this number as 'NrCenGens'.
   */
-  NrCenGens = Pres.NrGens + (LastGen[1] * (LastGen[1] - 1)) / 2 +
+  NrCenGens = Pres.NrGens - Pres.NrDefs + (LastGen[1] * (LastGen[1] - 1)) / 2 +
     LastGen[1] * (NrPcGens - LastGen[1]) - NrPcGens;
 
   bool *IsDefPower = new bool[NrPcGens + 1];
@@ -337,14 +368,7 @@ void AddGen(presentation &Pres) {
   **  This is necessary because we need only to modify the images which
   **  don't define generators.
   */
-  bool *IsDefIm = new bool[Pres.NrGens + 1];
-  for (unsigned i = 1; i <= Pres.NrGens; i++)
-    IsDefIm[i] = false;
-
-  /* generators admitting a definition as relator don't need a tail */
-  for (unsigned i = 1; i <= Pres.NrRels; i++)
-    if (Pres.Relators[i]->type == TDREL)
-      IsDefIm[Pres.Relators[i]->cont.bin.l->cont.g] = true;
+  bool *IsDefIm = DefGenerators(Pres);
   
   for (unsigned i = 1; i <= NrPcGens; i++)
     if (!iscommgen(i)) {

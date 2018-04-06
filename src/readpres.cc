@@ -507,8 +507,9 @@ unsigned ReadPresentation(presentation &Pres0, const char *InputFileName) {
   }
 
   /* get relators */
-  Pres->NrRels = 0;
+  Pres->NrRels = Pres->NrDefs = 0;
   Pres->Relators = (node **) malloc(sizeof(node *));
+  Pres->Definitions = (node **) malloc(sizeof(node *));
   while (is_relation(Token)) {
     node *n = Expression(0);
 
@@ -519,7 +520,6 @@ unsigned ReadPresentation(presentation &Pres0, const char *InputFileName) {
     if (n->type == TREL) {
       ValidateLieExpression(n->cont.bin.l, (gen) -1);
       ValidateLieExpression(n->cont.bin.r, (gen) -1);
-      n->type = TDIFF;
     } else if (n->type == TDREL) {
       if (n->cont.bin.l->type != TGEN)
 	SyntaxError("LHS should be generator, not %s", nodename[n->cont.bin.l->type]);
@@ -527,9 +527,14 @@ unsigned ReadPresentation(presentation &Pres0, const char *InputFileName) {
     } else
       ValidateLieExpression(n, (gen) -1);
 
-    Pres->Relators = (node **) realloc(Pres->Relators, (Pres->NrRels+1) * sizeof(node *));
-    Pres->Relators[Pres->NrRels++] = n;
-
+    if (n->type == TDREL) {
+      Pres->Definitions = (node **) realloc(Pres->Definitions, (Pres->NrDefs+1) * sizeof(node *));
+      Pres->Definitions[Pres->NrDefs++] = n;
+    } else {
+      Pres->Relators = (node **) realloc(Pres->Relators, (Pres->NrRels+1) * sizeof(node *));
+      Pres->Relators[Pres->NrRels++] = n;
+    }
+    
     if (Token == COMMA)
       NextToken();
     else
@@ -576,6 +581,9 @@ void FreePresentation(presentation &Pres) {
   for (unsigned i = 0; i < Pres.NrRels; i++)
     FreeNode(Pres.Relators[i]);
   free(Pres.Relators);
+  for (unsigned i = 0; i < Pres.NrDefs; i++)
+    FreeNode(Pres.Definitions[i]);
+  free(Pres.Definitions);
   if (Pres.Extra != NULL) {
     for (unsigned i = 0; i < Pres.NrExtra; i++)
       FreeNode(Pres.Extra[i]);
@@ -700,6 +708,7 @@ void EvalRel(gpvec v, node *rel) {
     Neg(v);
     break;
   case TDIFF:
+  case TREL:
     vl = FreshVec();
     vr = FreshVec();
     EvalRel(vl, rel->cont.bin.l);
