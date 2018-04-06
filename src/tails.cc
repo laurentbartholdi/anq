@@ -97,23 +97,13 @@ bool AdjustTail(gen j, gen i) {
 void Tails(void) {
   for (unsigned i = 1; i <= NrPcGens; i++) {
     for (unsigned j = i + 1; j <= NrPcGens; j++) {
+      if (Graded && Weight[i]+Weight[j] != Class)
+	continue;
+
       if (!AdjustTail(j, i))
 	abortprintf(5, "Adjustment to tail of [a%d,a%d] doesn't lie in centre", j, i);
     }
   }
   
   TimeStamp("Tails()");
-}
-
-void GradedTails(void) {
-  /* TODO!!! add powers */
-  
-  for (unsigned k = 2; k <= Class / 2; k++)
-    for (unsigned i = LastGen[k-1] + 1; i <= LastGen[k]; i++)
-      for (unsigned j = std::max(i + 1, LastGen[Class-k-1] + 1); j <= LastGen[Class-k]; j++) {
-	if (!AdjustTail(j, i))
-	  abortprintf(5, "Tail [a,g,h]-[a,h,g]-[a,[g,h]] doesn't lie in centre for a=a%d,[g,h]=a%d", j, i);
-      }
-
-  TimeStamp("GradedTails()");
 }

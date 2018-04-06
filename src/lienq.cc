@@ -18,7 +18,7 @@ FILE *OutputFile = stdout;
 const char USAGE[] = "Usage: lienq [-A]\ttoggle GAP output, default false\n"
   "\t[-D]\tincrease debug level\n"
   "\t[-F <outputfile>]\n"
-  "\t[-G]toggle graded Lie algebra, default false\n"
+  "\t[-G]\ttoggle graded Lie algebra, default false\n"
   "\t[-P]\ttoggle printing definitions of basic commutators, default false\n"
   "\t[-X <exponent>]\tset exponent for p-central series, default 0\n"
   "\t[-Z]\ttoggle printing of zeros in multiplication table, default false\n"
@@ -28,6 +28,17 @@ const char USAGE[] = "Usage: lienq [-A]\ttoggle GAP output, default false\n"
 bool PrintZeros = false, Graded = false, Gap = false, PrintDefs = false;
 unsigned Debug = 0;
 unsigned long TorsionExp = 0;
+
+static const char *ordinal(unsigned n) {
+  if (Class % 10 == 1 && Class != 11) return "st";
+  if (Class % 10 == 2 && Class != 12) return "nd";
+  if (Class % 10 == 3 && Class != 13) return "rd";
+  return "th";
+}
+
+static const char *plural(unsigned n) {
+  return n == 1 ? "" : "s";
+}
 
 int main(int argc, char **argv) {
   char flags[24] = "";
@@ -106,21 +117,18 @@ int main(int argc, char **argv) {
   for (Class = 1; UpToClass == 0 || Class <= UpToClass; Class++) {
     unsigned OldNrPcGens = NrPcGens;
 
-    if (Class >= 2) {
-      if (Graded) GradedAddGen(); else AddGen(Pres);
-    }
+    if (Class >= 2)
+      AddGen(Pres);
 
     InitStack();
 
-    if (Class >= 2) {
-      if (Graded) GradedTails(); else Tails();
-    }
+    if (Class >= 2)
+      Tails();
     
     InitMatrix();
 
-    if (Class >= 2) {
-      if (Graded) GradedConsistency(); else Consistency();
-    }
+    if (Class >= 2)
+      Consistency();
     
     EvalAllRel(Pres);
 
@@ -141,7 +149,8 @@ int main(int argc, char **argv) {
 
     ExtendPcPres();
 
-    fprintf(OutputFile, "# The %d%s factor has %d generators of relative orders ", Class, (Class % 10 == 1 && Class != 11) ? "st" : (Class % 10 == 2 && Class != 12) ? "nd" : (Class % 10 == 3 && Class != 13) ? "rd" : "th", LastGen[Class]-LastGen[Class-1]);
+    int newgens = LastGen[Class]-LastGen[Class-1];
+    fprintf(OutputFile, "# The %d%s factor has %d generator%s of relative order%s ", Class, ordinal(Class), newgens, plural(newgens), plural(newgens));
     for (unsigned i = OldNrPcGens + 1; i <= NrPcGens; i++) {
       coeff_out_str(OutputFile, Exponent[i]);
       fprintf(OutputFile, i == NrPcGens ? "\n" : ", ");

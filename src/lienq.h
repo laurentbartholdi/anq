@@ -146,7 +146,6 @@ void EvalAllRel(presentation &);
 unsigned ReducedPcPres(presentation &, gpvec *, unsigned);
 void ExtendPcPres(void);
 void AddGen(presentation &);
-void GradedAddGen(void);
 
 /* operation functions */
 void Sum(gpvec, constgpvec, constgpvec);

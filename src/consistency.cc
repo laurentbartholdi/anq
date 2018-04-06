@@ -90,6 +90,9 @@ static void CheckJacobi(gen a, gen b, gen c) {
 **
 */
 static void CheckPower(gen a, gen b) {
+  if (Weight[a] + Weight[b] > Class)
+    return;
+  
   gpvec temp[2];
   temp[0] = FreshVec();
   temp[1] = FreshVec();
@@ -159,39 +162,24 @@ static void CheckTorsion(unsigned i) {
 void Consistency(void) {
   for (unsigned i = 1; i <= LastGen[1]; i++)
     for (unsigned j = i + 1; j <= NrPcGens; j++)
-      for (unsigned k = j + 1; k <= NrPcGens; k++)
+      for (unsigned k = j + 1; k <= NrPcGens; k++) {
+	if (Graded && Weight[i] + Weight[j] + Weight[k] != Class)
+	  continue;
+	
         CheckJacobi(i, j, k);
+      }
 
   for (unsigned i = 1; i <= NrPcGens; i++)
     if (coeff_nz_p(Exponent[i])) {
       CheckTorsion(i);
 
-      for (unsigned j = 1; j <= NrPcGens; j++)
+      for (unsigned j = 1; j <= NrPcGens; j++) {
+	if (Graded && Weight[i] + Weight[j] != Class)
+	  continue;
+	
 	CheckPower(i, j);
+      }
     }
   
   TimeStamp("Consistency()");
-}
-
-void GradedConsistency(void) {
-  for (unsigned a = 1; a <= LastGen[1]; a++) /* a is of weight 1 */
-    for (unsigned bw = 1; bw <= Class / 2; bw++) { /* bw is the weight of b */
-      unsigned cw = Class - 1 - bw; /* the weight of c */
-      for (unsigned b = std::max(a + 1, LastGen[bw-1] + 1); b <= LastGen[bw]; b++)
-        for (unsigned c = std::max(b + 1, LastGen[cw-1]); c <= LastGen[cw]; c++)
-	  CheckJacobi(a, b, c);
-    }
-
-  for (unsigned aw = 1; aw <= Class - 1; aw++) { /* the weight of a */
-    unsigned bw = Class - aw; /* that of b */
-    for (unsigned a = LastGen[aw-1] + 1; a <= LastGen[aw]; a++)
-      if (coeff_nz_p(Exponent[a])) {
-	CheckTorsion(a);
-	
-        for (unsigned b = LastGen[bw-1] + 1; b <= LastGen[bw]; b++)
-	  CheckPower(a, b);
-      }
-  }
-
-  TimeStamp("GradedConsistency()");
 }
