@@ -303,3 +303,10 @@ const inline void coeff_unit_annihilator(coeff &unit, coeff &annihilator, const 
   unit = coeff_inverse_mod_si(va);
   annihilator = uint64_t2coeff(MONTGOMERY_N / vgcd);
 }
+
+inline int coeff_out_str(FILE *f, const coeff &a)
+{
+  return fprintf(f, "%ld", coeff_get_si(a)); /* maybe we should print in base MODULUS_PRIME? */
+}
+
+#define coeff_base MODULUS_PRIME

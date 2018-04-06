@@ -193,3 +193,8 @@ inline void coeff_unit_annihilator(coeff &unit, coeff &annihilator, const coeff 
   unit.data = coeff_sgn(a);
   annihilator.data = 0;
 }
+
+inline int coeff_out_str(FILE *f, const coeff &a)
+{
+  return fprintf(f, "%lld", a.data);
+}

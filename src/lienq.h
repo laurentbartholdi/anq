@@ -9,30 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-
-/****************************************************************
- * coefficients.
- * they can be of various types, with varying performance:
- * - signed long int
- * - multiprecision gmpz_t
- * - hybrid 63-bit signed long / gmpz_t
- * - mod-2^64 arithmetic (unsigned long int)
- * - mod-p^k arithmetic (unsigned long int)
- ****************************************************************/
-#ifdef COEFF_IS_LONG
-#include "coeff_long.h"
-#elif defined(COEFF_IS_MPZ)
-#include "coeff_mpz.h"
-#elif defined(COEFF_IS_Z)
-#include "coeff_z.h"
-#elif defined(COEFF_IS_MOD2_64)
-#include "coeff_2_64.h"
-#elif defined(COEFF_IS_MODp_k)
-#include "coeff_p_k.h"
-#else
-#error you must specify a coefficient type: COEFF_IS_LONG, ...
-#include </> // force stop
-#endif
+#include "coeff.h"
 
 /****************************************************************
  * generators
@@ -60,8 +37,14 @@ typedef const gpower *constgpvec;
 ** allow the power of a generator to an integer exponent (lie-product).
 */
 enum nodetype {
-  TNUM, TGEN, TMPROD, TLPROD, TSUM, TREL, TDRELL, TDRELR
+  TNUM,
+  TGEN,
+  TBRACK, TBRACE, TPROD, TQUO, TPOW, TSUM, TDIFF, TREL, TDREL, TDRELR,
+  TNEG, TINV,
+  TINVALID
 };
+constexpr static bool is_unary(nodetype t) { return t >= TNEG && t <= TINV; }
+constexpr static bool is_binary(nodetype t) { return t >= TBRACK && t <= TDRELR; }
 
 struct node {
   nodetype type;
@@ -71,15 +54,15 @@ struct node {
     gen g;
     struct {
       node *l, *r;
-    } op;
+    } bin;
+    node *u;
   } cont;
 };
 
 struct presentation {
-  unsigned NrGens, NrRels, NrExtraRels;
-  char **Generators;
-  node **Relators;
-  node **ExtraRelators;
+  unsigned NrGens, NrRels, NrExtra;
+  char **GeneratorName;
+  node **Relators, **Extra;
 };
 
 /****************************************************************
@@ -132,7 +115,7 @@ void Consistency(void);
 void GradedConsistency(void);
 
 /* print functions */
-extern void abortprintf(int, const char *, ...) __attribute__((format(printf, 2, 3)));
+extern void abortprintf(int, const char *, ...) __attribute__((format(printf, 2, 3),noreturn));
 void PrintVec(gpvec);
 void PrintPcPres(presentation &);
 void TimeStamp(const char *);

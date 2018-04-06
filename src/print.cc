@@ -42,8 +42,11 @@ void TimeStamp(const char *s) {
 }
 
 void PrintVec(gpvec gv) {
-  for (unsigned i = 0; gv[i].g != EOW; i++)
-    fprintf(OutputFile, "%s%ld*a%d", i ? " + " : "", coeff_get_si(gv[i].c), gv[i].g);
+  for (unsigned i = 0; gv[i].g != EOW; i++) {
+    if (i) fprintf(OutputFile, " + ");
+    coeff_out_str(OutputFile, gv[i].c);
+    fprintf(OutputFile, "*a%d", gv[i].g);
+  }
 }
 
 void PrintPcPres(presentation &Pres) {
@@ -61,9 +64,15 @@ void PrintPcPres(presentation &Pres) {
   
   fprintf(OutputFile, "# The epimorphism:\n");
   for (unsigned i = 1; i <= Pres.NrGens; i++) {
-    fprintf(OutputFile, "# %10s |--> ", Pres.Generators[i]);
-    PrintVec(Epimorphism[i]);
-    fprintf(OutputFile, "\n");
+    gen g = Epimorphism[i]->g;
+    fprintf(OutputFile, "# %10s |-->", Pres.GeneratorName[i]);
+    if (g && isimggen(g) && i == Definition[g].g)
+      fprintf(OutputFile, ": a%d\n", g);
+    else {
+      fprintf(OutputFile, " ");
+      PrintVec(Epimorphism[i]);
+      fprintf(OutputFile, "\n");
+    }
   }
   if (PrintDefs) {
     fprintf(OutputFile, "# The definitions:\n");
@@ -84,9 +93,12 @@ void PrintPcPres(presentation &Pres) {
       } else {
 	gen g = Definition[i].g;
 	if (0 < (int)g)
-	  fprintf(OutputFile, "#%10s a%d = (%s)^epimorphism\n", "", i, Pres.Generators[g]);
-	else
-	  fprintf(OutputFile, "#%10s a%d = %ld*a%d\n", "", i, coeff_get_si(Exponent[-g]), -g);
+	  fprintf(OutputFile, "#%10s a%d = (%s)^epimorphism\n", "", i, Pres.GeneratorName[g]);
+	else {
+	  fprintf(OutputFile, "#%10s a%d = ", "", i);
+	  coeff_out_str(OutputFile, Exponent[-g]);
+	  fprintf(OutputFile, "*a%d", -g);
+	}
       }
   }
 
@@ -96,10 +108,16 @@ void PrintPcPres(presentation &Pres) {
     if (coeff_nz_p(Exponent[i])) {
       if (!first)
 	  fprintf(OutputFile, ",\n");
-      fprintf(OutputFile, "%10s%ld*a%d", "", coeff_get_si(Exponent[i]), i);
+      fprintf(OutputFile, "%10s", "");
+      coeff_out_str(OutputFile, Exponent[i]);
+      fprintf(OutputFile, "*a%d", i);
       if (Power[i] != NULL && Power[i]->g != EOW) {
-        fprintf(OutputFile, " =%s ", ispowergen(Power[i]->g) ? ":" : "");
-        PrintVec(Power[i]);
+	if (ispowergen(Power[i]->g))
+	  fprintf(OutputFile, " =: a%d", Power[i]->g);
+	else {
+	  fprintf(OutputFile, " = ");
+	  PrintVec(Power[i]);
+	}
       }
       first = false;
     }
@@ -115,20 +133,24 @@ void PrintPcPres(presentation &Pres) {
 	  fprintf(OutputFile, "# The product relations:\n");
         fprintf(OutputFile, "%10s[ a%d, a%d ]", "", j, i);
         if (g != EOW) {
-	  fprintf(OutputFile, " =%s ", Definition[g].g == j && Definition[g].h == i ? ":" : "");
-          PrintVec(Product[j][i]);
+	  if (Definition[g].g == j && Definition[g].h == i)
+	    fprintf(OutputFile, " =: a%d", Product[j][i]->g);
+	  else {
+	    fprintf(OutputFile, " = ");
+	    PrintVec(Product[j][i]);
+	  }
         }
 	first = false;
       }
     }
   
-  if (Pres.NrExtraRels > 0) {
+  if (Pres.NrExtra > 0) {
     fprintf(OutputFile, " |\n# The extra elements:\n");
     first = true;
     gpvec v = FreshVec();
-    for (unsigned i = 0; i < Pres.NrExtraRels; i++) {
+    for (unsigned i = 0; i < Pres.NrExtra; i++) {
       gpvec temp = FreshVec();
-      EvalRel(temp, Pres.ExtraRelators[i]);
+      EvalRel(temp, Pres.Extra[i]);
       Collect(v, temp);
       PopVec();
       if (!first)

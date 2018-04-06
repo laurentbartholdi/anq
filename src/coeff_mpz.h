@@ -65,3 +65,8 @@ inline void coeff_swap(coeff &a, coeff &b) {
   mpz_set(b, t);
   mpz_clear(t);
 }
+
+inline int coeff_out_str(FILE *f, const coeff &a)
+{
+  return mpz_out_str(f, 10, a);
+}

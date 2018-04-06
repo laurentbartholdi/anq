@@ -51,8 +51,11 @@ bool AdjustTail(gen j, gen i) {
     Collect(tail, v);
     PopVec();
 
-    if (Debug >= 2)
-      fprintf(OutputFile, "# tail: [a%d,a%d] = %ld*[a%d,a%d] = ", j, i, coeff_get_si(Exponent[g]), j, g);
+    if (Debug >= 2) {
+      fprintf(OutputFile, "# tail: [a%d,a%d] = ", j, i);
+      coeff_out_str(OutputFile, Exponent[g]);
+      fprintf(OutputFile, "*[a%d,a%d] = ", j, g);
+    }
   } else { /* aj = N*g */
     gen g = -Definition[j].g;
     gpvec v = FreshVec();
@@ -65,8 +68,11 @@ bool AdjustTail(gen j, gen i) {
     Collect(tail, v);
     PopVec();
 
-    if (Debug >= 2)
-      fprintf(OutputFile, "# tail: [a%d,a%d] = %ld*[a%d,a%d] = ", j, i, coeff_get_si(Exponent[g]), g, i);
+    if (Debug >= 2) {
+      fprintf(OutputFile, "# tail: [a%d,a%d] = ", j, i);
+      coeff_out_str(OutputFile, Exponent[g]);
+      fprintf(OutputFile, "*[a%d,a%d] = ", g, i);
+    }
   }
 
   if (Debug >= 2) {

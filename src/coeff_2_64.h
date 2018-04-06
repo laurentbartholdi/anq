@@ -150,3 +150,10 @@ inline void coeff_unit_annihilator(coeff &unit, coeff &annihilator, const coeff 
   int shift0 = shift >> 1; /* beware, shifting by 64 is a no-op */
   annihilator.data = (1ULL << (32-shift0)) << (32+shift0-shift);
 }
+
+inline int coeff_out_str(FILE *f, const coeff &a)
+{
+  return fprintf(f, "%llu", a.data); /* maybe we should print in binary or hex? */
+}
+
+#define coeff_base 2

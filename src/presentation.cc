@@ -15,6 +15,7 @@ deftype *Definition;
 
 unsigned *Weight, *LastGen, Class, NrCenGens, NrPcGens, NrTotalGens;
 
+/* add generator newgen to vector v, and store its definition */
 static void AddSingleGenerator(gpvec &v, gen newgen, deftype def) {
   unsigned l;
   if (v == NULL) {
@@ -30,6 +31,7 @@ static void AddSingleGenerator(gpvec &v, gen newgen, deftype def) {
   Definition[newgen] = def;
 }
 
+/* initialize Pc presentation, at class 1. No products or powers are set yet. */
 void InitPcPres(presentation &Pres) {
   /*
   ** We initialize the power-relations to be trivial.
@@ -121,6 +123,10 @@ void FreePcPres(presentation &Pres) {
   free(Weight);
 }
 
+/* eliminate redundant generators from v; rels is a list of relations
+   in the centre, and renumber says how central generators are to be
+   renumbered. */
+
 /* This is time-critical. It can be optimized in various ways:
    -- g is a central generator, so we can skip the beginning if we ever
       have to call Diff
@@ -160,10 +166,30 @@ void EliminateTrivialGenerators(gpvec *rels, gpvec &v, int renumber[]) {
     v = ResizeVec(v, NrTotalGens, pos);
   ShrinkCollect(v);
 }
-  
+
+/* evaluate all relations, and add them to the relation matrix */
 void EvalAllRel(presentation &Pres) {
   gpvec v = FreshVec();
+
   for (unsigned i = 0; i < Pres.NrRels; i++) {
+    if (Pres.Relators[i]->type != TDREL)
+      continue;
+    EvalRel(v, Pres.Relators[i]->cont.bin.r);
+    gen g = Pres.Relators[i]->cont.bin.l->cont.g;
+    ResizeVec(Epimorphism[g], Length(Epimorphism[g]), Length(v));
+    Collect(Epimorphism[g], v);    
+    if (Debug >= 2) {
+      fprintf(OutputFile, "# defining relation: ");
+      PrintNode(Pres.Relators[i]);
+      fprintf(OutputFile, "\n");
+      PrintVec(v);
+      fprintf(OutputFile, "\n");
+    }
+  }
+  
+  for (unsigned i = 0; i < Pres.NrRels; i++) {
+    if (Pres.Relators[i]->type == TDREL)
+      continue;
     gpvec temp = FreshVec();
     EvalRel(temp, Pres.Relators[i]);
     Collect(v, temp);
@@ -182,6 +208,7 @@ void EvalAllRel(presentation &Pres) {
   TimeStamp("EvalAllRel()");
 }
 
+/* quotient the centre by the relations rels */
 unsigned ReducedPcPres(presentation &Pres, gpvec *rels, unsigned numrels) {
   unsigned trivialgens = 0;
 
@@ -307,13 +334,18 @@ void AddGen(presentation &Pres) {
 
   /*
   **  In this step we sign the epimorphic images which are definitions.
-  **  This is  necessary because we need only to modify the images which
+  **  This is necessary because we need only to modify the images which
   **  don't define generators.
   */
   bool *IsDefIm = new bool[Pres.NrGens + 1];
   for (unsigned i = 1; i <= Pres.NrGens; i++)
     IsDefIm[i] = false;
 
+  /* generators admitting a definition as relator don't need a tail */
+  for (unsigned i = 1; i <= Pres.NrRels; i++)
+    if (Pres.Relators[i]->type == TDREL)
+      IsDefIm[Pres.Relators[i]->cont.bin.l->cont.g] = true;
+  
   for (unsigned i = 1; i <= NrPcGens; i++)
     if (!iscommgen(i)) {
       if (isimggen(i)) /* a generator is defined as image of
@@ -352,7 +384,7 @@ void AddGen(presentation &Pres) {
     if (!IsDefIm[i]) {
       AddSingleGenerator(Epimorphism[i], ++shift, {.g = i, .h = 0});
       if (Debug >= 2)
-	fprintf(OutputFile, "# added tail a%d to epimorphic image of %s\n", shift, Pres.Generators[i]);
+	fprintf(OutputFile, "# added tail a%d to epimorphic image of %s\n", shift, Pres.GeneratorName[i]);
     }
 
   /* now this is tricky. In mode "TorsionExp > 0", we use as basis
@@ -448,11 +480,10 @@ void ExtendPcPres(void) {
     Weight[i] = Class;
 
   /*
-  ** Because of the anti-symmetry we need only to store the product-relations
-  ** of the form [ i, j ] when i>j (sorry...). Hence the form of their 'matrix'
-  ** turns into triangle-shaped. The row corresponding to the i-th generotor
-  *will
-  ** be of length i-1.
+   * Because of the anti-symmetry we need only to store the
+   * product-relations of the form [ i, j ] when i>j. Hence the form
+   * of their 'matrix' turns into triangle-shaped. The row
+   * corresponding to the i-th generotor will be of length i-1.
   */
 
   Product = (gpvec **) realloc(Product, (NrTotalGens + 1) * sizeof(gpvec *));

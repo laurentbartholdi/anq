@@ -12,11 +12,44 @@
 #include <stdarg.h>
 
 enum token {
-  LPAREN, RPAREN, LBRACK, RBRACK, LBRACE, RBRACE, LANGLE, RANGLE,
-  MULT, DIV, POWER, PLUS, MINUS,
-  EQUAL, DEQUALL, DEQUALR,
-  PIPE, COMMA, SEMICOLON, NUMBER, GEN };
-  
+  LPAREN, RPAREN, LBRACK, RBRACK, LBRACE, RBRACE,
+  NUMBER, GEN,
+  MULT, DIV, POWER, PLUS, MINUS, INVERSE, EQUAL, DEQUALL, DEQUALR,
+  LANGLE, RANGLE, PIPE, COMMA, SEMICOLON,
+  BADTOKEN };
+
+const char *nodename[] = {"TNUM", "TGEN", "TBRACK", "TBRACE", "TPROD", "TQUO",
+			  "TPOW", "TSUM", "TDIFF", "TREL", "TDREL", "TDRELR",
+			  "TNEG", "TINV"};
+
+enum associativity {
+  LEFTASSOC, RIGHTASSOC };
+
+constexpr bool is_unary(token t) {
+  return t == MINUS || t == INVERSE;
+}
+constexpr bool is_binary(token t) {
+  return t >= MULT && t <= DEQUALR;
+}
+constexpr associativity token_assoc(token t) {
+  return t == POWER ? RIGHTASSOC : LEFTASSOC;
+					 }
+constexpr int unary_prec(token t) {
+  return t == INVERSE ? 6 : t == MINUS ? 4 : 0;
+}
+constexpr int binary_prec(token t) {
+  return (t == MINUS || t == PLUS) ? 3 : (t == MULT || t == DIV) ? 5 : t == POWER ? 7 : 0;
+}
+constexpr bool is_relation(token t) {
+  return t <= DEQUALR;
+}
+constexpr nodetype unary_node(token t) {
+  return t == MINUS ? TNEG : t == INVERSE ? TINV : TINVALID;
+}
+constexpr nodetype binary_node(token t) {
+  return t == MULT ? TPROD : t == DIV ? TQUO : t == POWER ? TPOW : t == PLUS ? TSUM : t == MINUS ? TDIFF : t == EQUAL ? TREL : t == DEQUALL ? TDREL : t == DEQUALR ? TDRELR : TINVALID;
+}
+
 static char Ch;           /* Contains the next char on the input. */
 static token Token;       /* Contains the current token. */
 static int Line;          /* Current line number. */
@@ -26,7 +59,7 @@ static int TChar;         /* Character number where token starts. */
 static const char *InFileName;  /* Current input file name. */
 static FILE *InFp;        /* Current input file pointer. */
 static coeff N;           /* Contains the integer just read. */
-static char Gen[128];     /* Contains the generator name. */
+static char *Gen;         /* Contains the generator name. */
 static presentation *Pres;
 
 void FreeNode(node *n) {
@@ -37,8 +70,12 @@ void FreeNode(node *n) {
     coeff_clear(n->cont.n);
     break;
   default:
-    FreeNode(n->cont.op.l);
-    FreeNode(n->cont.op.r);
+    if (is_unary(n->type))
+      FreeNode(n->cont.u);
+    else {
+      FreeNode(n->cont.bin.l);
+      FreeNode(n->cont.bin.r);
+    }
   }
   delete n;
 }
@@ -53,9 +90,9 @@ enum genstatus { NOCREATE, CREATE };
 
 static gen GenNumber(char *gname, genstatus status) {
   if (status == CREATE && Pres->NrGens == 0)
-    Pres->Generators = (char **) malloc(2 * sizeof(char *));
+    Pres->GeneratorName = (char **) malloc(2 * sizeof(char *));
   for (unsigned i = 1; i <= Pres->NrGens; i++) {
-    if (!strcmp(gname, Pres->Generators[i])) {
+    if (!strcmp(gname, Pres->GeneratorName[i])) {
       if (status == CREATE)
         return (gen) 0;
       return (gen) i;
@@ -64,20 +101,14 @@ static gen GenNumber(char *gname, genstatus status) {
   if (status == NOCREATE)
     return (gen) 0;
   Pres->NrGens++;
-  Pres->Generators = (char **) realloc(Pres->Generators, (Pres->NrGens + 1) * sizeof(char *));
-  Pres->Generators[Pres->NrGens] = new char[strlen(gname) + 1];
-  strcpy(Pres->Generators[Pres->NrGens], gname);
+  Pres->GeneratorName = (char **) realloc(Pres->GeneratorName, (Pres->NrGens + 1) * sizeof(char *));
+  Pres->GeneratorName[Pres->NrGens] = (char *) malloc(strlen(gname) + 1);
+  strcpy(Pres->GeneratorName[Pres->NrGens], gname);
 
   return Pres->NrGens;
 }
 
-char *GenName(gen g) {
-  if (g > Pres->NrGens)
-    return (char *) NULL;
-  return Pres->Generators[g];
-}
-
-static void SyntaxError(const char *format, ...) __attribute__((format(printf, 1, 2)));
+static void SyntaxError(const char *format, ...) __attribute__((format(printf, 1, 2),noreturn));
 static void SyntaxError(const char *format, ...) {
   va_list va;
   va_start (va, format);
@@ -117,89 +148,87 @@ static void SkipBlanks(void) {
   }
 }
 
-static void Number(void) {
-  coeff_set_si(N, 0);
-
-  while (isdigit(Ch)) {
-    coeff_mul_si(N, N, 10);
-    coeff_add_si(N, N, Ch - '0');
-    ReadCh();
-  }
-}
-
-static void Generator(void) {
-  int i;
-
-  for (i = 0; i < 127 && (isalnum(Ch) || Ch == '_' || Ch == '.'); i++) {
-    Gen[i] = Ch;
-    ReadCh();
-  }
-  Gen[i] = '\0';
-  /* Discard the rest. */
-  while (isalnum(Ch) || Ch == '_' || Ch == '.')
-    ReadCh();
-}
-
+/* gets a new token from the stream, and puts it in the global variable
+   Token.
+   Also sets the globals Gen and N in case a generator / number is read.
+*/
 static void NextToken(void) {
   SkipBlanks();
   TChar = Char;
   TLine = Line;
+  Token = BADTOKEN;
   switch (Ch) {
-  case '(': {
+  case '(':
     Token = LPAREN;
     ReadCh();
     break;
-  }
-  case ')': {
+  
+  case ')':
     Token = RPAREN;
     ReadCh();
     break;
-  }
-  case '[': {
+  
+  case '[':
     Token = LBRACK;
     ReadCh();
     break;
-  }
-  case ']': {
+  
+  case ']':
     Token = RBRACK;
     ReadCh();
     break;
-  }
-  case '{': {
+  
+  case '{':
     Token = LBRACE;
     ReadCh();
     break;
-  }
-  case '}': {
+  
+  case '}':
     Token = RBRACE;
     ReadCh();
     break;
-  }
+  
 
-  case '*': {
+  case '*':
     Token = MULT;
     ReadCh();
     break;
-  }
-  case '/': {
+  
+  case '/':
     Token = DIV;
     ReadCh();
     break;
-  }
-  case '^': {
+  
+  case '^':
     Token = POWER;
     ReadCh();
     break;
-  }
-  case ':': {
+    
+  case '+':
+    Token = PLUS;
+    ReadCh();
+    break;
+    
+  case '-':
+    Token = MINUS;
+    ReadCh();
+    break;
+    
+  case '~':
+    Token = INVERSE;
+    ReadCh();
+    break;
+  
+
+  case ':':
     ReadCh();
     if (Ch != '=')
       SyntaxError("Illegal character '%c'", Ch);
     Token = DEQUALL;
     ReadCh();
     break;
-  }
-  case '=': {
+  
+  case '=':
     ReadCh();
     if (Ch != ':')
       Token = EQUAL;
@@ -208,46 +237,32 @@ static void NextToken(void) {
       ReadCh();
     }
     break;
-  }
-
-  case '+': {
-    Token = PLUS;
-    ReadCh();
-    break;
-  }
-  case '-': {
-    Token = MINUS;
-    ReadCh();
-    break;
-  }
-
-  case '<': {
+  
+  case '<':
     Token = LANGLE;
     ReadCh();
     break;
-  }
-  case '>': {
+  
+  case '>':
     Token = RANGLE;
     ReadCh();
     break;
-  }
-
-  case '|': {
+  
+  case '|':
     Token = PIPE;
     ReadCh();
     break;
-  }
-  case ',': {
+  
+  case ',':
     Token = COMMA;
     ReadCh();
     break;
-  }
-  case ';': {
+  
+  case ';':
     Token = SEMICOLON;
     ReadCh();
     break;
-  }
-
+  
   case '0':
   case '1':
   case '2':
@@ -259,236 +274,183 @@ static void NextToken(void) {
   case '8':
   case '9': {
     Token = NUMBER;
-    Number();
+    coeff_set_si(N, 0);
+    int base = (Ch == '0' ? coeff_base : 10);
+    
+    while (isdigit(Ch)) {
+      coeff_mul_si(N, N, base);
+      coeff_add_si(N, N, Ch - '0');
+      ReadCh();
+    }
     break;
   }
-  default:
-    if (isalnum(Ch) || Ch == '_' || Ch == '.') {
-      Token = GEN;
-      Generator();
-      break;
-    } else
+
+  default: {
+    Token = GEN;
+    int len;
+
+    for (len = 0; isalnum(Ch) || Ch == '_' || Ch == '.'; len++) {
+      if (len > 100)
+	Gen = (char *) realloc(Gen, len+2);
+      Gen[len] = Ch;
+      ReadCh();
+    }
+    Gen[len] = '\0';
+
+    if (len == 0)
       SyntaxError("Illegal character '%c'", Ch);
+
+    break;
+  }
   }
 }
 
-static node *SNumber(void) {
-  node *n;
-
+node *Term(void) {
+  node *Expression(int);
+  
+  if (is_unary(Token)) {
+    node *n = NewNode(unary_node(Token));
+    int new_precedence = unary_prec(Token);
+    NextToken();
+    node *u = Expression(new_precedence);
+    if (u->type == TNUM) { /* compile-time evaluation */
+      coeff_init(n->cont.n);
+      switch (n->type) {
+      case TNEG:
+	coeff_neg(n->cont.n, u->cont.n);
+	break;
+#if 0 /* not implemented */
+      case TINV:
+	coeff_inv(n->cont.n, u->cont.n);
+	break;
+#endif
+      default:
+	abortprintf(3, "I can't evaluate a numerical expression with unary operator %s", nodename[n->type]);
+      }
+      n->type = TNUM;
+      FreeNode(u);
+    } else
+      n->cont.u = u;
+    return n;
+  }
+  if (Token == LPAREN) {
+    NextToken();
+    node *n = Expression(0);
+    if (Token != RPAREN)
+      SyntaxError("')' expected");
+    NextToken();
+    return n;
+  }
+  if (Token == LBRACK || Token == LBRACE) {
+    token close = (Token == LBRACK ? RBRACK : RBRACE);
+    nodetype oper = (Token == LBRACK ? TBRACK : TBRACE);  
+    char closechar = (Token == LBRACK ? ']' : '}');  
+    NextToken();
+    node *n = Expression(0);
+    while (Token == COMMA) {
+      NextToken();
+      node *p = NewNode(oper);
+      p->cont.bin.l = n;
+      p->cont.bin.r = Expression(0);
+      n = p;
+    }
+    if (Token != close)
+      SyntaxError("'%c' expected", closechar);
+    NextToken();
+    return n;
+  }
   if (Token == NUMBER) {
-    n = NewNode(TNUM);
+    node *n = NewNode(TNUM);
     coeff_init_set(n->cont.n, N);
     NextToken();
-  } else if (Token == PLUS) {
-    NextToken();
-    if (Token != NUMBER)
-      SyntaxError("Number expected");
-    n = NewNode(TNUM);
-    coeff_init_set(n->cont.n, N);
-    NextToken();
-  } else if (Token == MINUS) {
-    NextToken();
-    if (Token != NUMBER)
-      SyntaxError("Number expected");
-    n = NewNode(TNUM);
-    coeff_init(n->cont.n);
-    coeff_neg(n->cont.n, N);
-    NextToken();
-  } else {
-    SyntaxError("Number expected");
-    n = NULL;
+    return n;
   }
-
-  return n;
-}
-
-static node *LieProduct(void) {
-  node *n, *o;
-  extern node *Elem(void);
-
-  if (Token != LBRACK)
-    SyntaxError("Left square bracket expected");
-
-  NextToken();
-  if (Token != GEN && Token != LPAREN && Token != LBRACK)
-    SyntaxError("Word expected");
-
-  o = Elem();
-  if (Token != COMMA)
-    SyntaxError("Comma expected");
-  while (Token == COMMA) {
-    NextToken();
-    if (Token != GEN && Token != LPAREN && Token != LBRACK)
-      SyntaxError("Word expected");
-    n = NewNode(TLPROD);
-    n->cont.op.l = o;
-    n->cont.op.r = Elem();
-    o = n;
-  }
-  if (Token != RBRACK)
-    SyntaxError("Right square bracket missing");
-  NextToken();
-  return n;
-}
-
-static node *Atom(void) {
-  node *n;
-  extern node *Elem(void);
-
   if (Token == GEN) {
-    n = NewNode(TGEN);
+    node *n = NewNode(TGEN);
     n->cont.g = GenNumber(Gen, NOCREATE);
     if (n->cont.g == (gen)0)
       SyntaxError("Unkown generator %s", Gen);
     NextToken();
-  } else if (Token == LPAREN) {
-    NextToken();
-    n = Elem();
-    if (Token != RPAREN)
-      SyntaxError("Closing parenthesis expected");
-    NextToken();
-  } else if (Token == LBRACK) {
-    n = LieProduct();
-  } else {
-    SyntaxError("Generator, left parenthesis or commutator expected");
-    n = NULL;
+    return n;
   }
-  return n;
+  SyntaxError("Term expected");
 }
 
-static node *ModuleProduct(void) {
-  node *n, *o;
-
-  if (Token != PLUS && Token != MINUS && Token != NUMBER)
-    SyntaxError("Integer expected in module operation");
-  o = SNumber();
-
-  if (Token == MULT) {
+node *Expression(int precedence) {
+  node *t = Term();
+  int new_precedence;
+  
+  while (is_binary(Token) && (new_precedence = binary_prec(Token)) >= precedence) {
+    if (token_assoc(Token) == LEFTASSOC)
+      new_precedence++;
+    nodetype oper = binary_node(Token);
     NextToken();
-    if (Token != GEN && Token != LPAREN && Token != NUMBER && Token != LBRACK)
-      SyntaxError("Something is wrong in module operation");
 
-    n = o;
-    o = NewNode(TMPROD);
-    o->cont.op.l = n;
-    o->cont.op.r = Atom();
-  }
-  return o;
-}
+    node *u = Expression(new_precedence);
 
-/*
-**    Elem() reads a Lie-algebra element. The defining rule is:
-**
-**    element:      module-product | module-product '+' element
-**
-**    A word starts either with 'generator', with '(', with '['
-**    or with integer number (ring-element).
-*/
-node *Elem(void) {
-  node *n, *o;
-
-  if (Token == PLUS || Token == MINUS || Token == NUMBER)
-    o = ModuleProduct();
-  else if (Token == GEN || Token == LPAREN || Token == LBRACK)
-    o = Atom();
-  else
-    SyntaxError("Element expected");
-
-  while (Token == PLUS) {
-    NextToken();
-    n = o;
-    o = NewNode(TSUM);
-    o->cont.op.l = n;
-    if (Token == NUMBER || Token == PLUS || Token == MINUS)
-      o->cont.op.r = ModuleProduct();
-    else if (Token == GEN || Token == LPAREN || Token == LBRACK)
-      o->cont.op.r = Atom();
-    else
-      SyntaxError("Error in Sum");
-  }
-
-  return o;
-}
-
-/*
-**    Relation() reads a relation. The defining rule is:
-**
-**    relation:        element | element '=' element | element '=:' element |
-**    element ':=' element
-**
-**    A relation starts either with 'generator', with '(', with '[' or
-**    with integer (ring-element).
-*/
-static node *Relation(void) {
-  node *o = Elem();
-  if (Token == EQUAL) {
-    NextToken();
-    node *n = o;
-    o = NewNode(TREL);
-    o->cont.op.l = n;
-    o->cont.op.r = Elem();
-  } else if (Token == DEQUALL) {
-    NextToken();
-    node *n = o;
-    o = NewNode(TDRELL);
-    o->cont.op.l = n;
-    o->cont.op.r = Elem();
-  } else if (Token == DEQUALR) {
-    NextToken();
-    node *n = o;
-    o = NewNode(TDRELR);
-    o->cont.op.l = n;
-    o->cont.op.r = Elem();
-  }
-
-  return o;
-}
-
-/*
-**    RelList() reads a list of relations. The defining rules are:
-**
-**    rellist:         'empty' | relseq
-**    relseq:          relation | relation ',' relseq
-**
-**    A relation starts either with 'generator', with '(', with '['
-**    or with an integer (ring-element).
-*/
-
-static int RelList(node **&rellist) {
-  unsigned n = 0;
-
-  rellist = (node **) malloc(sizeof(node *));
-  if (Token == GEN || Token == LPAREN || Token == LBRACK || Token == NUMBER || Token == MINUS || Token == PLUS) {
-    rellist = (node **) realloc(rellist, 2 * sizeof(node *));
-    rellist[n++] = Relation();
-    while (Token == COMMA) {
-      NextToken();
-      rellist = (node **) realloc(rellist, (n + 2) * sizeof(node *));
-      rellist[n++] = Relation();
+    if (t->type == TNUM && u->type == TNUM) { /* compile-time evaluation */
+      switch (oper) {
+      case TPROD:
+	coeff_mul(t->cont.n, t->cont.n, u->cont.n);
+	break;
+      case TPOW:
+	coeff_pow(t->cont.n, t->cont.n, u->cont.n);
+	break;
+      case TSUM:
+	coeff_add(t->cont.n, t->cont.n, u->cont.n);
+	break;
+      case TDIFF:
+	coeff_sub(t->cont.n, t->cont.n, u->cont.n);
+	break;
+      default:
+	abortprintf(3, "I can't evaluate a numerical expression with binary operator %d", oper);
+      }
+      FreeNode(u);
+    } else {
+      node *n = NewNode(oper);
+      n->cont.bin = {.l = t, .r = u};
+      t = n;
     }
   }
-  return n;
+  return t;
 }
 
-/*
-**    GenList() reads a list of generators. The defining rules are:
-**
-**    genlist:         generator | genseq
-**    genseq:          'empty' | generator ',' genseq
-*/
-static void GenList() {
-  for (;;) {
-    if (Token != GEN)
-      SyntaxError("Generator expected");
-    
-    if (GenNumber(Gen, CREATE) == (gen) 0)
-      SyntaxError("Duplicate generator %s", Gen);
+static void ValidateLieExpression(node *n, gen g) {
+  /* check that n is a valid Lie expression, involving only generators of index < g.
 
-    NextToken();
+     For TPROD, LHS must be a number, and all other terms must be Lie expressions.
+     Forbid TINV, TQUO, TBRACE, TREL, TDREL.
+  */
 
-    if (Token != COMMA) break;
-
-    NextToken();
+  switch(n->type) {
+  case TNUM:
+    SyntaxError("Lie expression expected, not number");
+  case TGEN:
+    if (n->cont.g >= g)
+      SyntaxError("Generator of rank <= %d expected, not %d", g, n->cont.g);
+    break;
+  case TINV:
+  case TQUO:
+  case TBRACE:
+  case TREL:
+  case TDREL:
+    SyntaxError("Operator %s unexpected", nodename[n->type]);
+  case TPROD:
+    if (n->cont.bin.l->type != TNUM)
+      SyntaxError("LHS of TPROD should be number, not %s", nodename[n->cont.bin.l->type]);
+    ValidateLieExpression(n->cont.bin.r, g);
+    break;
+  case TBRACK:
+  case TSUM:
+  case TDIFF:
+    ValidateLieExpression(n->cont.bin.l, g);
+    ValidateLieExpression(n->cont.bin.r, g);
+    break;
+  case TNEG:
+    ValidateLieExpression(n->cont.u, g);
+    break;
+  default:
+    SyntaxError("Invalid expression of type %s", nodename[n->type]);
   }
 }
 
@@ -511,100 +473,188 @@ unsigned ReadPresentation(presentation &Pres0, const char *InputFileName) {
   Char = 0;
   Line = 1;
   coeff_init(N);
+  Gen = (char *) malloc(102);
   
-  NextToken();
+  NextToken(); // start parsing
 
   if (Token == NUMBER) {
     uptoclass = coeff_get_si(N);
     NextToken();
   }
   
-  if (Token != LANGLE)
-    SyntaxError("Presentation expected");
-  NextToken();
+  if (Token == LANGLE)
+    NextToken();
+  else
+    SyntaxError("'<' expected");
 
-  if (Token != GEN)
-    SyntaxError("Generator expected");
+  /* get generators */
+  while (true) {
+    if (Token != GEN)
+      SyntaxError("Generator expected");
+    
+    if (GenNumber(Gen, CREATE) == (gen) 0)
+      SyntaxError("Duplicate generator %s", Gen);
 
-  GenList();
+    NextToken(); // | or ,
 
-  if (Token != PIPE)
-    SyntaxError("Vertical bar expected");
-  NextToken();
+    if (Token == PIPE) {
+      NextToken();
+      break;
+    } else if (Token == COMMA)
+      NextToken();
+    else
+      SyntaxError("',' expected");
+  }
 
-  Pres->NrRels = RelList(Pres->Relators);
+  /* get relators */
+  Pres->NrRels = 0;
+  Pres->Relators = (node **) malloc(sizeof(node *));
+  while (is_relation(Token)) {
+    node *n = Expression(0);
 
+    if (n->type == TDRELR) { /* switch sides */
+      n->type = TDREL;
+      n->cont.bin = {.l = n->cont.bin.r, .r = n->cont.bin.l};
+    }
+    if (n->type == TREL) {
+      ValidateLieExpression(n->cont.bin.l, (gen) -1);
+      ValidateLieExpression(n->cont.bin.r, (gen) -1);
+      n->type = TDIFF;
+    } else if (n->type == TDREL) {
+      if (n->cont.bin.l->type != TGEN)
+	SyntaxError("LHS should be generator, not %s", nodename[n->cont.bin.l->type]);
+      ValidateLieExpression(n->cont.bin.r, n->cont.bin.l->cont.g);
+    } else
+      ValidateLieExpression(n, (gen) -1);
+
+    Pres->Relators = (node **) realloc(Pres->Relators, (Pres->NrRels+1) * sizeof(node *));
+    Pres->Relators[Pres->NrRels++] = n;
+
+    if (Token == COMMA)
+      NextToken();
+    else
+      break;
+  }
+
+  /* get extra elements to evaluate in result */
+  Pres->NrExtra = 0;
   if (Token == PIPE) {
     NextToken();
-    Pres->NrExtraRels = RelList(Pres->ExtraRelators);
+
+    Pres->Extra = (node **) malloc(sizeof(node *));
+    while (is_relation(Token)) {
+      node *n = Expression(0);
+      ValidateLieExpression(n, (gen) -1);
+    
+      Pres->Extra = (node **) realloc(Pres->Extra, (Pres->NrExtra+1) * sizeof(node *));
+
+      Pres->Extra[Pres->NrExtra++] = n;
+      if (Token == COMMA)
+	NextToken();
+      else
+	break;
+    }
   } else
-    Pres->NrExtraRels = 0, Pres->ExtraRelators = NULL;
+    Pres->Extra = NULL;
 
   if (Token != RANGLE)
-    SyntaxError("Presentation has to be closed by '>'");
+    SyntaxError("'>' expected");
 
   if (!readstdin)
     fclose(InFp);
 
   coeff_clear(N);
-
+  free(Gen);
+  
   return uptoclass;
 }
 
 void FreePresentation(presentation &Pres) {
   for (unsigned i = 1; i <= Pres.NrGens; i++)
-    free(Pres.Generators[i]);
-  free(Pres.Generators);
+    free(Pres.GeneratorName[i]);
+  free(Pres.GeneratorName);
   for (unsigned i = 0; i < Pres.NrRels; i++)
     FreeNode(Pres.Relators[i]);
   free(Pres.Relators);
-  if (Pres.ExtraRelators != NULL) {
-    for (unsigned i = 0; i < Pres.NrExtraRels; i++)
-      FreeNode(Pres.ExtraRelators[i]);
-    free(Pres.ExtraRelators);
+  if (Pres.Extra != NULL) {
+    for (unsigned i = 0; i < Pres.NrExtra; i++)
+      FreeNode(Pres.Extra[i]);
+    free(Pres.Extra);
   }
 }
 
 void PrintNode(node *n) {
   switch (n->type) {
   case TNUM:
-    fprintf(OutputFile, "%ld", coeff_get_si(n->cont.n));
+    coeff_out_str(OutputFile, n->cont.n);
     break;
   case TGEN:
-    fprintf(OutputFile, "%s", Pres->Generators[n->cont.g]);
+    fprintf(OutputFile, "%s", Pres->GeneratorName[n->cont.g]);
+    break;
+  case TNEG:
+    fprintf(OutputFile, "-");
+    PrintNode(n->cont.u);
+    break;
+  case TINV:
+    fprintf(OutputFile, "~");
+    PrintNode(n->cont.u);
     break;
   case TSUM:
-    PrintNode(n->cont.op.l);
+    PrintNode(n->cont.bin.l);
     fprintf(OutputFile, " + ");
-    PrintNode(n->cont.op.r);
+    PrintNode(n->cont.bin.r);
     break;
-  case TMPROD:
-    PrintNode(n->cont.op.l);
+  case TDIFF:
+    PrintNode(n->cont.bin.l);
+    fprintf(OutputFile, " - ");
+    PrintNode(n->cont.bin.r);
+    break;
+  case TPROD:
+    PrintNode(n->cont.bin.l);
     fprintf(OutputFile, "*");
-    PrintNode(n->cont.op.r);
+    PrintNode(n->cont.bin.r);
     break;
-  case TLPROD:
+  case TQUO:
+    PrintNode(n->cont.bin.l);
+    fprintf(OutputFile, "/");
+    PrintNode(n->cont.bin.r);
+    break;
+  case TPOW:
+    PrintNode(n->cont.bin.l);
+    fprintf(OutputFile, "^");
+    PrintNode(n->cont.bin.r);
+    break;
+  case TBRACK:
     fprintf(OutputFile, "[");
-    PrintNode(n->cont.op.l);
+    PrintNode(n->cont.bin.l);
     fprintf(OutputFile, ",");
-    PrintNode(n->cont.op.r);
+    PrintNode(n->cont.bin.r);
     fprintf(OutputFile, "]");
     break;
-  case TREL:
-    PrintNode(n->cont.op.l);
-    fprintf(OutputFile, " = ");
-    PrintNode(n->cont.op.r);
+  case TBRACE:
+    fprintf(OutputFile, "{");
+    PrintNode(n->cont.bin.l);
+    fprintf(OutputFile, ",");
+    PrintNode(n->cont.bin.r);
+    fprintf(OutputFile, "}");
     break;
-  case TDRELL:
-    PrintNode(n->cont.op.l);
+  case TREL:
+    PrintNode(n->cont.bin.l);
+    fprintf(OutputFile, " = ");
+    PrintNode(n->cont.bin.r);
+    break;
+  case TDREL:
+    PrintNode(n->cont.bin.l);
     fprintf(OutputFile, " := ");
-    PrintNode(n->cont.op.r);
+    PrintNode(n->cont.bin.r);
     break;
   case TDRELR:
-    PrintNode(n->cont.op.l);
+    PrintNode(n->cont.bin.l);
     fprintf(OutputFile, " =: ");
-    PrintNode(n->cont.op.r);
+    PrintNode(n->cont.bin.r);
     break;
+  default:
+    abortprintf(3, "PrintNode: Illegal node of type %s", nodename[n->type]);
   }
 }
 
@@ -623,21 +673,21 @@ void EvalRel(gpvec v, node *rel) {
   case TSUM:
     vl = FreshVec();
     vr = FreshVec();
-    EvalRel(vl, rel->cont.op.l);
-    EvalRel(vr, rel->cont.op.r);
+    EvalRel(vl, rel->cont.bin.l);
+    EvalRel(vr, rel->cont.bin.r);
     Sum(v, vl, vr);
     PopVec();
     PopVec();
     break;
-  case TMPROD:
-    EvalRel(v, rel->cont.op.r);
-    Prod(v, (rel->cont.op.l)->cont.n, v);
+  case TPROD:
+    EvalRel(v, rel->cont.bin.r);
+    Prod(v, rel->cont.bin.l->cont.n, v);
     break;
-  case TLPROD:
+  case TBRACK:
     vl = FreshVec();
     vr = FreshVec();
-    EvalRel(vl, rel->cont.op.l);
-    EvalRel(vr, rel->cont.op.r);
+    EvalRel(vl, rel->cont.bin.l);
+    EvalRel(vr, rel->cont.bin.r);
     Prod(v, vl, vr);
     PopVec();
     PopVec();
@@ -645,18 +695,20 @@ void EvalRel(gpvec v, node *rel) {
   case TGEN:
     Copy(v, Epimorphism[rel->cont.g]);
     break;
-  case TREL:
-  case TDRELL:
-  case TDRELR:
+  case TNEG:
+    EvalRel(v, rel->cont.u);
+    Neg(v);
+    break;
+  case TDIFF:
     vl = FreshVec();
     vr = FreshVec();
-    EvalRel(vl, rel->cont.op.l);
-    EvalRel(vr, rel->cont.op.r);
+    EvalRel(vl, rel->cont.bin.l);
+    EvalRel(vr, rel->cont.bin.r);
     Diff(v, vl, vr);
     PopVec();
     PopVec();
     break;
   default:
-    abortprintf(3, "EvalRel: type %d should not occur", rel->type);
+    abortprintf(3, "EvalRel: operator of type %s should not occur", nodename[rel->type]);
   }
 }

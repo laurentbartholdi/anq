@@ -33,33 +33,33 @@ clean:
 lienq_mpz: $(subst .o,_mpz.o,$(LIENQ_OBJ))
 	$(CXX) -o $@ $^ -lgmp
 
-%_mpz.o: %.cc lienq.h coeff_mpz.h
+%_mpz.o: %.cc lienq.h coeff.h coeff_mpz.h
 	$(CXX) -c -DCOEFF_IS_MPZ $(CXXFLAGS) $(LIENQVERSION) $< -o $@
 
 lienq_z: $(subst .o,_z.o,$(LIENQ_OBJ))
 	$(CXX) -o $@ $^ -lgmp
 
-%_z.o: %.cc lienq.h coeff_z.h
+%_z.o: %.cc lienq.h coeff.h coeff_z.h
 	$(CXX) -c -DCOEFF_IS_Z $(CXXFLAGS) $(LIENQVERSION) $< -o $@
 
 lienq_long: $(subst .o,_long.o,$(LIENQ_OBJ))
 
-%_long.o: %.cc lienq.h coeff_long.h
+%_long.o: %.cc lienq.h coeff.h coeff_long.h
 	$(CXX) -c -DCOEFF_IS_LONG $(CXXFLAGS) $(LIENQVERSION) $< -o $@
 
 lienq_2_64: $(subst .o,_2_64.o,$(LIENQ_OBJ))
 
-%_2_64.o: %.cc lienq.h coeff_2_64.h
+%_2_64.o: %.cc lienq.h coeff.h coeff_2_64.h
 	$(CXX) -c -DCOEFF_IS_MOD2_64 $(CXXFLAGS) $(LIENQVERSION) $< -o $@
 
 lienq_3_39: $(subst .o,_3_39.o,$(LIENQ_OBJ))
 
-%_3_39.o: %.cc lienq.h coeff_p_k.h
+%_3_39.o: %.cc lienq.h coeff.h coeff_p_k.h
 	$(CXX) -c -DCOEFF_IS_MODp_k -DMODULUS_PRIME=3 -DMODULUS_EXPONENT=39 $(CXXFLAGS) $(LIENQVERSION) $< -o $@
 
 lienq_3_38: $(subst .o,_3_38.o,$(LIENQ_OBJ))
 
-%_3_38.o: %.cc lienq.h coeff_p_k.h
+%_3_38.o: %.cc lienq.h coeff.h coeff_p_k.h
 	$(CXX) -c -DCOEFF_IS_MODp_k -DMODULUS_PRIME=3 -DMODULUS_EXPONENT=38 $(CXXFLAGS) $(LIENQVERSION) $< -o $@
 
 test: test.cc

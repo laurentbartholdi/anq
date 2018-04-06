@@ -110,7 +110,11 @@ static void CheckPower(gen a, gen b) {
   Collect(temp[!parity], temp[parity]), parity ^= 1;
 
   if (Debug >= 2) {
-    fprintf(OutputFile, "# consistency: %ld*[a%d,a%d]-[%ld*a%d,a%d] = ", coeff_get_si(Exponent[a]), a, b, coeff_get_si(Exponent[a]), a, b);
+    fprintf(OutputFile, "# consistency: ");
+    coeff_out_str(OutputFile, Exponent[a]);
+    fprintf(OutputFile, "*[a%d,a%d]-[", a, b);
+    coeff_out_str(OutputFile, Exponent[a]);
+    fprintf(OutputFile, "*a%d,a%d] = ", a, b);
     PrintVec(temp[parity]);
     fprintf(OutputFile, "\n");
   }
@@ -135,7 +139,11 @@ static void CheckTorsion(unsigned i) {
   Collect(temp2, temp1);
   
   if (Debug >= 2) {
-    fprintf(OutputFile, "# consistency: %ld*%ld*a%d = ", coeff_get_si(annihilator), coeff_get_si(Exponent[i]), i);
+    fprintf(OutputFile, "# consistency: ");
+    coeff_out_str(OutputFile, annihilator);
+    fprintf(OutputFile, "*");
+    coeff_out_str(OutputFile, Exponent[i]);
+    fprintf(OutputFile, "*a%d = ", i);
     PrintVec(temp2);
     fprintf(OutputFile, "\n");
   }
