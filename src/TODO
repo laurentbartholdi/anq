@@ -1,0 +1,7 @@
+* Accept groups: *, ^-1, {a,b} = a^-1*b^-1*a*b, a^b, and combinatorial collector
+
+* Improve matrix code: use shorter arrays to improve cache locality, avoid fillin, avoid coefficient explosion, use finite fields, (in local rings) permute basis to get rid of redundant generators
+
+* GAP output is LieRing format
+
+* Check graded Lie algebra generation
