@@ -13,12 +13,13 @@
 #include <mcheck.h>
 #endif
 
-FILE *OutputFile = stdout;
+FILE *OutputFile = stdout, *LogFile = stdout;
 
 const char USAGE[] = "Usage: lienq [-A]\ttoggle GAP output, default false\n"
   "\t[-D]\tincrease debug level\n"
   "\t[-F <outputfile>]\n"
   "\t[-G]\ttoggle graded Lie algebra, default false\n"
+  "\t[-L <logfile>]\n"
   "\t[-P]\ttoggle printing definitions of basic commutators, default false\n"
   "\t[-X <exponent>]\tset exponent for p-central series, default 0\n"
   "\t[-Z]\ttoggle printing of zeros in multiplication table, default false\n"
@@ -44,7 +45,7 @@ int main(int argc, char **argv) {
   char flags[24] = "";
   int c;
   
-  while ((c = getopt (argc, argv, "ADF:GPX:Z")) != -1)
+  while ((c = getopt (argc, argv, "ADF:GL:PX:Z")) != -1)
     switch (c) {
     case 'A':
       Gap = !Gap;
@@ -57,12 +58,18 @@ int main(int argc, char **argv) {
     case 'F':
       OutputFile = fopen(optarg, "w");
       if (OutputFile == NULL)
-	abortprintf(1, "I can't open the output file '%s'", optarg);
+	abortprintf(1, "I can't open output file '%s'", optarg);
       sprintf(flags + strlen(flags), "-F '%s' ", optarg);
       break;
     case 'G':
       Graded = !Graded;
       strcat(flags, "-G ");
+      break;
+    case 'L':
+      LogFile = fopen(optarg, "w");
+      if (LogFile == NULL)
+	abortprintf(1, "I can't open log file '%s'", optarg);
+      sprintf(flags + strlen(flags), "-L '%s' ", optarg);
       break;
     case 'P':
       PrintDefs = !PrintDefs;
@@ -96,15 +103,15 @@ int main(int argc, char **argv) {
   strcpy(timestring, ctime(&t));
   
   gethostname(hostname, 128);
-  fprintf(OutputFile, "# The Lie algebra Nilpotent Quotient Program\n"
+  fprintf(LogFile, "# The Lie algebra Nilpotent Quotient Program\n"
 	  "# for calculating nilpotent quotients in finitely presented Lie rings by Csaba Schneider.\n");
-  fprintf(OutputFile, "# Program:\t%s, version %s\n", argv[0], VERSION);
-  fprintf(OutputFile, "# Machine:\t%s\n", hostname);
-  fprintf(OutputFile, "# Coefficients:\t%s\n", COEFF_ID);
-  fprintf(OutputFile, "# Input file:\t%s\n", InputFileName);
-  fprintf(OutputFile, "# Start time:\t%s", timestring);
-  fprintf(OutputFile, "# Class:\t%d\n", UpToClass);
-  fprintf(OutputFile, "# Flags:\t'%s'\n\n", flags);
+  fprintf(LogFile, "# Program:\t%s, version %s\n", argv[0], VERSION);
+  fprintf(LogFile, "# Machine:\t%s\n", hostname);
+  fprintf(LogFile, "# Coefficients:\t%s\n", COEFF_ID);
+  fprintf(LogFile, "# Input file:\t%s\n", InputFileName);
+  fprintf(LogFile, "# Start time:\t%s", timestring);
+  fprintf(LogFile, "# Class:\t%d\n", UpToClass);
+  fprintf(LogFile, "# Flags:\t'%s'\n\n", flags);
 
 #ifdef MEMCHECK
   mtrace();
@@ -150,15 +157,18 @@ int main(int argc, char **argv) {
     ExtendPcPres();
 
     int newgens = LastGen[Class]-LastGen[Class-1];
-    fprintf(OutputFile, "# The %d%s factor has %d generator%s of relative order%s ", Class, ordinal(Class), newgens, plural(newgens), plural(newgens));
+    fprintf(LogFile, "# The %d%s factor has %d generator%s of relative order%s ", Class, ordinal(Class), newgens, plural(newgens), plural(newgens));
     for (unsigned i = OldNrPcGens + 1; i <= NrPcGens; i++) {
-      coeff_out_str(OutputFile, Exponent[i]);
-      fprintf(OutputFile, i == NrPcGens ? "\n" : ", ");
+      coeff_out_str(LogFile, Exponent[i]);
+      fprintf(LogFile, i == NrPcGens ? "\n" : ", ");
     }
   }
 
   InitStack();
-  PrintPcPres(Pres);
+  if (Gap)
+    PrintGAPPres(OutputFile, Pres);  
+  else
+    PrintPcPres(OutputFile, Pres);
   FreeStack();
 
   TimeStamp("main()");

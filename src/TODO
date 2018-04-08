@@ -5,3 +5,11 @@
 * GAP output is LieRing format
 
 * Check graded Lie algebra generation
+
+* Make LieNQ a library: accept calls to
+  - NewLiePresentation
+  - ProductNode, SumNode etc. to create relators
+  - AddGen(lpres, string)
+  - AddRel(lpres, node)
+  - LieNQ(lpres, maxclass)
+  Make (almost!) all variables local!

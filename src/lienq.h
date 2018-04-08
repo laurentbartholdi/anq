@@ -81,7 +81,7 @@ struct deftype {
 extern bool PrintZeros, Graded, Gap, PrintDefs;
 extern unsigned Debug;
 extern unsigned long TorsionExp;
-extern FILE *OutputFile;
+extern FILE *LogFile;
 
 /* auxiliary functions */
 void InitStack(void);
@@ -116,14 +116,24 @@ void GradedConsistency(void);
 
 /* print functions */
 extern void abortprintf(int, const char *, ...) __attribute__((format(printf, 2, 3),noreturn));
-void PrintVec(gpvec);
-void PrintPcPres(presentation &);
+void PrintVec(FILE *f, gpvec);
+void PrintPcPres(FILE *f, presentation &);
+void PrintGAPPres(FILE *f, presentation &);
 void TimeStamp(const char *);
   
 /* presentation functions */
+/****************************************************************
+ * global variables containing a Pc presentation
+ ****************************************************************/
 extern gpvec **Product, *Power, *Epimorphism;
 extern coeff *Exponent, *Annihilator;
 extern deftype *Definition;
+extern unsigned *Weight, *LastGen;
+extern unsigned Class,
+  NrPcGens, // = LastGen[Class-1]
+  NrCenGens, // = LastGen[Class]-LastGen[Class-1]
+  NrTotalGens; // = LastGen[Class]
+
 inline bool isimggen(gen g) { /* g is defined as an image of original generator */
   return Definition[g].h == 0 && 0 < (int) Definition[g].g;
 }
@@ -133,12 +143,6 @@ inline bool ispowergen(gen g) { /* g is defined as power of a pc generator */
 inline bool iscommgen(gen g) { /* g is defined as commutator */
   return Definition[g].h != 0;
 }
-
-extern unsigned *Weight, *LastGen;
-extern unsigned Class,
-  NrPcGens, // = LastGen[Class-1]
-  NrCenGens, // = LastGen[Class]-LastGen[Class-1]
-  NrTotalGens; // = LastGen[Class]
 
 void InitPcPres(presentation &);
 void FreePcPres(presentation &);
@@ -192,7 +196,7 @@ void ShrinkCollect(gpvec &);
 unsigned ReadPresentation(presentation &, const char *);
 void FreePresentation(presentation &);
 void EvalRel(gpvec, node *);
-void PrintNode(node *);
+void PrintNode(FILE *f, node *);
 
 /* matrix functions */
 void HermiteNormalForm(gpvec **, unsigned *);

@@ -211,9 +211,9 @@ void EvalAllRel(presentation &Pres) {
     Collect(v, temp);
     PopVec();
     if (Debug >= 2) {
-      fprintf(OutputFile, "# defining relation: ");
-      PrintNode(Pres.Definitions[i]);
-      fprintf(OutputFile, " ("); PrintVec(v); fprintf(OutputFile, ")\n");
+      fprintf(LogFile, "# defining relation: ");
+      PrintNode(LogFile, Pres.Definitions[i]);
+      fprintf(LogFile, " ("); PrintVec(LogFile, v); fprintf(LogFile, ")\n");
     }
     gen g = Pres.Definitions[i]->cont.bin.l->cont.g;
     Epimorphism[g] = ResizeVec(Epimorphism[g], Length(Epimorphism[g]), Length(v));
@@ -226,9 +226,9 @@ void EvalAllRel(presentation &Pres) {
     Collect(v, temp);
     PopVec();
     if (Debug >= 2) {
-      fprintf(OutputFile, "# relation: ");
-      PrintNode(Pres.Relators[i]);
-      fprintf(OutputFile, " ("); PrintVec(v); fprintf(OutputFile, ")\n");
+      fprintf(LogFile, "# relation: ");
+      PrintNode(LogFile, Pres.Relators[i]);
+      fprintf(LogFile, " ("); PrintVec(LogFile, v); fprintf(LogFile, ")\n");
     }
     AddRow(v);
   }
@@ -242,9 +242,9 @@ unsigned ReducedPcPres(presentation &Pres, gpvec *rels, unsigned numrels) {
   unsigned trivialgens = 0;
 
   if (Debug >= 2) {
-    fprintf(OutputFile, "# relations matrix:\n");
+    fprintf(LogFile, "# relations matrix:\n");
     for (unsigned i = 0; i < numrels; i++) {
-      fprintf(OutputFile, "# "); PrintVec(rels[i]); fprintf(OutputFile, "\n");
+      fprintf(LogFile, "# "); PrintVec(LogFile, rels[i]); fprintf(LogFile, "\n");
     }
   }
 
@@ -382,7 +382,7 @@ void AddGen(presentation &Pres) {
       if (!IsDefIm[i]) {
 	AddSingleGenerator(Epimorphism[i], ++shift, {.g = i, .h = 0});
 	if (Debug >= 2)
-	  fprintf(OutputFile, "# added tail a%d to epimorphic image of %s\n", shift, Pres.GeneratorName[i]);
+	  fprintf(LogFile, "# added tail a%d to epimorphic image of %s\n", shift, Pres.GeneratorName[i]);
       }
   }
 
@@ -401,7 +401,7 @@ void AddGen(presentation &Pres) {
 	if (!IsDefPower[i] && coeff_nz_p(Exponent[i])) {
 	  AddSingleGenerator(Power[i], ++shift, {.g = -i, .h = 0});
 	  if (Debug >= 2)
-	    fprintf(OutputFile, "# added tail a%d to non-defining torsion generator a%d\n", shift, i);
+	    fprintf(LogFile, "# added tail a%d to non-defining torsion generator a%d\n", shift, i);
 	}
     } else {
   /* Don't wait more to do our main task: modify the commutator relations!
@@ -413,7 +413,7 @@ void AddGen(presentation &Pres) {
 	  if (!IsDefRel[i][j] && !ispowergen(i)) { /* don't add tails to [ai,aj] if ai := N*ak, since this will be N*[ak,aj] */
 	    AddSingleGenerator(Product[i][j], ++shift, {.g = i, .h = j});
 	    if (Debug >= 2)
-	      fprintf(OutputFile, "# added tail a%d to non-defining commutator [a%d, a%d]\n", shift, i, j);
+	      fprintf(LogFile, "# added tail a%d to non-defining commutator [a%d, a%d]\n", shift, i, j);
 	  }
     }
 

@@ -118,7 +118,7 @@ bool AddRow(gpvec cv) {
 	ReduceRow(row, Matrix[j]);
 
       if (Debug >= 3) {
-	printf("ADD ROW %d: ",row); PrintVec(Matrix[row]); printf("\n");
+	fprintf(LogFile, "# Adding row %d: ",row); PrintVec(LogFile, Matrix[row]); fprintf(LogFile, "\n");
       }
 
       Prod(p[parity], annihilator, p[parity]);
@@ -141,7 +141,7 @@ bool AddRow(gpvec cv) {
 	long maxsize = 0;
 	for (gpvec q = p[parity]; q->g != EOW; q++)
 	  maxsize = std::max(maxsize, labs(q->c->_mp_size));
-	printf("CHANGE p: max coeff size %ld\n", maxsize);
+	fprintf(LogFile, "# Changed p: max coeff size %ld\n", maxsize);
       }
 #endif
 	
@@ -157,7 +157,7 @@ bool AddRow(gpvec cv) {
 	//ReduceRow(row, p[parity]); // actually slows down the code
 
 	if (Debug >= 3) {
-	  printf("CHANGE ROW %d: ",row); PrintVec(Matrix[row]); printf("\n");
+	  fprintf(LogFile, "# Change row %d: ",row); PrintVec(LogFile, Matrix[row]); fprintf(LogFile, "\n");
 	}
       }
       coeff_clear(a);

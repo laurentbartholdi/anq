@@ -591,75 +591,75 @@ void FreePresentation(presentation &Pres) {
   }
 }
 
-void PrintNode(node *n) {
+void PrintNode(FILE *f, node *n) {
   switch (n->type) {
   case TNUM:
-    coeff_out_str(OutputFile, n->cont.n);
+    coeff_out_str(f, n->cont.n);
     break;
   case TGEN:
-    fprintf(OutputFile, "%s", Pres->GeneratorName[n->cont.g]);
+    fprintf(f, "%s", Pres->GeneratorName[n->cont.g]);
     break;
   case TNEG:
-    fprintf(OutputFile, "-");
-    PrintNode(n->cont.u);
+    fprintf(f, "-");
+    PrintNode(f, n->cont.u);
     break;
   case TINV:
-    fprintf(OutputFile, "~");
-    PrintNode(n->cont.u);
+    fprintf(f, "~");
+    PrintNode(f, n->cont.u);
     break;
   case TSUM:
-    PrintNode(n->cont.bin.l);
-    fprintf(OutputFile, " + ");
-    PrintNode(n->cont.bin.r);
+    PrintNode(f, n->cont.bin.l);
+    fprintf(f, " + ");
+    PrintNode(f, n->cont.bin.r);
     break;
   case TDIFF:
-    PrintNode(n->cont.bin.l);
-    fprintf(OutputFile, " - ");
-    PrintNode(n->cont.bin.r);
+    PrintNode(f, n->cont.bin.l);
+    fprintf(f, " - ");
+    PrintNode(f, n->cont.bin.r);
     break;
   case TPROD:
-    PrintNode(n->cont.bin.l);
-    fprintf(OutputFile, "*");
-    PrintNode(n->cont.bin.r);
+    PrintNode(f, n->cont.bin.l);
+    fprintf(f, "*");
+    PrintNode(f, n->cont.bin.r);
     break;
   case TQUO:
-    PrintNode(n->cont.bin.l);
-    fprintf(OutputFile, "/");
-    PrintNode(n->cont.bin.r);
+    PrintNode(f, n->cont.bin.l);
+    fprintf(f, "/");
+    PrintNode(f, n->cont.bin.r);
     break;
   case TPOW:
-    PrintNode(n->cont.bin.l);
-    fprintf(OutputFile, "^");
-    PrintNode(n->cont.bin.r);
+    PrintNode(f, n->cont.bin.l);
+    fprintf(f, "^");
+    PrintNode(f, n->cont.bin.r);
     break;
   case TBRACK:
-    fprintf(OutputFile, "[");
-    PrintNode(n->cont.bin.l);
-    fprintf(OutputFile, ",");
-    PrintNode(n->cont.bin.r);
-    fprintf(OutputFile, "]");
+    fprintf(f, "[");
+    PrintNode(f, n->cont.bin.l);
+    fprintf(f, ",");
+    PrintNode(f, n->cont.bin.r);
+    fprintf(f, "]");
     break;
   case TBRACE:
-    fprintf(OutputFile, "{");
-    PrintNode(n->cont.bin.l);
-    fprintf(OutputFile, ",");
-    PrintNode(n->cont.bin.r);
-    fprintf(OutputFile, "}");
+    fprintf(f, "{");
+    PrintNode(f, n->cont.bin.l);
+    fprintf(f, ",");
+    PrintNode(f, n->cont.bin.r);
+    fprintf(f, "}");
     break;
   case TREL:
-    PrintNode(n->cont.bin.l);
-    fprintf(OutputFile, " = ");
-    PrintNode(n->cont.bin.r);
+    PrintNode(f, n->cont.bin.l);
+    fprintf(f, " = ");
+    PrintNode(f, n->cont.bin.r);
     break;
   case TDREL:
-    PrintNode(n->cont.bin.l);
-    fprintf(OutputFile, " := ");
-    PrintNode(n->cont.bin.r);
+    PrintNode(f, n->cont.bin.l);
+    fprintf(f, " := ");
+    PrintNode(f, n->cont.bin.r);
     break;
   case TDRELR:
-    PrintNode(n->cont.bin.l);
-    fprintf(OutputFile, " =: ");
-    PrintNode(n->cont.bin.r);
+    PrintNode(f, n->cont.bin.l);
+    fprintf(f, " =: ");
+    PrintNode(f, n->cont.bin.r);
     break;
   default:
     abortprintf(3, "PrintNode: Illegal node of type %s", nodename[n->type]);

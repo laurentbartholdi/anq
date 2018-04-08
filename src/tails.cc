@@ -43,7 +43,7 @@ bool AdjustTail(gen j, gen i) {
     PopVec();
 
     if (Debug >= 2)
-      fprintf(OutputFile, "# tail: [a%d,a%d] = [a%d,[a%d,a%d]] = ", j, i, j, g, h);
+      fprintf(LogFile, "# tail: [a%d,a%d] = [a%d,[a%d,a%d]] = ", j, i, j, g, h);
   } else if (ispowergen(i)) { /* ai=N*g */
     gen g = -Definition[i].g;
     gpvec v = FreshVec();
@@ -52,9 +52,9 @@ bool AdjustTail(gen j, gen i) {
     PopVec();
 
     if (Debug >= 2) {
-      fprintf(OutputFile, "# tail: [a%d,a%d] = ", j, i);
-      coeff_out_str(OutputFile, Exponent[g]);
-      fprintf(OutputFile, "*[a%d,a%d] = ", j, g);
+      fprintf(LogFile, "# tail: [a%d,a%d] = ", j, i);
+      coeff_out_str(LogFile, Exponent[g]);
+      fprintf(LogFile, "*[a%d,a%d] = ", j, g);
     }
   } else { /* aj = N*g */
     gen g = -Definition[j].g;
@@ -69,15 +69,15 @@ bool AdjustTail(gen j, gen i) {
     PopVec();
 
     if (Debug >= 2) {
-      fprintf(OutputFile, "# tail: [a%d,a%d] = ", j, i);
-      coeff_out_str(OutputFile, Exponent[g]);
-      fprintf(OutputFile, "*[a%d,a%d] = ", g, i);
+      fprintf(LogFile, "# tail: [a%d,a%d] = ", j, i);
+      coeff_out_str(LogFile, Exponent[g]);
+      fprintf(LogFile, "*[a%d,a%d] = ", g, i);
     }
   }
 
   if (Debug >= 2) {
-    PrintVec(tail);
-    fprintf(OutputFile, "\n");
+    PrintVec(LogFile, tail);
+    fprintf(LogFile, "\n");
   }
 
   unsigned k;

@@ -71,9 +71,9 @@ static void CheckJacobi(gen a, gen b, gen c) {
   Collect(temp1, temp2);
 
   if (Debug >= 2) {
-    fprintf(OutputFile, "# consistency: jacobi(a%d,a%d,a%d) = ", a, b, c);
-    PrintVec(temp1);
-    fprintf(OutputFile, "\n");
+    fprintf(LogFile, "# consistency: jacobi(a%d,a%d,a%d) = ", a, b, c);
+    PrintVec(LogFile, temp1);
+    fprintf(LogFile, "\n");
   }
 
   AddRow(temp1);
@@ -113,13 +113,13 @@ static void CheckPower(gen a, gen b) {
   Collect(temp[!parity], temp[parity]), parity ^= 1;
 
   if (Debug >= 2) {
-    fprintf(OutputFile, "# consistency: ");
-    coeff_out_str(OutputFile, Exponent[a]);
-    fprintf(OutputFile, "*[a%d,a%d]-[", a, b);
-    coeff_out_str(OutputFile, Exponent[a]);
-    fprintf(OutputFile, "*a%d,a%d] = ", a, b);
-    PrintVec(temp[parity]);
-    fprintf(OutputFile, "\n");
+    fprintf(LogFile, "# consistency: ");
+    coeff_out_str(LogFile, Exponent[a]);
+    fprintf(LogFile, "*[a%d,a%d]-[", a, b);
+    coeff_out_str(LogFile, Exponent[a]);
+    fprintf(LogFile, "*a%d,a%d] = ", a, b);
+    PrintVec(LogFile, temp[parity]);
+    fprintf(LogFile, "\n");
   }
 
   AddRow(temp[parity]);
@@ -142,13 +142,13 @@ static void CheckTorsion(unsigned i) {
   Collect(temp2, temp1);
   
   if (Debug >= 2) {
-    fprintf(OutputFile, "# consistency: ");
-    coeff_out_str(OutputFile, annihilator);
-    fprintf(OutputFile, "*");
-    coeff_out_str(OutputFile, Exponent[i]);
-    fprintf(OutputFile, "*a%d = ", i);
-    PrintVec(temp2);
-    fprintf(OutputFile, "\n");
+    fprintf(LogFile, "# consistency: ");
+    coeff_out_str(LogFile, annihilator);
+    fprintf(LogFile, "*");
+    coeff_out_str(LogFile, Exponent[i]);
+    fprintf(LogFile, "*a%d = ", i);
+    PrintVec(LogFile, temp2);
+    fprintf(LogFile, "\n");
   }
 
   AddRow(temp2);
