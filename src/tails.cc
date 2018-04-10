@@ -20,7 +20,7 @@
  * - if j is defined as N*g, compute [j,i] = N*[g,i] or -N*[i,g]
  */
 bool AdjustTail(gen j, gen i) {
-  if (i <= LastGen[1] && !ispowergen(j)) /* nothing to do, it's a fresh gen */
+  if (i <= LastGen[1] && Definition[j].t != DPOW) /* nothing to do, it's a fresh gen */
     return true;
 
   if (Weight[j] + Weight[i] > Class) /* the tail would go too far out */
@@ -28,7 +28,7 @@ bool AdjustTail(gen j, gen i) {
 
   gpvec tail = FreshVec();
 
-  if (iscommgen(i)) { /* ai = [g,h] */
+  if (Definition[i].t == DCOMM) { /* ai = [g,h] */
     gen g = Definition[i].g, h = Definition[i].h;
 
     gpvec agh = FreshVec();
@@ -44,8 +44,8 @@ bool AdjustTail(gen j, gen i) {
 
     if (Debug >= 2)
       fprintf(LogFile, "# tail: [a%d,a%d] = [a%d,[a%d,a%d]] = ", j, i, j, g, h);
-  } else if (ispowergen(i)) { /* ai=N*g */
-    gen g = -Definition[i].g;
+  } else if (Definition[i].t == DPOW) { /* ai=N*g */
+    gen g = Definition[i].g;
     gpvec v = FreshVec();
     Prod(v, Exponent[g], Product[j][g]);
     Collect(tail, v);
@@ -57,7 +57,7 @@ bool AdjustTail(gen j, gen i) {
       fprintf(LogFile, "*[a%d,a%d] = ", j, g);
     }
   } else { /* aj = N*g */
-    gen g = -Definition[j].g;
+    gen g = Definition[j].g;
     gpvec v = FreshVec();
     if (g > i)
       Prod(v, Exponent[g], Product[g][i]);

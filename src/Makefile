@@ -22,7 +22,7 @@ else
     CXX = g++
 endif
 
-LIENQ_OBJ = presentation.o print.o readpres.o operations.o matrix.o consistency.o tails.o auxiliary.o lienq.o
+LIENQ_OBJ = fppresentation.o pcpresentation.o print.o operations.o matrix.o consistency.o tails.o auxiliary.o lienq.o
 
 all: lienq_long lienq_2_64 lienq_3_38 lienq_3_39 lienq_mpz
 

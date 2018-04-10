@@ -66,7 +66,7 @@ void PrintPcPres(FILE *f, presentation &Pres) {
   for (unsigned i = 1; i <= Pres.NrGens; i++) {
     gen g = Epimorphism[i]->g;
     fprintf(f, "# %10s |-->", Pres.GeneratorName[i]);
-    if (g && isimggen(g) && i == Definition[g].g)
+    if (g && Definition[g].t == DGEN && Definition[g].g == i)
       fprintf(f, ": a%d\n", g);
     else {
       fprintf(f, " ");
@@ -77,10 +77,10 @@ void PrintPcPres(FILE *f, presentation &Pres) {
   if (PrintDefs) {
     fprintf(f, "# The definitions:\n");
     for (unsigned i = 1; i <= NrTotalGens; i++)
-      if (iscommgen(i)) {
+      if (Definition[i].t == DCOMM) {
 	gen cv[Weight[i] + 1], g = i;
 	for (unsigned pos = Weight[g]; Weight[g] > 1; pos--) {
-	  if (!iscommgen(g))
+	  if (Definition[g].t != DCOMM)
 	    abortprintf(5, "Iterated definition of generator %d does not involve commutators and weight-1 generators", i);
 
 	  cv[pos] = Definition[g].h;
@@ -112,7 +112,7 @@ void PrintPcPres(FILE *f, presentation &Pres) {
       coeff_out_str(f, Exponent[i]);
       fprintf(f, "*a%d", i);
       if (Power[i] != NULL && Power[i]->g != EOW) {
-	if (ispowergen(Power[i]->g))
+	if (Definition[Power[i]->g].t == DPOW)
 	  fprintf(f, " =: a%d", Power[i]->g);
 	else {
 	  fprintf(f, " = ");
@@ -164,13 +164,24 @@ void PrintPcPres(FILE *f, presentation &Pres) {
   fprintf(f, " >\n");
 }
 
+bool PrintGAPVec(FILE *f, gpvec v, bool first) {
+  for (; v->g != EOW; v++) {
+    if (first)
+      fprintf(f, " + ");
+    coeff_out_str(f, v->c);
+    fprintf(f, "*bas[%d]", v->g);
+    first = false;
+  }
+  return first;
+}
+  
 void PrintGAPPres(FILE *f, presentation &Pres) {
   fprintf(f, "LoadPackage(\"liering\");\n"
 	  "F := FreeLieRing(Integers,[");
   for (unsigned i = 1; i <= Pres.NrGens; i++)
     fprintf(f, "%s\"%s\"", i > 1 ? "," : "", Pres.GeneratorName[i]);
-  fprintf(f, "]);\n"
-	  "L := CallFuncList(function()\n"
+  fprintf(f, "]);\n");
+  fprintf(f, "L := CallFuncList(function()\n"
 	  "\tlocal T, L, bas, epi, src, genimgs, eval;\n"
 	  "\tT := EmptySCTable(%d,0,\"antisymmetric\");\n", NrPcGens);
   for (unsigned j = 1; j <= NrPcGens; j++)
@@ -197,14 +208,8 @@ void PrintGAPPres(FILE *f, presentation &Pres) {
       fprintf(f, "%s-", first ? "" : ",\n\t\t");
       coeff_out_str(f, Exponent[i]);
       fprintf(f, "*bas[%d]", i);
-      if (Power[i] != NULL && Power[i]->g != EOW) {
-	for (gpvec v = Power[i]; v->g != EOW; v++) {
-	  fprintf(f, " + ");
-	  coeff_out_str(f, v->c);
-	  fprintf(f, "*bas[%d]", v->g);
-	  first = false;
-	}
-      }
+      if (Power[i] != NULL)
+	PrintGAPVec(f, Power[i], false);
       first = false;
     }
   }
@@ -213,13 +218,8 @@ void PrintGAPPres(FILE *f, presentation &Pres) {
   fprintf(f, "\tgenimgs := [");
   for (unsigned i = 1; i <= Pres.NrGens; i++) {
     fprintf(f, "%s(", i == 1 ? "" : ",");
-    bool first = true;
-    for (gpvec v = Epimorphism[i]; v->g != EOW; v++) {
-      fprintf(f, "%s", first ? "" : " + ");
-      coeff_out_str(f, v->c);
-      fprintf(f, "*bas[%d]", v->g);
-      first = false;
-    }
+    if (PrintGAPVec(f, Epimorphism[i], true))
+      fprintf(f, "Zero(L)");
     fprintf(f, ")^epi");
   }
   fprintf(f,"];\n");
@@ -233,14 +233,7 @@ void PrintGAPPres(FILE *f, presentation &Pres) {
       Collect(v, temp);
       PopVec();
       fprintf(f, "%s(", i == 0 ? "" : ",");
-      bool first = true;
-      for (gpvec p = v; p->g != EOW; p++) {
-	fprintf(f, "%s", first ? "" : " + ");
-	coeff_out_str(f, p->c);
-	fprintf(f, "*bas[%d]", p->g);
-	first = false;
-      }
-      if (first)
+      if (PrintGAPVec(f, v, true))
 	fprintf(f,"Zero(L)");
       fprintf(f, ")^epi");
     }
@@ -248,16 +241,16 @@ void PrintGAPPres(FILE *f, presentation &Pres) {
     fprintf(f, "];\n");
   }
   
-  fprintf(f, "\tL := Range(epi);\n"
-	  "\tsrc := F;\n"
-	  "\teval := function(expr)\n"
+  fprintf(f, "\tL := Range(epi);\n");
+  fprintf(f, "\tsrc := F;\n");
+  fprintf(f, "\teval := function(expr)\n"
 	  "\t\tif IsBound(expr.var) then\n"
 	  "\t\t\treturn genimgs[expr.var];\n"
 	  "\t\telse\n"
 	  "\t\treturn eval(expr.left)*eval(expr.right);\n"
 	  "\t\tfi;\n"
-	  "\tend;\n"
-	  "\tSetCanonicalProjection(L,function(elm)\n"
+	  "\tend;\n");
+  fprintf(f, "\tSetCanonicalProjection(L,function(elm)\n"
 	  "\t\tlocal res, i;\n"
 	  "\t\tif not elm in src then Error(\"Element \",elm,\" does not belong to free Lie algebra \",src); fi;\n"
 	  "\t\telm := elm![1];\n"
@@ -266,7 +259,7 @@ void PrintGAPPres(FILE *f, presentation &Pres) {
 	  "\t\t\tres := res + elm[i]*eval(elm[i-1]);\n"
 	  "\t\tod;\n"
 	  "\t\treturn res;\n"
-	  "\tend);\n"
-	  "\treturn L;\n"
+	  "\tend);\n");
+  fprintf(f, "\treturn L;\n"
 	  "end,[]);\n");
 }

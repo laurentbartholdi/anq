@@ -75,7 +75,7 @@ void InitPcPres(presentation &Pres) {
     if (!IsDefIm[i]) {
       NrCenGens++;
       Epimorphism[i] = NULL;
-      AddSingleGenerator(Epimorphism[i], NrCenGens, {.g = NrCenGens, .h = 0});
+      AddSingleGenerator(Epimorphism[i], NrCenGens, {.t = DGEN, .g = NrCenGens});
     }
   delete[] IsDefIm;
 
@@ -291,8 +291,8 @@ unsigned ReducedPcPres(presentation &Pres, gpvec *rels, unsigned numrels) {
 
   if (TorsionExp == 0) /* sanity check */
     for (unsigned i = 1; i <= NrTotalGens-trivialgens; i++)
-      if (ispowergen(i))
-	abortprintf(5, "Generator %d is neither image of presentation generator nor defined as a commutator, but is a power of generator %d", i, -Definition[i].g);    
+      if (Definition[i].t == DPOW)
+	abortprintf(5, "Generator %d is neither image of presentation generator nor defined as a commutator, but is a power of generator %d", i, Definition[i].g);    
   
   delete[] renumber;
 
@@ -351,14 +351,14 @@ void AddGen(presentation &Pres) {
       bool torsion = coeff_nz_p(Exponent[i]);
       if (torsion)
 	NrCenGens++; /* we add a tail at Exponent[i]*ai */
-      if (iscommgen(i))
+      if (Definition[i].t == DCOMM)
 	IsDefRel[Definition[i].g][Definition[i].h] = true;
-      else if (isimggen(i))
+      else if (Definition[i].t == DGEN)
 	IsDefIm[Definition[i].g] = true;
-      else { /* ispowergen(i) */
+      else { /* Definition[i].t == DPOW */
 	NrCenGens++; /* we'll add a tail to ... */
 	if (torsion) {
-	  IsDefPower[-Definition[i].g] = true;
+	  IsDefPower[Definition[i].g] = true;
 	  NrCenGens -= LastGen[1]+1; /* we actually don't need a tail
 					to Exponent[i]*ai, and we
 					don't need [ai,aj] either */
@@ -380,7 +380,7 @@ void AddGen(presentation &Pres) {
     /* Let's modify the epimorphic images. */
     for (unsigned i = 1; i <= Pres.NrGens; i++)
       if (!IsDefIm[i]) {
-	AddSingleGenerator(Epimorphism[i], ++shift, {.g = i, .h = 0});
+	AddSingleGenerator(Epimorphism[i], ++shift, {.t = DGEN, .g = i});
 	if (Debug >= 2)
 	  fprintf(LogFile, "# added tail a%d to epimorphic image of %s\n", shift, Pres.GeneratorName[i]);
       }
@@ -399,7 +399,7 @@ void AddGen(presentation &Pres) {
       /* Could you guess what to do now? Right! Modify the power relations. */
       for (unsigned i = 1; i <= NrPcGens; i++)
 	if (!IsDefPower[i] && coeff_nz_p(Exponent[i])) {
-	  AddSingleGenerator(Power[i], ++shift, {.g = -i, .h = 0});
+	  AddSingleGenerator(Power[i], ++shift, {.t = DPOW, .g = i});
 	  if (Debug >= 2)
 	    fprintf(LogFile, "# added tail a%d to non-defining torsion generator a%d\n", shift, i);
 	}
@@ -410,8 +410,8 @@ void AddGen(presentation &Pres) {
    */
       for (unsigned i = (Graded ? LastGen[Class-2]+1 : 1); i <= NrPcGens; i++)
 	for (unsigned j = 1; j < i && j <= LastGen[1]; j++)
-	  if (!IsDefRel[i][j] && !ispowergen(i)) { /* don't add tails to [ai,aj] if ai := N*ak, since this will be N*[ak,aj] */
-	    AddSingleGenerator(Product[i][j], ++shift, {.g = i, .h = j});
+	  if (!IsDefRel[i][j] && Definition[i].t != DPOW) { /* don't add tails to [ai,aj] if ai := N*ak, since this will be N*[ak,aj] */
+	    AddSingleGenerator(Product[i][j], ++shift, {.t = DCOMM, .g = i, .h = j});
 	    if (Debug >= 2)
 	      fprintf(LogFile, "# added tail a%d to non-defining commutator [a%d, a%d]\n", shift, i, j);
 	  }

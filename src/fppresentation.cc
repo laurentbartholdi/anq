@@ -10,6 +10,7 @@
 #include <ctype.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <vector>
 
 enum token {
   LPAREN, RPAREN, LBRACK, RBRACK, LBRACE, RBRACE,
@@ -59,7 +60,7 @@ static int TChar;         /* Character number where token starts. */
 static const char *InFileName;  /* Current input file name. */
 static FILE *InFp;        /* Current input file pointer. */
 static coeff N;           /* Contains the integer just read. */
-static char *Gen;         /* Contains the generator name. */
+static char *GenName;     /* Contains the generator name. */
 static presentation *Pres;
 
 void FreeNode(node *n) {
@@ -88,11 +89,13 @@ static node *NewNode(nodetype type) {
 
 enum genstatus { NOCREATE, CREATE };
 
-static gen GenNumber(char *gname, genstatus status) {
-  if (status == CREATE && Pres->NrGens == 0)
+static gen GenNumber(genstatus status) {
+  if (status == CREATE && Pres->NrGens == 0) {
     Pres->GeneratorName = (char **) malloc(2 * sizeof(char *));
+    Pres->Weight = (unsigned *) malloc(2 * sizeof(unsigned));
+  }
   for (unsigned i = 1; i <= Pres->NrGens; i++) {
-    if (!strcmp(gname, Pres->GeneratorName[i])) {
+    if (!strcmp(GenName, Pres->GeneratorName[i])) {
       if (status == CREATE)
         return (gen) 0;
       return (gen) i;
@@ -102,9 +105,11 @@ static gen GenNumber(char *gname, genstatus status) {
     return (gen) 0;
   Pres->NrGens++;
   Pres->GeneratorName = (char **) realloc(Pres->GeneratorName, (Pres->NrGens + 1) * sizeof(char *));
-  Pres->GeneratorName[Pres->NrGens] = (char *) malloc(strlen(gname) + 1);
-  strcpy(Pres->GeneratorName[Pres->NrGens], gname);
-
+  Pres->Weight = (unsigned *) realloc(Pres->Weight, (Pres->NrGens + 1) * sizeof(unsigned));
+  Pres->GeneratorName[Pres->NrGens] = (char *) malloc(strlen(GenName) + 1);
+  strcpy(Pres->GeneratorName[Pres->NrGens], GenName);
+  Pres->Weight[Pres->NrGens] = 1;
+  
   return Pres->NrGens;
 }
 
@@ -150,7 +155,7 @@ static void SkipBlanks(void) {
 
 /* gets a new token from the stream, and puts it in the global variable
    Token.
-   Also sets the globals Gen and N in case a generator / number is read.
+   Also sets the globals GenName and N in case a generator / number is read.
 */
 static void NextToken(void) {
   SkipBlanks();
@@ -291,11 +296,11 @@ static void NextToken(void) {
 
     for (len = 0; isalnum(Ch) || Ch == '_' || Ch == '.'; len++) {
       if (len > 100)
-	Gen = (char *) realloc(Gen, len+2);
-      Gen[len] = Ch;
+	GenName = (char *) realloc(GenName, len+2);
+      GenName[len] = Ch;
       ReadCh();
     }
-    Gen[len] = '\0';
+    GenName[len] = '\0';
 
     if (len == 0)
       SyntaxError("Illegal character '%c'", Ch);
@@ -367,9 +372,9 @@ node *Term(void) {
   }
   if (Token == GEN) {
     node *n = NewNode(TGEN);
-    n->cont.g = GenNumber(Gen, NOCREATE);
-    if (n->cont.g == (gen)0)
-      SyntaxError("Unkown generator %s", Gen);
+    n->cont.g = GenNumber(NOCREATE);
+    if (n->cont.g == (gen) 0)
+      SyntaxError("Unkown generator %s", GenName);
     NextToken();
     return n;
   }
@@ -473,7 +478,7 @@ unsigned ReadPresentation(presentation &Pres0, const char *InputFileName) {
   Char = 0;
   Line = 1;
   coeff_init(N);
-  Gen = (char *) malloc(102);
+  GenName = (char *) malloc(102);
   
   NextToken(); // start parsing
 
@@ -492,8 +497,9 @@ unsigned ReadPresentation(presentation &Pres0, const char *InputFileName) {
     if (Token != GEN)
       SyntaxError("Generator expected");
     
-    if (GenNumber(Gen, CREATE) == (gen) 0)
-      SyntaxError("Duplicate generator %s", Gen);
+    gen g = GenNumber(CREATE);
+    if (g == (gen) 0)
+      SyntaxError("Duplicate generator %s", GenName);
 
     NextToken(); // | or ,
 
@@ -504,6 +510,13 @@ unsigned ReadPresentation(presentation &Pres0, const char *InputFileName) {
       NextToken();
     else
       SyntaxError("',' expected");
+
+    if (Token == NUMBER) {
+      Pres->Weight[g] = coeff_get_si(N);
+      NextToken();
+      if (Token != COMMA)
+	SyntaxError("',' expected");
+    }
   }
 
   /* get relators */
@@ -569,7 +582,7 @@ unsigned ReadPresentation(presentation &Pres0, const char *InputFileName) {
     fclose(InFp);
 
   coeff_clear(N);
-  free(Gen);
+  free(GenName);
   
   return uptoclass;
 }
@@ -578,6 +591,7 @@ void FreePresentation(presentation &Pres) {
   for (unsigned i = 1; i <= Pres.NrGens; i++)
     free(Pres.GeneratorName[i]);
   free(Pres.GeneratorName);
+  free(Pres.Weight);
   for (unsigned i = 0; i < Pres.NrRels; i++)
     FreeNode(Pres.Relators[i]);
   free(Pres.Relators);

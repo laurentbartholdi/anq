@@ -60,7 +60,7 @@ struct node {
 };
 
 struct presentation {
-  unsigned NrGens, NrRels, NrDefs, NrExtra;
+  unsigned NrGens, NrRels, NrDefs, NrExtra, *Weight;
   char **GeneratorName;
   node **Relators, **Definitions, **Extra;
 };
@@ -70,9 +70,15 @@ struct presentation {
  * the special case h=0 means that generator is defined as image
  * of presentation generator g.
  ****************************************************************/
+enum gendeftype {
+  DGEN,  /* g is defined as an image of original generator */
+  DCOMM,  /* g is defined as commutator */
+  DPOW /* g is defined as power of a pc generator */
+};
+
 struct deftype {
-  gen g;
-  gen h;
+  gendeftype t;
+  gen g, h;
 };
 
 /****************************************************************
@@ -133,16 +139,6 @@ extern unsigned Class,
   NrPcGens, // = LastGen[Class-1]
   NrCenGens, // = LastGen[Class]-LastGen[Class-1]
   NrTotalGens; // = LastGen[Class]
-
-inline bool isimggen(gen g) { /* g is defined as an image of original generator */
-  return Definition[g].h == 0 && 0 < (int) Definition[g].g;
-}
-inline bool ispowergen(gen g) { /* g is defined as power of a pc generator */
-  return Definition[g].h == 0 && 0 > (int) Definition[g].g;
-}
-inline bool iscommgen(gen g) { /* g is defined as commutator */
-  return Definition[g].h != 0;
-}
 
 void InitPcPres(presentation &);
 void FreePcPres(presentation &);
