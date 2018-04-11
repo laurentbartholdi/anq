@@ -60,15 +60,16 @@ struct node {
 };
 
 struct presentation {
-  unsigned NrGens, NrRels, NrDefs, NrExtra, *Weight;
+  unsigned NrGens, NrRels, NrAliases, NrExtra, *Weight;
   char **GeneratorName;
-  node **Relators, **Definitions, **Extra;
+  node **Relators, **Aliases, **Extra;
 };
 
 /****************************************************************
- * a definition of a generator is as a commutator [g,h].
- * the special case h=0 means that generator is defined as image
- * of presentation generator g.
+ * every pc generator x is defined as either
+ * - an image of fp generator (then x = Epimorphism[g])
+ * - an commutator of pc generators (then x = Product[g][h])
+ * - a power of a pc generator (then x = g^Exponent[g])
  ****************************************************************/
 enum gendeftype {
   DGEN,  /* g is defined as an image of original generator */
@@ -112,13 +113,11 @@ void FreeVec(gpvec);
 gpvec ResizeVec(gpvec, unsigned, unsigned);
 
 /* tails functions */
-void Tails(void);
-void GradedTails(void);
+void ComputeTails(void);
 
 /* consistency functions */
 void TripleProduct(gpvec &, gen, gen, gen);
 void Consistency(void);
-void GradedConsistency(void);
 
 /* print functions */
 extern void abortprintf(int, const char *, ...) __attribute__((format(printf, 2, 3),noreturn));
@@ -134,18 +133,16 @@ void TimeStamp(const char *);
 extern gpvec **Product, *Power, *Epimorphism;
 extern coeff *Exponent, *Annihilator;
 extern deftype *Definition;
-extern unsigned *Weight, *LastGen;
+extern unsigned *Weight;
 extern unsigned Class,
-  NrPcGens, // = LastGen[Class-1]
-  NrCenGens, // = LastGen[Class]-LastGen[Class-1]
-  NrTotalGens; // = LastGen[Class]
+  NrPcGens, // during extension of pc presentation, will be previous NrTotalGens
+  NrTotalGens;
 
 void InitPcPres(presentation &);
 void FreePcPres(presentation &);
+void AddNewTails(presentation &);
 void EvalAllRel(presentation &);
-unsigned ReducedPcPres(presentation &, gpvec *, unsigned);
-void ExtendPcPres(void);
-void AddGen(presentation &);
+void ReducePcPres(presentation &, gpvec *, unsigned);
 
 /* operation functions */
 void Sum(gpvec, constgpvec, constgpvec);

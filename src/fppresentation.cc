@@ -89,7 +89,7 @@ static node *NewNode(nodetype type) {
 
 enum genstatus { NOCREATE, CREATE };
 
-static gen GenNumber(genstatus status) {
+static gen GenNumber(genstatus status, unsigned weight) {
   if (status == CREATE && Pres->NrGens == 0) {
     Pres->GeneratorName = (char **) malloc(2 * sizeof(char *));
     Pres->Weight = (unsigned *) malloc(2 * sizeof(unsigned));
@@ -108,7 +108,7 @@ static gen GenNumber(genstatus status) {
   Pres->Weight = (unsigned *) realloc(Pres->Weight, (Pres->NrGens + 1) * sizeof(unsigned));
   Pres->GeneratorName[Pres->NrGens] = (char *) malloc(strlen(GenName) + 1);
   strcpy(Pres->GeneratorName[Pres->NrGens], GenName);
-  Pres->Weight[Pres->NrGens] = 1;
+  Pres->Weight[Pres->NrGens] = weight;
   
   return Pres->NrGens;
 }
@@ -372,8 +372,7 @@ node *Term(void) {
   }
   if (Token == GEN) {
     node *n = NewNode(TGEN);
-    n->cont.g = GenNumber(NOCREATE);
-    if (n->cont.g == (gen) 0)
+    if ((n->cont.g = GenNumber(NOCREATE, 0)) == (gen) 0)
       SyntaxError("Unkown generator %s", GenName);
     NextToken();
     return n;
@@ -492,37 +491,35 @@ unsigned ReadPresentation(presentation &Pres0, const char *InputFileName) {
   else
     SyntaxError("'<' expected");
 
+  unsigned weight = 1;
+
   /* get generators */
   while (true) {
+    while (Token == SEMICOLON) {
+      weight++;
+      NextToken();
+    }
+
     if (Token != GEN)
       SyntaxError("Generator expected");
-    
-    gen g = GenNumber(CREATE);
+    gen g = GenNumber(CREATE, weight);
     if (g == (gen) 0)
       SyntaxError("Duplicate generator %s", GenName);
+    NextToken();
 
-    NextToken(); // | or ,
-
-    if (Token == PIPE) {
-      NextToken();
+    if (Token == PIPE)
       break;
-    } else if (Token == COMMA)
-      NextToken();
-    else
-      SyntaxError("',' expected");
 
-    if (Token == NUMBER) {
-      Pres->Weight[g] = coeff_get_si(N);
+    if (Token == COMMA)
       NextToken();
-      if (Token != COMMA)
-	SyntaxError("',' expected");
-    }
   }
 
+  NextToken();
+
   /* get relators */
-  Pres->NrRels = Pres->NrDefs = 0;
+  Pres->NrRels = Pres->NrAliases = 0;
   Pres->Relators = (node **) malloc(sizeof(node *));
-  Pres->Definitions = (node **) malloc(sizeof(node *));
+  Pres->Aliases = (node **) malloc(sizeof(node *));
   while (is_relation(Token)) {
     node *n = Expression(0);
 
@@ -541,8 +538,8 @@ unsigned ReadPresentation(presentation &Pres0, const char *InputFileName) {
       ValidateLieExpression(n, (gen) -1);
 
     if (n->type == TDREL) {
-      Pres->Definitions = (node **) realloc(Pres->Definitions, (Pres->NrDefs+1) * sizeof(node *));
-      Pres->Definitions[Pres->NrDefs++] = n;
+      Pres->Aliases = (node **) realloc(Pres->Aliases, (Pres->NrAliases+1) * sizeof(node *));
+      Pres->Aliases[Pres->NrAliases++] = n;
     } else {
       Pres->Relators = (node **) realloc(Pres->Relators, (Pres->NrRels+1) * sizeof(node *));
       Pres->Relators[Pres->NrRels++] = n;
@@ -595,9 +592,9 @@ void FreePresentation(presentation &Pres) {
   for (unsigned i = 0; i < Pres.NrRels; i++)
     FreeNode(Pres.Relators[i]);
   free(Pres.Relators);
-  for (unsigned i = 0; i < Pres.NrDefs; i++)
-    FreeNode(Pres.Definitions[i]);
-  free(Pres.Definitions);
+  for (unsigned i = 0; i < Pres.NrAliases; i++)
+    FreeNode(Pres.Aliases[i]);
+  free(Pres.Aliases);
   if (Pres.Extra != NULL) {
     for (unsigned i = 0; i < Pres.NrExtra; i++)
       FreeNode(Pres.Extra[i]);

@@ -12,15 +12,16 @@ static unsigned NrRows;
 static gpvec *Matrix;
 
 void InitMatrix(void) {
-  Matrix = (gpvec *) malloc((NrCenGens+1) * sizeof(gpvec));
+  unsigned nrcentralgens = NrTotalGens-NrPcGens;
+  Matrix = (gpvec *) malloc((nrcentralgens+1) * sizeof(gpvec));
   if (Matrix == NULL)
     abortprintf(2, "InitMatrix: malloc(Matrix) failed");
 
   if (TorsionExp == 0)
     NrRows = 0;
   else {
-    NrRows = NrCenGens;
-    for (unsigned i = 0; i < NrCenGens; i++) {
+    NrRows = nrcentralgens;
+    for (unsigned i = 0; i < nrcentralgens; i++) {
       Matrix[i] = NewVec(NrTotalGens);
       Matrix[i][0].g = NrPcGens + i + 1;
       coeff_set_si(Matrix[i][0].c, TorsionExp);

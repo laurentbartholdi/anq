@@ -10,7 +10,7 @@
 
 /*
 **  Some of the newly introduced generators strictly depend on one another
-**  hence we can compute them proceeding on an induction method.
+**  hence we can compute them inductively.
 */
 
 /* compute the correct tail for [aj,ai]:
@@ -20,7 +20,7 @@
  * - if j is defined as N*g, compute [j,i] = N*[g,i] or -N*[i,g]
  */
 bool AdjustTail(gen j, gen i) {
-  if (i <= LastGen[1] && Definition[j].t != DPOW) /* nothing to do, it's a fresh gen */
+  if (Definition[i].t == DGEN && Definition[j].t != DPOW) /* nothing to do, [aj,ai] is a defining generator */
     return true;
 
   if (Weight[j] + Weight[i] > Class) /* the tail would go too far out */
@@ -94,7 +94,7 @@ bool AdjustTail(gen j, gen i) {
   return true;
 }
 
-void Tails(void) {
+void ComputeTails(void) {
   for (unsigned i = 1; i <= NrPcGens; i++) {
     for (unsigned j = i + 1; j <= NrPcGens; j++) {
       if (Graded && Weight[i]+Weight[j] != Class)

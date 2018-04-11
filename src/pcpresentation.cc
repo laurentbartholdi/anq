@@ -6,18 +6,19 @@
 */
 
 #include "lienq.h"
-#include <time.h> // for clock
+#include <vector>
 
 gpvec **Product,  *Power, *Epimorphism;
 coeff *Exponent, *Annihilator;
 
 deftype *Definition;
 
-unsigned *Weight, *LastGen, Class, NrCenGens, NrPcGens, NrTotalGens;
+unsigned *Weight, Class, NrPcGens, NrTotalGens;
 
 /* add generator newgen to vector v, and store its definition */
-static void AddSingleGenerator(gpvec &v, gen newgen, deftype def) {
+static void AddSingleGenerator(gpvec &v, deftype def) {
   unsigned l;
+
   if (v == NULL) {
     v = NewVec(1);
     l = 0;
@@ -25,30 +26,19 @@ static void AddSingleGenerator(gpvec &v, gen newgen, deftype def) {
     l = Length(v);
     v = ResizeVec(v, l, l + 1);
   }
-  v[l].g = newgen;
+
+  v[l].g = ++NrTotalGens;
   coeff_set_si(v[l].c, 1);
   v[l+1].g = EOW;
-  Definition[newgen] = def;
+
+  Definition = (deftype *) realloc(Definition, (NrTotalGens + 1) * sizeof(deftype));
+  if (Definition == NULL)
+    abortprintf(2, "AddSingleGenerator: realloc(Definition) failed");
+  
+  Definition[NrTotalGens] = def;
 }
 
-static bool *DefGenerators(presentation &Pres) {
-  bool *IsDefIm = new bool[Pres.NrGens + 1];
-
-  for (unsigned i = 1; i <= Pres.NrGens; i++)
-    IsDefIm[i] = false;
-
-  /* generators admitting a definition as relator don't need a tail */
-  for (unsigned i = 0; i < Pres.NrDefs; i++) {
-    gen g = Pres.Definitions[i]->cont.bin.l->cont.g;
-    if (IsDefIm[g])
-      abortprintf(3, "(At least) two definitions for generator %d", g);
-    IsDefIm[g] = true;
-  }
-
-  return IsDefIm;
-}
-
-/* initialize Pc presentation, at class 1. No products or powers are set yet. */
+/* initialize Pc presentation, at class 0. No products or powers are set yet. */
 void InitPcPres(presentation &Pres) {
   /*
   ** The epimorphism maps from the Lie-algebra given by finite presentation to
@@ -60,83 +50,43 @@ void InitPcPres(presentation &Pres) {
   ** (abelian) factor. It is rather trivial at the beginning, actually a
   ** one-to-one map between the two generator set.
 */
-  NrPcGens = NrCenGens = 0;
-
+  NrPcGens = 0;
+  Class = 0;
+  
   Epimorphism = (gpvec *) malloc((Pres.NrGens + 1) * sizeof(gpvec));
   if (Epimorphism == NULL)
     abortprintf(2, "InitPcPres: malloc(Epimorphism) failed");
+  for (unsigned i = 1; i <= Pres.NrGens; i++)
+    Epimorphism[i] = NewVec(0);
 
-  Definition = (deftype *) malloc((Pres.NrGens + 1) * sizeof(deftype));
+  Definition = (deftype *) malloc(sizeof(deftype));
   if (Definition == NULL)
     abortprintf(2, "InitPcPres: malloc(Definition) failed");
 
-  bool *IsDefIm = DefGenerators(Pres);
-  for (unsigned i = 1; i <= Pres.NrGens; i++)
-    if (!IsDefIm[i]) {
-      NrCenGens++;
-      Epimorphism[i] = NULL;
-      AddSingleGenerator(Epimorphism[i], NrCenGens, {.t = DGEN, .g = NrCenGens});
-    }
-  delete[] IsDefIm;
-
-  NrTotalGens = NrCenGens;
-
-  LastGen = (unsigned *) malloc(1 * sizeof(unsigned));
-  if (LastGen == NULL)
-    abortprintf(2, "InitPcPres: malloc(LastGen) failed");
-  LastGen[0] = 0;
-
-  /* LastGen[c] is the last generator of weight c */
-  Weight = (unsigned *) malloc(1 * sizeof(unsigned));
+  Weight = (unsigned *) malloc(sizeof(unsigned));
   if (Weight == NULL)
     abortprintf(2, "InitPcPres: malloc(Weight) failed");
 
   /* we initialize the exponents and annihilators of our pc generators */
-  Exponent = (coeff *) malloc((NrTotalGens + 1) * sizeof(coeff));
+  Exponent = (coeff *) malloc(sizeof(coeff));
   if (Exponent == NULL)
     abortprintf(2, "InitPcPres: malloc(Exponent) failed");
 
-  for (unsigned i = 1; i <= NrTotalGens; i++)
-    coeff_init_set_si(Exponent[i], TorsionExp);
-  
-  Annihilator = (coeff *) malloc((NrTotalGens + 1) * sizeof(coeff));
+  Annihilator = (coeff *) malloc((NrPcGens + 1) * sizeof(coeff));
   if (Annihilator == NULL)
     abortprintf(2, "InitPcPres: malloc(Annihilator) failed");
 
-  for (unsigned i = 1; i <= NrTotalGens; i++)
-    coeff_init_set_si(Annihilator[i], 0);
-
-  /* we reserve some space for the powers and commutators of generators,
-     as well as the definitions of generators in terms of powers or
-     commutators of previous ones.
-
-     The actual values will be filled in later. */
-  Power = (gpvec *) malloc((NrTotalGens + 1) * sizeof(gpvec));
+  Power = (gpvec *) malloc(sizeof(gpvec));
   if (Power == NULL)
     abortprintf(2, "InitPcPres: malloc(Power) failed");
-  for (unsigned i = 1; i <= NrTotalGens; i++)
-    Power[i] = NULL;
 
-  Product = (gpvec **) malloc((NrTotalGens + 1) * sizeof(gpvec *));
+  Product = (gpvec **) malloc((NrPcGens + 1) * sizeof(gpvec *));
   if (Product == NULL)
     abortprintf(2, "InitPcPres: malloc(Product) failed");
-
-  /* Finally we set the epimorphism images from the defining relations */
-  InitStack();
-  for (unsigned i = 0; i < Pres.NrDefs; i++) {
-    gen g = Pres.Definitions[i]->cont.bin.l->cont.g;
-    gpvec v = FreshVec();
-    EvalRel(v, Pres.Definitions[i]->cont.bin.r);
-    Epimorphism[g] = NewVec(Length(v));
-    Copy(Epimorphism[g], v);
-    PopVec();
-    ShrinkCollect(Epimorphism[g]);
-  }
-  FreeStack();
 }
 
 void FreePcPres(presentation &Pres) {
-  for (unsigned i = 1; i <= NrTotalGens; i++) {
+  for (unsigned i = 1; i <= NrPcGens; i++) {
     if (Power[i] != NULL)
       FreeVec(Power[i]);
     coeff_clear(Exponent[i]);
@@ -153,8 +103,190 @@ void FreePcPres(presentation &Pres) {
   free(Annihilator);
   free(Product);
   free(Definition);
-  free(LastGen);
   free(Weight);
+}
+
+/*
+**  The first step is to extend the epimorphism to the next factor.
+**  In order to do that we define new generators for the images
+**  of the generators of the finite presentation which are not definitions.
+*/
+void AddNewTails(presentation &Pres) {
+  NrTotalGens = NrPcGens;
+
+  /* inverse lookup tables:
+     - is_dgen[i] == (exist g: Definition[g] = {DGEN,i}), so fp generator i is used to define a pc generator or an alias
+     is_dpow[i] == (exist g: Definition[g] = {DPOW,i}), so ai^Exponent[i] = ag
+     is_dcomm[i][j] == (exist g: Definition[g] = {DCOMM,i,j}), so [ai,aj] = ag
+  */
+  std::vector<bool> is_dgen(Pres.NrGens+1,false);
+  std::vector<bool> is_dpow(NrPcGens+1,false);
+  std::vector<std::vector<bool>> is_dcomm(NrPcGens+1);
+
+  /* first mark aliases */
+  for (unsigned i = 0; i < Pres.NrAliases; i++) {
+    gen g = Pres.Aliases[i]->cont.bin.l->cont.g;
+    if (is_dgen[g])
+      abortprintf(3, "(At least) two definitions for generator %d", g);
+    is_dgen[g] = true;
+  }
+    
+  for (unsigned i = 1; i <= NrPcGens; i++) {
+    is_dcomm[i] = std::vector<bool>(i,false);
+
+    switch(Definition[i].t) {
+    case DCOMM:
+      is_dcomm[Definition[i].g][Definition[i].h] = true;
+      break;
+    case DGEN:
+      is_dgen[Definition[i].g] = true;
+      break;
+    case DPOW:
+      is_dpow[Definition[i].g] = true;
+      break;
+    }
+  }
+
+  /* first, add new pc generators for the fp generators.
+     If x is an fp generator of degree d, add a pc generator in degree d,
+     in the graded case, and in degree >= d, in the ungraded case.
+  */
+  for (unsigned i = 1; i <= Pres.NrGens; i++) {
+    if (is_dgen[i] || Weight[i] > Class || (Graded && Weight[i] != Class))
+      continue;
+    AddSingleGenerator(Epimorphism[i], {.t = DGEN, .g = i});
+    if (Debug >= 2)
+      fprintf(LogFile, "# added tail a%d to epimorphic image of %s\n", NrTotalGens, Pres.GeneratorName[i]);
+  }
+
+  /* now add new generators ("tails") to powers and commutators.
+
+     In mode "TorsionExp > 0", we use as basis
+     generators of the form N*[ai,aj,...] with ai,aj,... of degree 1.
+     In mode "TorsionExp == 0", we force N=1.
+
+     This means that in mode "TorsionExp > 0" we favour powers, so we
+     put them last; while in mode "TorsionExp == 0" we avoid them, so
+     we put them first.
+  */
+  for (int pass = 0; pass < 2; pass++) {
+    /* for all pc generators g with Exponent[g]!=0, add a tail to
+       Power[g], unless:
+       - g is defined as a power
+       - we're in graded, torsion mode (so producing a (Z/TorsionExp)[t]-algebra) and g has degree < Class-1
+    */
+    if (pass == (TorsionExp == 0)) {
+      for (unsigned i = 1; i <= NrPcGens; i++) {
+	if (is_dpow[i] || !coeff_nz_p(Exponent[i]))
+	  continue;
+	if (Graded && (TorsionExp == 0 || Weight[i]+1 != Class))
+	  continue;
+	AddSingleGenerator(Power[i], {.t = DPOW, .g = i});
+	if (Debug >= 2)
+	  fprintf(LogFile, "# added tail a%d to non-defining torsion generator a%d\n", NrTotalGens, i);
+      }
+    }
+
+    if (pass == (TorsionExp > 0)) {
+      /* for all non-power pc generators g of weight <=Class-k and all
+	 defining pc generators h of weight k, with g > h, and such
+	 that [g,h] is not defining, add a tail to Product[g][h].
+
+	 all other tails will be computed in Tails() out of these:
+	 - if h is not defining, using Jacobi or Z-linearity;
+	 - if g is a power, using Z-linearity */
+      for (unsigned i = 1; i <= NrPcGens; i++) {
+	if (!is_dgen[i])
+	  continue;
+	for (unsigned j = i+1; j <= NrPcGens; j++) {
+	  if (is_dcomm[j][i])
+	    continue;
+	  if (Definition[j].t == DPOW)
+	    continue;
+	  unsigned totalweight = Weight[i]+Weight[j];
+	  if (totalweight > Class || (Graded && totalweight != Class))
+	    continue;
+	    
+	  AddSingleGenerator(Product[j][i], {.t = DCOMM, .g = j, .h = i});
+	  if (Debug >= 2)
+	    fprintf(LogFile, "# added tail a%d to non-defining commutator [a%d, a%d]\n", NrTotalGens, j, i);
+	}
+      }
+    }
+  }
+
+  /*
+  **  Extend the arrays of exponents, commutators etc. to the
+  **  necessary size.  Let's define the newly introduced generators to
+  **  be central i.e.  All of their product relations will be trivial
+  **  and also they have coefficients 0.
+  */
+
+  Exponent = (coeff *) realloc(Exponent, (NrTotalGens + 1) * sizeof(coeff));
+  if (Exponent == NULL)
+    abortprintf(2, "AddNewTails: realloc(Exponent) failed");
+  for (unsigned i = NrPcGens + 1; i <= NrTotalGens; i++)
+    coeff_init_set_si(Exponent[i], TorsionExp);
+
+  Annihilator = (coeff *) realloc(Annihilator, (NrTotalGens + 1) * sizeof(coeff));
+  if (Annihilator == NULL)
+    abortprintf(2, "AddNewTails: realloc(Annihilator) failed");
+  for (unsigned i = NrPcGens + 1; i <= NrTotalGens; i++)
+    coeff_init_set_si(Annihilator[i], 0);
+
+  Power = (gpvec *) realloc(Power, (NrTotalGens + 1) * sizeof(gpvec));
+  if (Power == NULL)
+    abortprintf(2, "AddNewTails: realloc(Power) failed");
+  for (unsigned i = NrPcGens + 1; i <= NrTotalGens; i++)
+    Power[i] = NULL;
+
+  Weight = (unsigned *) realloc(Weight, (NrTotalGens + 1) * sizeof(unsigned));
+  if (Weight == NULL)
+    abortprintf(2, "ExtendPcPres: realloc(Weight) failed");
+
+  for (unsigned i = NrPcGens + 1; i <= NrTotalGens; i++)
+    Weight[i] = Class;
+
+  /* The Product array is not extended yet, because anyways it won't be used.
+     we'll extend it later, in ReducePcPres */
+    
+  TimeStamp("AddNewTails()");
+}
+
+/* evaluate all relations, and add them to the relation matrix */
+void EvalAllRel(presentation &Pres) {
+  gpvec v = FreshVec();
+
+  for (unsigned i = 0; i < Pres.NrAliases; i++) {
+    gpvec temp = FreshVec();
+    EvalRel(temp, Pres.Aliases[i]->cont.bin.r);
+    Collect(v, temp);
+    PopVec();
+    if (Debug >= 2) {
+      fprintf(LogFile, "# aliasing relation: ");
+      PrintNode(LogFile, Pres.Aliases[i]);
+      fprintf(LogFile, " ("); PrintVec(LogFile, v); fprintf(LogFile, ")\n");
+    }
+    gen g = Pres.Aliases[i]->cont.bin.l->cont.g;
+    Epimorphism[g] = ResizeVec(Epimorphism[g], Length(Epimorphism[g]), Length(v));
+    Copy(Epimorphism[g], v);
+  }
+  
+  for (unsigned i = 0; i < Pres.NrRels; i++) {
+    gpvec temp = FreshVec();
+    EvalRel(temp, Pres.Relators[i]);
+    Collect(v, temp);
+    PopVec();
+    if (Debug >= 2) {
+      fprintf(LogFile, "# relation: ");
+      PrintNode(LogFile, Pres.Relators[i]);
+      fprintf(LogFile, " ("); PrintVec(LogFile, v); fprintf(LogFile, ")\n");
+    }
+    AddRow(v);
+  }
+  PopVec();
+  
+  TimeStamp("EvalAllRel()");
 }
 
 /* eliminate redundant generators from v; rels is a list of relations
@@ -201,44 +333,8 @@ void EliminateTrivialGenerators(gpvec *rels, gpvec &v, int renumber[]) {
   ShrinkCollect(v);
 }
 
-/* evaluate all relations, and add them to the relation matrix */
-void EvalAllRel(presentation &Pres) {
-  gpvec v = FreshVec();
-
-  for (unsigned i = 0; i < Pres.NrDefs; i++) {
-    gpvec temp = FreshVec();
-    EvalRel(temp, Pres.Definitions[i]->cont.bin.r);
-    Collect(v, temp);
-    PopVec();
-    if (Debug >= 2) {
-      fprintf(LogFile, "# defining relation: ");
-      PrintNode(LogFile, Pres.Definitions[i]);
-      fprintf(LogFile, " ("); PrintVec(LogFile, v); fprintf(LogFile, ")\n");
-    }
-    gen g = Pres.Definitions[i]->cont.bin.l->cont.g;
-    Epimorphism[g] = ResizeVec(Epimorphism[g], Length(Epimorphism[g]), Length(v));
-    Copy(Epimorphism[g], v);
-  }
-  
-  for (unsigned i = 0; i < Pres.NrRels; i++) {
-    gpvec temp = FreshVec();
-    EvalRel(temp, Pres.Relators[i]);
-    Collect(v, temp);
-    PopVec();
-    if (Debug >= 2) {
-      fprintf(LogFile, "# relation: ");
-      PrintNode(LogFile, Pres.Relators[i]);
-      fprintf(LogFile, " ("); PrintVec(LogFile, v); fprintf(LogFile, ")\n");
-    }
-    AddRow(v);
-  }
-  PopVec();
-  
-  TimeStamp("EvalAllRel()");
-}
-
 /* quotient the centre by the relations rels */
-unsigned ReducedPcPres(presentation &Pres, gpvec *rels, unsigned numrels) {
+void ReducePcPres(presentation &Pres, gpvec *rels, unsigned numrels) {
   unsigned trivialgens = 0;
 
   if (Debug >= 2) {
@@ -267,6 +363,7 @@ unsigned ReducedPcPres(presentation &Pres, gpvec *rels, unsigned numrels) {
     }
     i++;
   }
+  unsigned newnrpcgens = NrTotalGens - trivialgens;
 
   /* Modify the torsions first, in decreasing order, since they're needed
      for Collect */
@@ -290,210 +387,34 @@ unsigned ReducedPcPres(presentation &Pres, gpvec *rels, unsigned numrels) {
       Definition[renumber[i]] = Definition[i];
 
   if (TorsionExp == 0) /* sanity check */
-    for (unsigned i = 1; i <= NrTotalGens-trivialgens; i++)
+    for (unsigned i = 1; i <= newnrpcgens; i++)
       if (Definition[i].t == DPOW)
 	abortprintf(5, "Generator %d is neither image of presentation generator nor defined as a commutator, but is a power of generator %d", i, Definition[i].g);    
   
+  for (unsigned i = newnrpcgens+1; i <= NrTotalGens; i++) {
+    coeff_clear(Exponent[i]);
+    coeff_clear(Annihilator[i]);
+  }
+
   delete[] renumber;
+  /* we could shrink the arrays Definition, Exponent, Annihilator,
+     Weight, but it's not worth it */
 
-  for (unsigned i = 0; i < trivialgens; i++) {
-    coeff_clear(Exponent[NrTotalGens - i]);
-    coeff_clear(Annihilator[NrTotalGens - i]);
-  }
-  
-  TimeStamp("ReducedPcPres()");
-
-  return trivialgens;
-}
-
-/*
-**  The first step is to extend the epimorphism to the next factor.
-**  In order to do that we define new generators for the images
-**  of the generators of the finite presentation which are not definitions.
-*/
-void AddGen(presentation &Pres) {
-  /*
-  **  We want to know in advance the number of the newly introduced generators.
-  **  And also don't hesitate to refer this number as 'NrCenGens'.
-  */
-
-  /* IsDefIm[i] means that original generator i is used to define a pc
-     generator;
-     IsDefRel[i][j] means that [ai,aj] is used to define a pc
-     generator;
-     IsDefPower[i] means that ai^Exponent[i] is used to define a pc
-     generator */
-  bool *IsDefIm = DefGenerators(Pres);
-
-  bool **IsDefRel = new bool *[NrPcGens + 1];
-  for (unsigned i = 1; i <= NrPcGens; i++) {
-    IsDefRel[i] = new bool[LastGen[1] + 1];
-    for (unsigned j = 1; j <= LastGen[1]; j++)
-      IsDefRel[i][j] = false;
-  }
-
-  bool *IsDefPower = new bool[NrPcGens + 1];
-  for (unsigned i = 1; i <= NrPcGens; i++)
-    IsDefPower[i] = false;
-
-  if (Graded) {
-    /* very simple, we just add commutators of level 1 with level Class-1 */
-    if (Class == 2)
-      NrCenGens = (LastGen[1] * (LastGen[1] - 1)) / 2;
-    else
-      NrCenGens = (LastGen[Class-1]-LastGen[Class-2]) * LastGen[1];
-  } else {
-    NrCenGens = Pres.NrGens - Pres.NrDefs
-      + (LastGen[1] * (LastGen[1] - 1)) / 2
-      + LastGen[1] * (NrPcGens - LastGen[1]) - NrPcGens;
-
-    for (unsigned i = 1; i <= NrPcGens; i++) {
-      bool torsion = coeff_nz_p(Exponent[i]);
-      if (torsion)
-	NrCenGens++; /* we add a tail at Exponent[i]*ai */
-      if (Definition[i].t == DCOMM)
-	IsDefRel[Definition[i].g][Definition[i].h] = true;
-      else if (Definition[i].t == DGEN)
-	IsDefIm[Definition[i].g] = true;
-      else { /* Definition[i].t == DPOW */
-	NrCenGens++; /* we'll add a tail to ... */
-	if (torsion) {
-	  IsDefPower[Definition[i].g] = true;
-	  NrCenGens -= LastGen[1]+1; /* we actually don't need a tail
-					to Exponent[i]*ai, and we
-					don't need [ai,aj] either */
-	}
-      }
-    }
-  }
-  
-  NrTotalGens += NrCenGens;
-
-  /* Allocate space for the Definition. */
-  Definition = (deftype *) realloc(Definition, (NrTotalGens + 1) * sizeof(deftype));
-  if (Definition == NULL)
-    abortprintf(2, "AddGen: realloc(Definition) failed");
-  
-  unsigned shift = NrPcGens; /* points to the place of the new/pseudo generator. */
-
-  if (!Graded) {
-    /* Let's modify the epimorphic images. */
-    for (unsigned i = 1; i <= Pres.NrGens; i++)
-      if (!IsDefIm[i]) {
-	AddSingleGenerator(Epimorphism[i], ++shift, {.t = DGEN, .g = i});
-	if (Debug >= 2)
-	  fprintf(LogFile, "# added tail a%d to epimorphic image of %s\n", shift, Pres.GeneratorName[i]);
-      }
-  }
-
-  /* now this is tricky. In mode "TorsionExp > 0", we use as basis
-     generators of the form N*[ai,aj,...] with ai,aj,... of degree 1.
-     In mode "TorsionExp == 0", we force N=0.
-
-     This means that in mode "TorsionExp > 0" we favour powers, so we
-     put them last; while in mode "TorsionExp == 0" we avoid them, so
-     we put them first. */
-
-  for (int flag = 0; flag < 2; flag++)
-    if ((flag == 0) == (TorsionExp == 0)) {
-      /* Could you guess what to do now? Right! Modify the power relations. */
-      for (unsigned i = 1; i <= NrPcGens; i++)
-	if (!IsDefPower[i] && coeff_nz_p(Exponent[i])) {
-	  AddSingleGenerator(Power[i], ++shift, {.t = DPOW, .g = i});
-	  if (Debug >= 2)
-	    fprintf(LogFile, "# added tail a%d to non-defining torsion generator a%d\n", shift, i);
-	}
-    } else {
-  /* Don't wait more to do our main task: modify the commutator relations!
-   * we only add them for [ai,aj] with aj of degree 1, and ai not a power
-   * generator; Product[i][j] will be set in Tails() for the other ones
-   */
-      for (unsigned i = (Graded ? LastGen[Class-2]+1 : 1); i <= NrPcGens; i++)
-	for (unsigned j = 1; j < i && j <= LastGen[1]; j++)
-	  if (!IsDefRel[i][j] && Definition[i].t != DPOW) { /* don't add tails to [ai,aj] if ai := N*ak, since this will be N*[ak,aj] */
-	    AddSingleGenerator(Product[i][j], ++shift, {.t = DCOMM, .g = i, .h = j});
-	    if (Debug >= 2)
-	      fprintf(LogFile, "# added tail a%d to non-defining commutator [a%d, a%d]\n", shift, i, j);
-	  }
-    }
-
-  if (shift != NrTotalGens)
-    abortprintf(5, "AddGen: shift (=%d) != NrTotalGens (=%d)", shift, NrTotalGens);
-  
-  for (unsigned i = 1; i <= NrPcGens; i++)
-    delete[] IsDefRel[i];
-  delete[] IsDefRel;
-  delete[] IsDefIm;
-  delete[] IsDefPower;
-  
-  /*
-  **  Extend the arrays of exponents, commutators etc. to the
-  **  necessary size.  Let's define the newly introduced generators to
-  **  be central i.e.  All of their product relations will be trivial
-  **  and also they have coefficients 0.
-  */
-
-  Exponent = (coeff *) realloc(Exponent, (NrTotalGens + 1) * sizeof(coeff));
-  if (Exponent == NULL)
-    abortprintf(2, "ExtendPower: realloc(Exponent) failed");
-
-  for (unsigned i = NrPcGens + 1; i <= NrTotalGens; i++)
-    coeff_init_set_si(Exponent[i], TorsionExp);
-
-  Annihilator = (coeff *) realloc(Annihilator, (NrTotalGens + 1) * sizeof(coeff));
-  if (Annihilator == NULL)
-    abortprintf(2, "ExtendPower: realloc(Annihilator) failed");
-
-  for (unsigned i = NrPcGens + 1; i <= NrTotalGens; i++)
-    coeff_init_set_si(Annihilator[i], 0);
-
-  Power = (gpvec *) realloc(Power, (NrTotalGens + 1) * sizeof(gpvec));
-  if (Power == NULL)
-    abortprintf(2, "ExtendPower: realloc(Power) failed");
-  for (unsigned i = NrPcGens + 1; i <= NrTotalGens; i++)
-    Power[i] = NULL;
-
-  /* The Product arrays will be modified later. */
-    
-  TimeStamp("AddGen()");
-}
-
-void ExtendPcPres(void) {
-  LastGen = (unsigned *) realloc(LastGen, (Class + 1) * sizeof(unsigned));
-  if (LastGen == NULL)
-    abortprintf(2, "ExtendPcPres: realloc(LastGen) failed");
-
-  LastGen[Class] = NrTotalGens;
-
-  Weight = (unsigned *) realloc(Weight, (NrTotalGens + 1) * sizeof(unsigned));
-  if (Weight == NULL)
-    abortprintf(2, "ExtendPcPres: realloc(Weight) failed");
-
-  for (unsigned i = NrPcGens + 1; i <= NrTotalGens; i++)
-    Weight[i] = Class;
-
-  /*
-   * Because of the anti-symmetry we need only to store the
-   * product-relations of the form [ i, j ] when i>j. Hence the form
-   * of their 'matrix' turns into triangle-shaped. The row
-   * corresponding to the i-th generotor will be of length i-1.
-  */
-
-  Product = (gpvec **) realloc(Product, (NrTotalGens + 1) * sizeof(gpvec *));
+  /* finally extend the Product array, by trivial elements */
+  Product = (gpvec **) realloc(Product, (newnrpcgens + 1) * sizeof(gpvec *));
   if (Product == NULL)
-    abortprintf(2, "ExtendPcPres: realloc(Product) failed");
+    abortprintf(2, "ReducePcPres: realloc(Product) failed");
 
-  for (unsigned i = NrPcGens + 1; i <= NrTotalGens; i++) {
+  for (unsigned i = NrPcGens + 1; i <= newnrpcgens; i++) {
     Product[i] = (gpvec *) malloc(i * sizeof(gpvec));
     if (Product[i] == NULL)
-      abortprintf(2, "ExtendPcPres: realloc(Product[%d]) failed", i);
+      abortprintf(2, "ReducePcPres: realloc(Product[%d]) failed", i);
 
-    for (unsigned j = 1; j < i; j++) {
+    for (unsigned j = 1; j < i; j++)
       Product[i][j] = NewVec(0);
-      Product[i][j][0].g = EOW;
-    }
   }
+  
+  TimeStamp("ReducePcPres()");
 
-  NrPcGens += NrCenGens;
-  NrCenGens = 0;
+  NrPcGens = newnrpcgens;
 }

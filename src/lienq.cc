@@ -122,43 +122,35 @@ int main(int argc, char **argv) {
   TimeStamp("initialization");
   
   for (Class = 1; UpToClass == 0 || Class <= UpToClass; Class++) {
-    unsigned OldNrPcGens = NrPcGens;
+    unsigned oldnrpcgens = NrPcGens;
 
-    if (Class >= 2)
-      AddGen(Pres);
+    AddNewTails(Pres); // add fresh tails
 
     InitStack();
 
-    if (Class >= 2)
-      Tails();
+    ComputeTails(); // compute other tails
     
     InitMatrix();
 
-    if (Class >= 2)
-      Consistency();
+    Consistency(); // enforce Jacobi and Z-linearity
     
-    EvalAllRel(Pres);
+    EvalAllRel(Pres); // evaluate relations
 
     gpvec *rels;
     unsigned numrels;
     HermiteNormalForm(&rels, &numrels);
     
-    unsigned trivialgens = ReducedPcPres(Pres, rels, numrels);
+    ReducePcPres(Pres, rels, numrels); // enforce relations
 
     FreeMatrix();
     FreeStack();
 
-    NrCenGens -= trivialgens;
-    NrTotalGens -= trivialgens;
-
-    if (NrCenGens == 0)
+    if (NrPcGens == oldnrpcgens)
       break;
 
-    ExtendPcPres();
-
-    int newgens = LastGen[Class]-LastGen[Class-1];
+    int newgens = NrPcGens-oldnrpcgens;
     fprintf(LogFile, "# The %d%s factor has %d generator%s of relative order%s ", Class, ordinal(Class), newgens, plural(newgens), plural(newgens));
-    for (unsigned i = OldNrPcGens + 1; i <= NrPcGens; i++) {
+    for (unsigned i = oldnrpcgens + 1; i <= NrPcGens; i++) {
       coeff_out_str(LogFile, Exponent[i]);
       fprintf(LogFile, i == NrPcGens ? "\n" : ", ");
     }

@@ -10,7 +10,7 @@
 
 /*
 **  The goal of this file is to check the consistency relations in the
-**  factorring.
+**  quotient ring.
 */
 
 /*
@@ -57,9 +57,6 @@ void TripleProduct(gpvec &v, gen a, gen b, gen c) {
 **  generators.
 */
 static void CheckJacobi(gen a, gen b, gen c) {
-  if (Weight[a] + Weight[b] + Weight[c] > Class)
-    return;
-
   gpvec temp1 = FreshVec();
   gpvec temp2 = FreshVec();
   gpvec temp3 = FreshVec();
@@ -90,9 +87,6 @@ static void CheckJacobi(gen a, gen b, gen c) {
 **
 */
 static void CheckPower(gen a, gen b) {
-  if (Weight[a] + Weight[b] > Class)
-    return;
-  
   gpvec temp[2];
   temp[0] = FreshVec();
   temp[1] = FreshVec();
@@ -160,23 +154,28 @@ static void CheckTorsion(unsigned i) {
 }
 
 void Consistency(void) {
-  for (unsigned i = 1; i <= LastGen[1]; i++)
+  for (unsigned i = 1; i <= NrPcGens; i++) {
+    if (Definition[i].t != DGEN)
+      continue;
     for (unsigned j = i + 1; j <= NrPcGens; j++)
       for (unsigned k = j + 1; k <= NrPcGens; k++) {
-	if (Graded && Weight[i] + Weight[j] + Weight[k] != Class)
+	unsigned totalweight = Weight[i] + Weight[j] + Weight[k];
+	if (totalweight > Class || (Graded && totalweight != Class))
 	  continue;
 	
         CheckJacobi(i, j, k);
       }
-
+  }
+  
   for (unsigned i = 1; i <= NrPcGens; i++)
     if (coeff_nz_p(Exponent[i])) {
       CheckTorsion(i);
 
       for (unsigned j = 1; j <= NrPcGens; j++) {
-	if (Graded && Weight[i] + Weight[j] != Class)
+	unsigned totalweight = Weight[i] + Weight[j];
+	if (totalweight > Class || (Graded && totalweight != Class))
 	  continue;
-	
+  	
 	CheckPower(i, j);
       }
     }
