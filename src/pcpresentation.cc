@@ -134,7 +134,7 @@ void AddNewTails(presentation &Pres) {
   for (unsigned i = 1; i <= NrPcGens; i++) {
     is_dcomm[i] = std::vector<bool>(i,false);
 
-    switch(Definition[i].t) {
+    switch (Definition[i].t) {
     case DCOMM:
       is_dcomm[Definition[i].g][Definition[i].h] = true;
       break;
@@ -147,14 +147,14 @@ void AddNewTails(presentation &Pres) {
     }
   }
 
-  /* first, add new pc generators for the fp generators.
+  /* first, add tails to the fp generators. These will have to be eliminated.
      If x is an fp generator of degree d, add a pc generator in degree d,
      in the graded case, and in degree >= d, in the ungraded case.
   */
   for (unsigned i = 1; i <= Pres.NrGens; i++) {
-    if (is_dgen[i] || Weight[i] > Class || (Graded && Weight[i] != Class))
+    if (is_dgen[i] || Pres.Weight[i] >= Class || Graded)
       continue;
-    AddSingleGenerator(Epimorphism[i], {.t = DGEN, .g = i});
+    AddSingleGenerator(Epimorphism[i], {.t = DINVALID, .g = i});
     if (Debug >= 2)
       fprintf(LogFile, "# added tail a%d to epimorphic image of %s\n", NrTotalGens, Pres.GeneratorName[i]);
   }
@@ -175,19 +175,19 @@ void AddNewTails(presentation &Pres) {
        - g is defined as a power
        - we're in graded, torsion mode (so producing a (Z/TorsionExp)[t]-algebra) and g has degree < Class-1
     */
-    if (pass == (TorsionExp == 0)) {
+    if (pass == (TorsionExp > 0)) {
       for (unsigned i = 1; i <= NrPcGens; i++) {
 	if (is_dpow[i] || !coeff_nz_p(Exponent[i]))
 	  continue;
 	if (Graded && (TorsionExp == 0 || Weight[i]+1 != Class))
 	  continue;
-	AddSingleGenerator(Power[i], {.t = DPOW, .g = i});
+	AddSingleGenerator(Power[i], {.t = (TorsionExp == 0 ? DINVALID : DPOW), .g = i});
 	if (Debug >= 2)
 	  fprintf(LogFile, "# added tail a%d to non-defining torsion generator a%d\n", NrTotalGens, i);
       }
     }
 
-    if (pass == (TorsionExp > 0)) {
+    if (pass == (TorsionExp == 0)) {
       /* for all non-power pc generators g of weight <=Class-k and all
 	 defining pc generators h of weight k, with g > h, and such
 	 that [g,h] is not defining, add a tail to Product[g][h].
@@ -196,7 +196,7 @@ void AddNewTails(presentation &Pres) {
 	 - if h is not defining, using Jacobi or Z-linearity;
 	 - if g is a power, using Z-linearity */
       for (unsigned i = 1; i <= NrPcGens; i++) {
-	if (!is_dgen[i])
+	if (Definition[i].t != DGEN)
 	  continue;
 	for (unsigned j = i+1; j <= NrPcGens; j++) {
 	  if (is_dcomm[j][i])
@@ -213,6 +213,16 @@ void AddNewTails(presentation &Pres) {
 	}
       }
     }
+  }
+
+  /* finally, add new pc generators for the new fp generators.
+  */
+  for (unsigned i = 1; i <= Pres.NrGens; i++) {
+    if (Pres.Weight[i] != Class)
+      continue;
+    AddSingleGenerator(Epimorphism[i], {.t = DGEN, .g = i});
+    if (Debug >= 2)
+      fprintf(LogFile, "# added tail a%d as epimorphic image of %s\n", NrTotalGens, Pres.GeneratorName[i]);
   }
 
   /*
@@ -251,42 +261,6 @@ void AddNewTails(presentation &Pres) {
      we'll extend it later, in ReducePcPres */
     
   TimeStamp("AddNewTails()");
-}
-
-/* evaluate all relations, and add them to the relation matrix */
-void EvalAllRel(presentation &Pres) {
-  gpvec v = FreshVec();
-
-  for (unsigned i = 0; i < Pres.NrAliases; i++) {
-    gpvec temp = FreshVec();
-    EvalRel(temp, Pres.Aliases[i]->cont.bin.r);
-    Collect(v, temp);
-    PopVec();
-    if (Debug >= 2) {
-      fprintf(LogFile, "# aliasing relation: ");
-      PrintNode(LogFile, Pres.Aliases[i]);
-      fprintf(LogFile, " ("); PrintVec(LogFile, v); fprintf(LogFile, ")\n");
-    }
-    gen g = Pres.Aliases[i]->cont.bin.l->cont.g;
-    Epimorphism[g] = ResizeVec(Epimorphism[g], Length(Epimorphism[g]), Length(v));
-    Copy(Epimorphism[g], v);
-  }
-  
-  for (unsigned i = 0; i < Pres.NrRels; i++) {
-    gpvec temp = FreshVec();
-    EvalRel(temp, Pres.Relators[i]);
-    Collect(v, temp);
-    PopVec();
-    if (Debug >= 2) {
-      fprintf(LogFile, "# relation: ");
-      PrintNode(LogFile, Pres.Relators[i]);
-      fprintf(LogFile, " ("); PrintVec(LogFile, v); fprintf(LogFile, ")\n");
-    }
-    AddRow(v);
-  }
-  PopVec();
-  
-  TimeStamp("EvalAllRel()");
 }
 
 /* eliminate redundant generators from v; rels is a list of relations
@@ -347,7 +321,7 @@ void ReducePcPres(presentation &Pres, gpvec *rels, unsigned numrels) {
   /* renumber[k] = j >= 1 means generator k should be renumbered j.
      renumber[k] = j <= 0 means generator k should be eliminated using row j */
   int *renumber = new int[NrTotalGens + 1];
-  
+
   for (unsigned k = 1, i = 0; k <= NrTotalGens; k++) {
     unsigned newk = renumber[k] = k - trivialgens;
     if (i >= numrels || k != rels[i]->g) /* no relation for k, remains */
@@ -365,6 +339,14 @@ void ReducePcPres(presentation &Pres, gpvec *rels, unsigned numrels) {
   }
   unsigned newnrpcgens = NrTotalGens - trivialgens;
 
+  if (Debug >= 2) {
+    fprintf(LogFile, "# renumbering:");
+    for (unsigned i = 1; i <= NrTotalGens; i++)
+      if (renumber[i] != (int) i)
+	fprintf(LogFile, " %d→%d", i, renumber[i]);
+    fprintf(LogFile, "\n");
+  }
+    
   /* Modify the torsions first, in decreasing order, since they're needed
      for Collect */
   for (unsigned j = NrTotalGens; j >= 1; j--)
@@ -388,8 +370,8 @@ void ReducePcPres(presentation &Pres, gpvec *rels, unsigned numrels) {
 
   if (TorsionExp == 0) /* sanity check */
     for (unsigned i = 1; i <= newnrpcgens; i++)
-      if (Definition[i].t == DPOW)
-	abortprintf(5, "Generator %d is neither image of presentation generator nor defined as a commutator, but is a power of generator %d", i, Definition[i].g);    
+      if (Definition[i].t == DINVALID)
+	abortprintf(5, "Generator %d should have been eliminated", i);
   
   for (unsigned i = newnrpcgens+1; i <= NrTotalGens; i++) {
     coeff_clear(Exponent[i]);

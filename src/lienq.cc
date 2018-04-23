@@ -14,21 +14,21 @@
 #endif
 
 FILE *OutputFile = stdout, *LogFile = stdout;
+unsigned Debug = 0;
 
-const char USAGE[] = "Usage: lienq [-A]\ttoggle GAP output, default false\n"
+bool Graded = false;
+unsigned long TorsionExp = 0;
+
+const char USAGE[] = "Usage: lienq <options> (<inputfile> | \"-\") [<maximal class>]\n"
+  "\t[-A]\ttoggle GAP output, default false\n"
+  "\t[-C]\ttoggle printing compact form of multiplication table, default true\n"
   "\t[-D]\tincrease debug level\n"
   "\t[-F <outputfile>]\n"
   "\t[-G]\ttoggle graded Lie algebra, default false\n"
   "\t[-L <logfile>]\n"
   "\t[-P]\ttoggle printing definitions of basic commutators, default false\n"
   "\t[-X <exponent>]\tset exponent for p-central series, default 0\n"
-  "\t[-Z]\ttoggle printing of zeros in multiplication table, default false\n"
-  "\t<inputfile>\n"
-  "\t[<maximal class>]";
-
-bool PrintZeros = false, Graded = false, Gap = false, PrintDefs = false;
-unsigned Debug = 0;
-unsigned long TorsionExp = 0;
+  "\t[-Z]\ttoggle printing zeros in multiplication table, default false";
 
 static const char *ordinal(unsigned n) {
   if (Class % 10 == 1 && Class != 11) return "st";
@@ -44,12 +44,17 @@ static const char *plural(unsigned n) {
 int main(int argc, char **argv) {
   char flags[24] = "";
   int c;
+  bool PrintZeros = false, PrintCompact = true, PrintDefs = false, Gap = false;
   
   while ((c = getopt (argc, argv, "ADF:GL:PX:Z")) != -1)
     switch (c) {
     case 'A':
       Gap = !Gap;
       strcat(flags, "-A ");
+      break;
+    case 'C':
+      PrintCompact = !PrintCompact;
+      strcat(flags, "-C ");
       break;
     case 'D':
       Debug++;
@@ -145,22 +150,27 @@ int main(int argc, char **argv) {
     FreeMatrix();
     FreeStack();
 
-    if (NrPcGens == oldnrpcgens)
-      break;
-
     int newgens = NrPcGens-oldnrpcgens;
-    fprintf(LogFile, "# The %d%s factor has %d generator%s of relative order%s ", Class, ordinal(Class), newgens, plural(newgens), plural(newgens));
-    for (unsigned i = oldnrpcgens + 1; i <= NrPcGens; i++) {
-      coeff_out_str(LogFile, Exponent[i]);
-      fprintf(LogFile, i == NrPcGens ? "\n" : ", ");
+    fprintf(LogFile, "# The %d%s factor has %d generator%s", Class, ordinal(Class), newgens, plural(newgens));
+    if (newgens) {
+      fprintf(LogFile, " of relative order%s ", plural(newgens));
+      for (unsigned i = oldnrpcgens + 1; i <= NrPcGens; i++) {
+	coeff_out_str(LogFile, Exponent[i]);
+	if (i != NrPcGens)
+	  fprintf(LogFile, ", ");
+      }
     }
+    fprintf(LogFile,"\n");
+
+    if (UpToClass == 0 && newgens == 0)
+      break;
   }
 
   InitStack();
   if (Gap)
     PrintGAPPres(OutputFile, Pres);  
   else
-    PrintPcPres(OutputFile, Pres);
+    PrintPcPres(OutputFile, Pres, PrintCompact, PrintDefs, PrintZeros);
   FreeStack();
 
   TimeStamp("main()");

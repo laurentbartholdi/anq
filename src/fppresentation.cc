@@ -61,7 +61,7 @@ static const char *InFileName;  /* Current input file name. */
 static FILE *InFp;        /* Current input file pointer. */
 static coeff N;           /* Contains the integer just read. */
 static char *GenName;     /* Contains the generator name. */
-static presentation *Pres;
+//static presentation *Pres;
 
 void FreeNode(node *n) {
   switch (n->type) {
@@ -89,13 +89,13 @@ static node *NewNode(nodetype type) {
 
 enum genstatus { NOCREATE, CREATE };
 
-static gen GenNumber(genstatus status, unsigned weight) {
-  if (status == CREATE && Pres->NrGens == 0) {
-    Pres->GeneratorName = (char **) malloc(2 * sizeof(char *));
-    Pres->Weight = (unsigned *) malloc(2 * sizeof(unsigned));
+static gen GenNumber(presentation &pres, genstatus status, unsigned weight) {
+  if (status == CREATE && pres.NrGens == 0) {
+    pres.GeneratorName = (char **) malloc(2 * sizeof(char *));
+    pres.Weight = (unsigned *) malloc(2 * sizeof(unsigned));
   }
-  for (unsigned i = 1; i <= Pres->NrGens; i++) {
-    if (!strcmp(GenName, Pres->GeneratorName[i])) {
+  for (unsigned i = 1; i <= pres.NrGens; i++) {
+    if (!strcmp(GenName, pres.GeneratorName[i])) {
       if (status == CREATE)
         return (gen) 0;
       return (gen) i;
@@ -103,14 +103,14 @@ static gen GenNumber(genstatus status, unsigned weight) {
   }
   if (status == NOCREATE)
     return (gen) 0;
-  Pres->NrGens++;
-  Pres->GeneratorName = (char **) realloc(Pres->GeneratorName, (Pres->NrGens + 1) * sizeof(char *));
-  Pres->Weight = (unsigned *) realloc(Pres->Weight, (Pres->NrGens + 1) * sizeof(unsigned));
-  Pres->GeneratorName[Pres->NrGens] = (char *) malloc(strlen(GenName) + 1);
-  strcpy(Pres->GeneratorName[Pres->NrGens], GenName);
-  Pres->Weight[Pres->NrGens] = weight;
+  pres.NrGens++;
+  pres.GeneratorName = (char **) realloc(pres.GeneratorName, (pres.NrGens + 1) * sizeof(char *));
+  pres.Weight = (unsigned *) realloc(pres.Weight, (pres.NrGens + 1) * sizeof(unsigned));
+  pres.GeneratorName[pres.NrGens] = (char *) malloc(strlen(GenName) + 1);
+  strcpy(pres.GeneratorName[pres.NrGens], GenName);
+  pres.Weight[pres.NrGens] = weight;
   
-  return Pres->NrGens;
+  return pres.NrGens;
 }
 
 static void SyntaxError(const char *format, ...) __attribute__((format(printf, 1, 2),noreturn));
@@ -310,14 +310,14 @@ static void NextToken(void) {
   }
 }
 
-node *Term(void) {
-  node *Expression(int);
+node *Term(presentation &pres) {
+  node *Expression(presentation&, int);
   
   if (is_unary(Token)) {
     node *n = NewNode(unary_node(Token));
     int new_precedence = unary_prec(Token);
     NextToken();
-    node *u = Expression(new_precedence);
+    node *u = Expression(pres, new_precedence);
     if (u->type == TNUM) { /* compile-time evaluation */
       coeff_init(n->cont.n);
       switch (n->type) {
@@ -340,7 +340,7 @@ node *Term(void) {
   }
   if (Token == LPAREN) {
     NextToken();
-    node *n = Expression(0);
+    node *n = Expression(pres, 0);
     if (Token != RPAREN)
       SyntaxError("')' expected");
     NextToken();
@@ -351,12 +351,12 @@ node *Term(void) {
     nodetype oper = (Token == LBRACK ? TBRACK : TBRACE);  
     char closechar = (Token == LBRACK ? ']' : '}');  
     NextToken();
-    node *n = Expression(0);
+    node *n = Expression(pres, 0);
     while (Token == COMMA) {
       NextToken();
       node *p = NewNode(oper);
       p->cont.bin.l = n;
-      p->cont.bin.r = Expression(0);
+      p->cont.bin.r = Expression(pres, 0);
       n = p;
     }
     if (Token != close)
@@ -372,7 +372,7 @@ node *Term(void) {
   }
   if (Token == GEN) {
     node *n = NewNode(TGEN);
-    if ((n->cont.g = GenNumber(NOCREATE, 0)) == (gen) 0)
+    if ((n->cont.g = GenNumber(pres, NOCREATE, 0)) == (gen) 0)
       SyntaxError("Unkown generator %s", GenName);
     NextToken();
     return n;
@@ -380,8 +380,8 @@ node *Term(void) {
   SyntaxError("Term expected");
 }
 
-node *Expression(int precedence) {
-  node *t = Term();
+node *Expression(presentation &pres, int precedence) {
+  node *t = Term(pres);
   int new_precedence;
   
   while (is_binary(Token) && (new_precedence = binary_prec(Token)) >= precedence) {
@@ -390,7 +390,7 @@ node *Expression(int precedence) {
     nodetype oper = binary_node(Token);
     NextToken();
 
-    node *u = Expression(new_precedence);
+    node *u = Expression(pres, new_precedence);
 
     if (t->type == TNUM && u->type == TNUM) { /* compile-time evaluation */
       switch (oper) {
@@ -426,7 +426,7 @@ static void ValidateLieExpression(node *n, gen g) {
      Forbid TINV, TQUO, TBRACE, TREL, TDREL.
   */
 
-  switch(n->type) {
+  switch (n->type) {
   case TNUM:
     SyntaxError("Lie expression expected, not number");
   case TGEN:
@@ -458,9 +458,9 @@ static void ValidateLieExpression(node *n, gen g) {
   }
 }
 
-unsigned ReadPresentation(presentation &Pres0, const char *InputFileName) {
+unsigned ReadPresentation(presentation &pres, const char *InputFileName) {
   bool readstdin = !strcmp(InputFileName, "-");
-  unsigned uptoclass = -1;
+  unsigned uptoclass = 0;
   
   if (readstdin)
     InFp = stdin;
@@ -470,8 +470,7 @@ unsigned ReadPresentation(presentation &Pres0, const char *InputFileName) {
     abortprintf(1, "Can't open input file '%s'", InputFileName);
   InFileName = InputFileName;
 
-  Pres = &Pres0;  
-  Pres->NrGens = 0;
+  pres.NrGens = 0;
   
   Ch = '\0';
   Char = 0;
@@ -500,9 +499,10 @@ unsigned ReadPresentation(presentation &Pres0, const char *InputFileName) {
       NextToken();
     }
 
+  read_gen:
     if (Token != GEN)
       SyntaxError("Generator expected");
-    gen g = GenNumber(CREATE, weight);
+    gen g = GenNumber(pres, CREATE, weight);
     if (g == (gen) 0)
       SyntaxError("Duplicate generator %s", GenName);
     NextToken();
@@ -510,18 +510,20 @@ unsigned ReadPresentation(presentation &Pres0, const char *InputFileName) {
     if (Token == PIPE)
       break;
 
-    if (Token == COMMA)
+    if (Token == COMMA) {
       NextToken();
+      goto read_gen;
+    }
   }
 
   NextToken();
 
   /* get relators */
-  Pres->NrRels = Pres->NrAliases = 0;
-  Pres->Relators = (node **) malloc(sizeof(node *));
-  Pres->Aliases = (node **) malloc(sizeof(node *));
+  pres.NrRels = pres.NrAliases = 0;
+  pres.Relators = (node **) malloc(sizeof(node *));
+  pres.Aliases = (node **) malloc(sizeof(node *));
   while (is_relation(Token)) {
-    node *n = Expression(0);
+    node *n = Expression(pres, 0);
 
     if (n->type == TDRELR) { /* switch sides */
       n->type = TDREL;
@@ -538,11 +540,11 @@ unsigned ReadPresentation(presentation &Pres0, const char *InputFileName) {
       ValidateLieExpression(n, (gen) -1);
 
     if (n->type == TDREL) {
-      Pres->Aliases = (node **) realloc(Pres->Aliases, (Pres->NrAliases+1) * sizeof(node *));
-      Pres->Aliases[Pres->NrAliases++] = n;
+      pres.Aliases = (node **) realloc(pres.Aliases, (pres.NrAliases+1) * sizeof(node *));
+      pres.Aliases[pres.NrAliases++] = n;
     } else {
-      Pres->Relators = (node **) realloc(Pres->Relators, (Pres->NrRels+1) * sizeof(node *));
-      Pres->Relators[Pres->NrRels++] = n;
+      pres.Relators = (node **) realloc(pres.Relators, (pres.NrRels+1) * sizeof(node *));
+      pres.Relators[pres.NrRels++] = n;
     }
     
     if (Token == COMMA)
@@ -552,25 +554,25 @@ unsigned ReadPresentation(presentation &Pres0, const char *InputFileName) {
   }
 
   /* get extra elements to evaluate in result */
-  Pres->NrExtra = 0;
+  pres.NrExtra = 0;
   if (Token == PIPE) {
     NextToken();
 
-    Pres->Extra = (node **) malloc(sizeof(node *));
+    pres.Extra = (node **) malloc(sizeof(node *));
     while (is_relation(Token)) {
-      node *n = Expression(0);
+      node *n = Expression(pres, 0);
       ValidateLieExpression(n, (gen) -1);
     
-      Pres->Extra = (node **) realloc(Pres->Extra, (Pres->NrExtra+1) * sizeof(node *));
+      pres.Extra = (node **) realloc(pres.Extra, (pres.NrExtra+1) * sizeof(node *));
 
-      Pres->Extra[Pres->NrExtra++] = n;
+      pres.Extra[pres.NrExtra++] = n;
       if (Token == COMMA)
 	NextToken();
       else
 	break;
     }
   } else
-    Pres->Extra = NULL;
+    pres.Extra = NULL;
 
   if (Token != RANGLE)
     SyntaxError("'>' expected");
@@ -602,75 +604,75 @@ void FreePresentation(presentation &Pres) {
   }
 }
 
-void PrintNode(FILE *f, node *n) {
+void PrintNode(FILE *f, presentation &pres, node *n) {
   switch (n->type) {
   case TNUM:
     coeff_out_str(f, n->cont.n);
     break;
   case TGEN:
-    fprintf(f, "%s", Pres->GeneratorName[n->cont.g]);
+    fprintf(f, "%s", pres.GeneratorName[n->cont.g]);
     break;
   case TNEG:
     fprintf(f, "-");
-    PrintNode(f, n->cont.u);
+    PrintNode(f, pres, n->cont.u);
     break;
   case TINV:
     fprintf(f, "~");
-    PrintNode(f, n->cont.u);
+    PrintNode(f, pres, n->cont.u);
     break;
   case TSUM:
-    PrintNode(f, n->cont.bin.l);
+    PrintNode(f, pres, n->cont.bin.l);
     fprintf(f, " + ");
-    PrintNode(f, n->cont.bin.r);
+    PrintNode(f, pres, n->cont.bin.r);
     break;
   case TDIFF:
-    PrintNode(f, n->cont.bin.l);
+    PrintNode(f, pres, n->cont.bin.l);
     fprintf(f, " - ");
-    PrintNode(f, n->cont.bin.r);
+    PrintNode(f, pres, n->cont.bin.r);
     break;
   case TPROD:
-    PrintNode(f, n->cont.bin.l);
+    PrintNode(f, pres, n->cont.bin.l);
     fprintf(f, "*");
-    PrintNode(f, n->cont.bin.r);
+    PrintNode(f, pres, n->cont.bin.r);
     break;
   case TQUO:
-    PrintNode(f, n->cont.bin.l);
+    PrintNode(f, pres, n->cont.bin.l);
     fprintf(f, "/");
-    PrintNode(f, n->cont.bin.r);
+    PrintNode(f, pres, n->cont.bin.r);
     break;
   case TPOW:
-    PrintNode(f, n->cont.bin.l);
+    PrintNode(f, pres, n->cont.bin.l);
     fprintf(f, "^");
-    PrintNode(f, n->cont.bin.r);
+    PrintNode(f, pres, n->cont.bin.r);
     break;
   case TBRACK:
     fprintf(f, "[");
-    PrintNode(f, n->cont.bin.l);
+    PrintNode(f, pres, n->cont.bin.l);
     fprintf(f, ",");
-    PrintNode(f, n->cont.bin.r);
+    PrintNode(f, pres, n->cont.bin.r);
     fprintf(f, "]");
     break;
   case TBRACE:
     fprintf(f, "{");
-    PrintNode(f, n->cont.bin.l);
+    PrintNode(f, pres, n->cont.bin.l);
     fprintf(f, ",");
-    PrintNode(f, n->cont.bin.r);
+    PrintNode(f, pres, n->cont.bin.r);
     fprintf(f, "}");
     break;
   case TREL:
-    PrintNode(f, n->cont.bin.l);
+    PrintNode(f, pres, n->cont.bin.l);
     fprintf(f, " = ");
-    PrintNode(f, n->cont.bin.r);
+    PrintNode(f, pres, n->cont.bin.r);
     break;
   case TDREL:
-    PrintNode(f, n->cont.bin.l);
+    PrintNode(f, pres, n->cont.bin.l);
     fprintf(f, " := ");
-    PrintNode(f, n->cont.bin.r);
+    PrintNode(f, pres, n->cont.bin.r);
     break;
   case TDRELR:
-    PrintNode(f, n->cont.bin.l);
+    PrintNode(f, pres, n->cont.bin.l);
     fprintf(f, " =: ");
-    PrintNode(f, n->cont.bin.r);
+    PrintNode(f, pres, n->cont.bin.r);
     break;
   default:
     abortprintf(3, "PrintNode: Illegal node of type %s", nodename[n->type]);
@@ -731,4 +733,40 @@ void EvalRel(gpvec v, node *rel) {
   default:
     abortprintf(3, "EvalRel: operator of type %s should not occur", nodename[rel->type]);
   }
+}
+
+/* evaluate all relations, and add them to the relation matrix */
+void EvalAllRel(presentation &pres) {
+  gpvec v = FreshVec();
+
+  for (unsigned i = 0; i < pres.NrAliases; i++) {
+    gpvec temp = FreshVec();
+    EvalRel(temp, pres.Aliases[i]->cont.bin.r);
+    Collect(v, temp);
+    PopVec();
+    if (Debug >= 2) {
+      fprintf(LogFile, "# aliasing relation: ");
+      PrintNode(LogFile, pres, pres.Aliases[i]);
+      fprintf(LogFile, " ("); PrintVec(LogFile, v); fprintf(LogFile, ")\n");
+    }
+    gen g = pres.Aliases[i]->cont.bin.l->cont.g;
+    Epimorphism[g] = ResizeVec(Epimorphism[g], Length(Epimorphism[g]), Length(v));
+    Copy(Epimorphism[g], v);
+  }
+  
+  for (unsigned i = 0; i < pres.NrRels; i++) {
+    gpvec temp = FreshVec();
+    EvalRel(temp, pres.Relators[i]);
+    Collect(v, temp);
+    PopVec();
+    if (Debug >= 2) {
+      fprintf(LogFile, "# relation: ");
+      PrintNode(LogFile, pres, pres.Relators[i]);
+      fprintf(LogFile, " ("); PrintVec(LogFile, v); fprintf(LogFile, ")\n");
+    }
+    AddRow(v);
+  }
+  PopVec();
+  
+  TimeStamp("EvalAllRel()");
 }

@@ -40,9 +40,9 @@ enum nodetype {
   TNUM,
   TGEN,
   TBRACK, TBRACE, TPROD, TQUO, TPOW, TSUM, TDIFF, TREL, TDREL, TDRELR,
-  TNEG, TINV,
-  TINVALID
+  TNEG, TINV
 };
+const nodetype TINVALID = (nodetype) -1;
 constexpr static bool is_unary(nodetype t) { return t >= TNEG && t <= TINV; }
 constexpr static bool is_binary(nodetype t) { return t >= TBRACK && t <= TDRELR; }
 
@@ -74,9 +74,10 @@ struct presentation {
 enum gendeftype {
   DGEN,  /* g is defined as an image of original generator */
   DCOMM,  /* g is defined as commutator */
-  DPOW /* g is defined as power of a pc generator */
+  DPOW, /* g is defined as power of a pc generator */
 };
-
+const gendeftype DINVALID = (gendeftype) -1;
+  
 struct deftype {
   gendeftype t;
   gen g, h;
@@ -85,9 +86,7 @@ struct deftype {
 /****************************************************************
  * global variables dictating the behaviour of lienq
  ****************************************************************/
-extern bool PrintZeros, Graded, Gap, PrintDefs;
 extern unsigned Debug;
-extern unsigned long TorsionExp;
 extern FILE *LogFile;
 
 /* auxiliary functions */
@@ -122,11 +121,11 @@ void Consistency(void);
 /* print functions */
 extern void abortprintf(int, const char *, ...) __attribute__((format(printf, 2, 3),noreturn));
 void PrintVec(FILE *f, gpvec);
-void PrintPcPres(FILE *f, presentation &);
+void PrintPcPres(FILE *f, presentation &, bool, bool, bool);
 void PrintGAPPres(FILE *f, presentation &);
 void TimeStamp(const char *);
   
-/* presentation functions */
+/* pcpresentation functions */
 /****************************************************************
  * global variables containing a Pc presentation
  ****************************************************************/
@@ -137,11 +136,12 @@ extern unsigned *Weight;
 extern unsigned Class,
   NrPcGens, // during extension of pc presentation, will be previous NrTotalGens
   NrTotalGens;
+extern bool Graded;
+extern unsigned long TorsionExp;
 
 void InitPcPres(presentation &);
 void FreePcPres(presentation &);
 void AddNewTails(presentation &);
-void EvalAllRel(presentation &);
 void ReducePcPres(presentation &, gpvec *, unsigned);
 
 /* operation functions */
@@ -185,11 +185,12 @@ void Prod(gpvec, constgpvec, constgpvec);
 void Collect(gpvec, constgpvec);
 void ShrinkCollect(gpvec &);
 
-/* readpres functions */
+/* fppresentation functions */
 unsigned ReadPresentation(presentation &, const char *);
 void FreePresentation(presentation &);
 void EvalRel(gpvec, node *);
-void PrintNode(FILE *f, node *);
+void EvalAllRel(presentation &);
+void PrintNode(FILE *f, presentation &, node *);
 
 /* matrix functions */
 void HermiteNormalForm(gpvec **, unsigned *);

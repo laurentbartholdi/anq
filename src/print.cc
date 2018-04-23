@@ -7,6 +7,7 @@
 
 #include "lienq.h"
 #include <stdarg.h>
+#include <vector>
 
 /*
 ** This file contains the print routines that are necessary to be able to
@@ -49,16 +50,22 @@ void PrintVec(FILE *f, gpvec gv) {
   }
 }
 
-void PrintPcPres(FILE *f, presentation &Pres) {
-  fprintf(f, "<");
+void PrintPcPres(FILE *f, presentation &Pres, bool PrintCompact, bool PrintDefs, bool PrintZeros) {
+  fprintf(f, "<\n");
 
   unsigned curclass = 0;
+  bool first;
   for (unsigned i = 1; i <= NrPcGens; i++) {
-    if (Weight[i] > curclass) {
-      curclass = Weight[i];
-      fprintf(f, "\n# Weight %d:\n", curclass);
+    while (Weight[i] > curclass) {
+      if (curclass++ > 0)
+	fprintf(f, ";\n");
+      fprintf(f, "# generators of weight %d:\n", curclass);
+      first = true;
     }
-    fprintf(f, " a%d%s", i, i < NrPcGens ? "," : "");
+    if (!first)
+      fprintf(f, ", ");
+    fprintf(f, "a%d", i);
+    first = false;
   }
   fprintf(f, " |\n");
   
@@ -76,33 +83,49 @@ void PrintPcPres(FILE *f, presentation &Pres) {
   }
   if (PrintDefs) {
     fprintf(f, "# The definitions:\n");
-    for (unsigned i = 1; i <= NrTotalGens; i++)
-      if (Definition[i].t == DCOMM) {
-	gen cv[Weight[i] + 1], g = i;
-	for (unsigned pos = Weight[g]; Weight[g] > 1; pos--) {
-	  if (Definition[g].t != DCOMM)
-	    abortprintf(5, "Iterated definition of generator %d does not involve commutators and weight-1 generators", i);
-
-	  cv[pos] = Definition[g].h;
-	  g = Definition[g].g;
-	}
-	cv[1] = g;
-	fprintf(f, "#%10s a%d = [a%d,a%d] = [", "", i, Definition[i].g, Definition[i].h);
-	for (unsigned j = 1; j <= Weight[i]; j++)
-	  fprintf(f, "a%d%s", cv[j], j == Weight[i] ? "]\n" : ",");
-      } else {
-	gen g = Definition[i].g;
-	if (0 < (int)g)
-	  fprintf(f, "#%10s a%d = (%s)^epimorphism\n", "", i, Pres.GeneratorName[g]);
-	else {
-	  fprintf(f, "#%10s a%d = ", "", i);
-	  coeff_out_str(f, Exponent[-g]);
-	  fprintf(f, "*a%d", -g);
-	}
+    for (unsigned i = 1; i <= NrPcGens; i++) {
+      /* we know each element is defined as an iterated multiple of an iterated commutator of generators */
+      
+      fprintf(f, "#%10s a%d = ", "", i);
+      switch (Definition[i].t) {
+      case DCOMM:
+	fprintf(f, "[a%d,a%d] = ", Definition[i].g, Definition[i].h);
+	break;
+      case DPOW:
+	coeff_out_str(f, Exponent[i]);
+	fprintf(f, "*a%d = ", Definition[i].g);
+	break;
+      case DGEN:;
       }
+
+      gen g = i;
+      while (Definition[g].t == DPOW) {
+	coeff_out_str(f, Exponent[g]);
+	fprintf(f,"*");
+	g = Definition[g].g;
+      }
+      std::vector<gen> cv;
+      while (Definition[g].t == DCOMM) {
+	cv.push_back(Definition[g].h);
+	g = Definition[g].g;
+      }
+      fprintf(f, "[");
+      for (;;) {
+	if (Definition[g].t != DGEN)
+	  abortprintf(5, "Generator %d is not iterated multiple of iterated commutator of generators", i);
+	fprintf(f, "%s", Pres.GeneratorName[Definition[g].g]);
+	if (cv.empty())
+	  break;
+	g = cv.back();
+	cv.pop_back();
+	fprintf(f, ",");
+      }
+      fprintf(f, "]^epimorphism\n");
+
+    }
   }
 
-  bool first = true;
+  first = true;
   fprintf(f, "# The torsion relations:\n");
   for (unsigned i = 1; i <= NrPcGens; i++) {
     if (coeff_nz_p(Exponent[i])) {
@@ -112,7 +135,7 @@ void PrintPcPres(FILE *f, presentation &Pres) {
       coeff_out_str(f, Exponent[i]);
       fprintf(f, "*a%d", i);
       if (Power[i] != NULL && Power[i]->g != EOW) {
-	if (Definition[Power[i]->g].t == DPOW)
+	if (Definition[Power[i]->g].t == DPOW && Definition[Power[i]->g].g == i)
 	  fprintf(f, " =: a%d", Power[i]->g);
 	else {
 	  fprintf(f, " = ");
@@ -122,26 +145,31 @@ void PrintPcPres(FILE *f, presentation &Pres) {
       first = false;
     }
   }
+  
   fprintf(f, "%s# The product relations:\n", first ? "" : ",\n");
-
   first = true;
   for (unsigned j = 1; j <= NrPcGens; j++)
     for (unsigned i = 1; i < j; i++) {
       gen g = Product[j][i]->g;
-      if (PrintZeros || g != EOW) {
-	if (!first)
-          fprintf(f, ",\n");
-        fprintf(f, "%10s[ a%d, a%d ]", "", j, i);
-        if (g != EOW) {
-	  if (Definition[g].g == j && Definition[g].h == i)
-	    fprintf(f, " =: a%d", Product[j][i]->g);
-	  else {
-	    fprintf(f, " = ");
-	    PrintVec(f, Product[j][i]);
-	  }
-        }
-	first = false;
+      if (PrintCompact) {
+	if (Definition[i].t != DGEN || Definition[j].t == DPOW)
+	  continue;
+      } else {
+	if (!PrintZeros && g == EOW)
+	continue;
+      }  
+      if (!first)
+	fprintf(f, ",\n");
+      fprintf(f, "%10s[ a%d, a%d ]", "", j, i);
+      if (g != EOW) {
+	if (Definition[g].g == j && Definition[g].h == i)
+	  fprintf(f, " =: a%d", Product[j][i]->g);
+	else {
+	  fprintf(f, " = ");
+	  PrintVec(f, Product[j][i]);
+	}
       }
+      first = false;
     }
   
   if (Pres.NrExtra > 0) {
