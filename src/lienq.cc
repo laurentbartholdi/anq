@@ -31,9 +31,9 @@ const char USAGE[] = "Usage: lienq <options> (<inputfile> | \"-\") [<maximal cla
   "\t[-Z]\ttoggle printing zeros in multiplication table, default false";
 
 static const char *ordinal(unsigned n) {
-  if (Class % 10 == 1 && Class != 11) return "st";
-  if (Class % 10 == 2 && Class != 12) return "nd";
-  if (Class % 10 == 3 && Class != 13) return "rd";
+  if (n % 10 == 1 && n != 11) return "st";
+  if (n % 10 == 2 && n != 12) return "nd";
+  if (n % 10 == 3 && n != 13) return "rd";
   return "th";
 }
 
@@ -96,8 +96,8 @@ int main(int argc, char **argv) {
     abortprintf(1, "I need at least one name as input file\n%s", USAGE);
 
   char *InputFileName = argv[optind++];
-  presentation Pres;
-  unsigned UpToClass = ReadPresentation(Pres, InputFileName);
+  presentation fppres;
+  unsigned UpToClass = ReadPresentation(fppres, InputFileName);
   
   if (optind < argc)
     UpToClass = atoi(argv[optind]);
@@ -122,41 +122,43 @@ int main(int argc, char **argv) {
   mtrace();
 #endif
 
-  InitPcPres(Pres);
+  pcpresentation pc;
+  
+  InitPcPres(pc, fppres);
 
   TimeStamp("initialization");
   
-  for (Class = 1; UpToClass == 0 || Class <= UpToClass; Class++) {
-    unsigned oldnrpcgens = NrPcGens;
+  for (pc.Class = 1; UpToClass == 0 || pc.Class <= UpToClass; pc.Class++) {
+    unsigned oldnrpcgens = pc.NrPcGens;
 
-    AddNewTails(Pres); // add fresh tails
+    AddNewTails(pc, fppres); // add fresh tails
 
     InitStack();
 
-    ComputeTails(); // compute other tails
+    ComputeTails(pc); // compute other tails
     
-    InitMatrix();
+    InitMatrix(pc);
 
-    Consistency(); // enforce Jacobi and Z-linearity
+    Consistency(pc); // enforce Jacobi and Z-linearity
     
-    EvalAllRel(Pres); // evaluate relations
+    EvalAllRel(pc, fppres); // evaluate relations
 
     gpvec *rels;
     unsigned numrels;
     HermiteNormalForm(&rels, &numrels);
     
-    ReducePcPres(Pres, rels, numrels); // enforce relations
+    ReducePcPres(pc, fppres, rels, numrels); // enforce relations
 
     FreeMatrix();
     FreeStack();
 
-    int newgens = NrPcGens-oldnrpcgens;
-    fprintf(LogFile, "# The %d%s factor has %d generator%s", Class, ordinal(Class), newgens, plural(newgens));
+    int newgens = pc.NrPcGens-oldnrpcgens;
+    fprintf(LogFile, "# The %d%s factor has %d generator%s", pc.Class, ordinal(pc.Class), newgens, plural(newgens));
     if (newgens) {
       fprintf(LogFile, " of relative order%s ", plural(newgens));
-      for (unsigned i = oldnrpcgens + 1; i <= NrPcGens; i++) {
-	coeff_out_str(LogFile, Exponent[i]);
-	if (i != NrPcGens)
+      for (unsigned i = oldnrpcgens + 1; i <= pc.NrPcGens; i++) {
+	coeff_out_str(LogFile, pc.Exponent[i]);
+	if (i != pc.NrPcGens)
 	  fprintf(LogFile, ", ");
       }
     }
@@ -168,15 +170,15 @@ int main(int argc, char **argv) {
 
   InitStack();
   if (Gap)
-    PrintGAPPres(OutputFile, Pres);  
+    PrintGAPPres(OutputFile, pc, fppres);  
   else
-    PrintPcPres(OutputFile, Pres, PrintCompact, PrintDefs, PrintZeros);
+    PrintPcPres(OutputFile, pc, fppres, PrintCompact, PrintDefs, PrintZeros);
   FreeStack();
 
   TimeStamp("main()");
 
-  FreePcPres(Pres);
-  FreePresentation(Pres);
+  FreePcPres(pc, fppres);
+  FreePresentation(fppres);
 
   return 0;
 }

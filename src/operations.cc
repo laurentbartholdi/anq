@@ -168,7 +168,7 @@ void Diff(gpvec vec0, constgpvec vec1, constgpvec vec2) {
  there into vec0.
 ****************************************************************/
 /* vec0 = [ vec1, vec2 ] */
-void Prod(gpvec vec0, constgpvec vec1, constgpvec vec2) {
+void LieBracket(pcpresentation &pc, gpvec vec0, constgpvec vec1, constgpvec vec2) {
   gpvec temp[2];
   bool parity = false;
   temp[0] = FreshVec();
@@ -178,15 +178,15 @@ void Prod(gpvec vec0, constgpvec vec1, constgpvec vec2) {
   
   for (constgpvec p1 = vec1; p1->g != EOW; p1++)
     for (constgpvec p2 = vec2; p2->g != EOW; p2++)
-      if (p1->g <= NrPcGens && p2->g <= NrPcGens && Weight[p1->g] + Weight[p2->g] <= Class) {
+      if (p1->g <= pc.NrPcGens && p2->g <= pc.NrPcGens && pc.Weight[p1->g] + pc.Weight[p2->g] <= pc.Class) {
         if (p1->g > p2->g) {
 	  coeff_mul(c, p1->c, p2->c);
-	  Sum(temp[!parity], temp[parity], c, Product[p1->g][p2->g]);
+	  Sum(temp[!parity], temp[parity], c, pc.Product[p1->g][p2->g]);
 	  parity ^= 1;
 	} else if (p2->g > p1->g) {
 	  coeff_mul(c, p1->c, p2->c);
 	  coeff_neg(c, c);
-	  Sum(temp[!parity], temp[parity], c, Product[p2->g][p1->g]);
+	  Sum(temp[!parity], temp[parity], c, pc.Product[p2->g][p1->g]);
 	  parity ^= 1;
 	}
       }
@@ -202,7 +202,7 @@ void Prod(gpvec vec0, constgpvec vec1, constgpvec vec2) {
 
    We should do it with a container such as <map>
 */
-void Collect(gpvec vec0, constgpvec v) {
+void Collect(pcpresentation &pc, gpvec vec0, constgpvec v) {
   gpvec temp[2], p;
   temp[0] = FreshVec();
   temp[1] = FreshVec();
@@ -212,19 +212,19 @@ void Collect(gpvec vec0, constgpvec v) {
   
   for (p = (gpvec) v; p->g != EOW;) {
     gen i = p->g;
-    if(coeff_reduced_p(p->c, Exponent[i])) {
+    if(coeff_reduced_p(p->c, pc.Exponent[i])) {
       coeff_set(vec0->c, p->c), vec0->g = i;
       vec0++;
       p++;
     } else {
-      coeff_fdiv_q(mp, p->c, Exponent[i]);
+      coeff_fdiv_q(mp, p->c, pc.Exponent[i]);
       coeff_set(vec0->c, p->c);
-      coeff_submul(vec0->c, mp, Exponent[i]);
+      coeff_submul(vec0->c, mp, pc.Exponent[i]);
       if (coeff_nz_p(vec0->c))
 	vec0->g = i, vec0++;
       p++;
-      if (Power[i] != NULL && Power[i]->g != EOW) {
-	Sum(temp[!parity], p, mp, Power[i]);
+      if (pc.Power[i] != NULL && pc.Power[i]->g != EOW) {
+	Sum(temp[!parity], p, mp, pc.Power[i]);
 	parity ^= 1;
 	p = temp[parity];
       }
@@ -242,15 +242,15 @@ void Collect(gpvec vec0, constgpvec v) {
   -- if shift<0, or reduced coeff=0, we may have space to accomodate Power[g]
   -- we should use a std::map in the full collect, see above
 */
-void ShrinkCollect(gpvec &v) {
+void ShrinkCollect(pcpresentation &pc, gpvec &v) {
   int shift = 0;
   unsigned pos;
   for (pos = 0; v[pos].g != EOW; pos++) {
     gen g = v[pos].g;
-    if(!coeff_reduced_p(v[pos].c, Exponent[g])) {
-      if (Power[g] != NULL && Power[g]->g != EOW) { // bad news, collection can become longer
+    if(!coeff_reduced_p(v[pos].c, pc.Exponent[g])) {
+      if (pc.Power[g] != NULL && pc.Power[g]->g != EOW) { // bad news, collection can become longer
 	gpvec newp = FreshVec();
-	Collect(newp, v+pos);
+	Collect(pc, newp, v+pos);
 	unsigned lenv = Length(v), lennewv = pos+shift+Length(newp);
 	if (lenv >= lennewv) {
 	  Copy(v+pos+shift, newp);
@@ -268,7 +268,7 @@ void ShrinkCollect(gpvec &v) {
 	PopVec();
 	return;
       }
-      coeff_fdiv_r(v[pos].c, v[pos].c, Exponent[g]);
+      coeff_fdiv_r(v[pos].c, v[pos].c, pc.Exponent[g]);
       if (coeff_z_p(v[pos].c)) { shift--; continue; }
     }
     if (shift < 0)

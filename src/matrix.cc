@@ -8,23 +8,24 @@
 #include "lienq.h"
 #include <algorithm>
 
-static unsigned NrRows;
+static unsigned NrRows, FirstCentral;
 static gpvec *Matrix;
 
-void InitMatrix(void) {
-  unsigned nrcentralgens = NrTotalGens-NrPcGens;
+void InitMatrix(pcpresentation &pc) {
+  FirstCentral = pc.NrPcGens + 1;
+  unsigned nrcentralgens = NrTotalGens-pc.NrPcGens;
   Matrix = (gpvec *) malloc((nrcentralgens+1) * sizeof(gpvec));
   if (Matrix == NULL)
     abortprintf(2, "InitMatrix: malloc(Matrix) failed");
 
-  if (TorsionExp == 0)
+  if (pc.TorsionExp == 0)
     NrRows = 0;
   else {
     NrRows = nrcentralgens;
     for (unsigned i = 0; i < nrcentralgens; i++) {
       Matrix[i] = NewVec(NrTotalGens);
-      Matrix[i][0].g = NrPcGens + i + 1;
-      coeff_set_si(Matrix[i][0].c, TorsionExp);
+      Matrix[i][0].g = pc.NrPcGens + i + 1;
+      coeff_set_si(Matrix[i][0].c, pc.TorsionExp);
       Matrix[i][1].g = EOW;
     }
   }
@@ -92,7 +93,7 @@ bool AddRow(gpvec cv) {
   if (cv->g == EOW) // easy case: trivial relation, change nothing
     return false;
   
-  if (cv->g <= NrPcGens)
+  if (cv->g < FirstCentral)
     abortprintf(5, "AddRow: vector has a term a%d not in the centre", cv->g);
 
   bool ChangedMatrix = false;

@@ -8,15 +8,10 @@
 #include "lienq.h"
 #include <vector>
 
-gpvec **Product,  *Power, *Epimorphism;
-coeff *Exponent, *Annihilator;
-
-deftype *Definition;
-
-unsigned *Weight, Class, NrPcGens, NrTotalGens;
+unsigned NrTotalGens;
 
 /* add generator newgen to vector v, and store its definition */
-static void AddSingleGenerator(gpvec &v, deftype def) {
+static void AddSingleGenerator(pcpresentation &pc, gpvec &v, deftype def) {
   unsigned l;
 
   if (v == NULL) {
@@ -31,15 +26,15 @@ static void AddSingleGenerator(gpvec &v, deftype def) {
   coeff_set_si(v[l].c, 1);
   v[l+1].g = EOW;
 
-  Definition = (deftype *) realloc(Definition, (NrTotalGens + 1) * sizeof(deftype));
-  if (Definition == NULL)
+  pc.Definition = (deftype *) realloc(pc.Definition, (NrTotalGens + 1) * sizeof(deftype));
+  if (pc.Definition == NULL)
     abortprintf(2, "AddSingleGenerator: realloc(Definition) failed");
   
-  Definition[NrTotalGens] = def;
+  pc.Definition[NrTotalGens] = def;
 }
 
 /* initialize Pc presentation, at class 0. No products or powers are set yet. */
-void InitPcPres(presentation &Pres) {
+void InitPcPres(pcpresentation &pc, presentation &pres) {
   /*
   ** The epimorphism maps from the Lie-algebra given by finite presentation to
   ** the nilpotent factor-algebra computed by the LieNQ algorithm.
@@ -50,60 +45,60 @@ void InitPcPres(presentation &Pres) {
   ** (abelian) factor. It is rather trivial at the beginning, actually a
   ** one-to-one map between the two generator set.
 */
-  NrPcGens = 0;
-  Class = 0;
+  pc.NrPcGens = 0;
+  pc.Class = 0;
   
-  Epimorphism = (gpvec *) malloc((Pres.NrGens + 1) * sizeof(gpvec));
-  if (Epimorphism == NULL)
+  pc.Epimorphism = (gpvec *) malloc((pres.NrGens + 1) * sizeof(gpvec));
+  if (pc.Epimorphism == NULL)
     abortprintf(2, "InitPcPres: malloc(Epimorphism) failed");
-  for (unsigned i = 1; i <= Pres.NrGens; i++)
-    Epimorphism[i] = NewVec(0);
+  for (unsigned i = 1; i <= pres.NrGens; i++)
+    pc.Epimorphism[i] = NewVec(0);
 
-  Definition = (deftype *) malloc(sizeof(deftype));
-  if (Definition == NULL)
+  pc.Definition = (deftype *) malloc(sizeof(deftype));
+  if (pc.Definition == NULL)
     abortprintf(2, "InitPcPres: malloc(Definition) failed");
 
-  Weight = (unsigned *) malloc(sizeof(unsigned));
-  if (Weight == NULL)
+  pc.Weight = (unsigned *) malloc(sizeof(unsigned));
+  if (pc.Weight == NULL)
     abortprintf(2, "InitPcPres: malloc(Weight) failed");
 
   /* we initialize the exponents and annihilators of our pc generators */
-  Exponent = (coeff *) malloc(sizeof(coeff));
-  if (Exponent == NULL)
+  pc.Exponent = (coeff *) malloc(sizeof(coeff));
+  if (pc.Exponent == NULL)
     abortprintf(2, "InitPcPres: malloc(Exponent) failed");
 
-  Annihilator = (coeff *) malloc((NrPcGens + 1) * sizeof(coeff));
-  if (Annihilator == NULL)
+  pc.Annihilator = (coeff *) malloc((pc.NrPcGens + 1) * sizeof(coeff));
+  if (pc.Annihilator == NULL)
     abortprintf(2, "InitPcPres: malloc(Annihilator) failed");
 
-  Power = (gpvec *) malloc(sizeof(gpvec));
-  if (Power == NULL)
+  pc.Power = (gpvec *) malloc(sizeof(gpvec));
+  if (pc.Power == NULL)
     abortprintf(2, "InitPcPres: malloc(Power) failed");
 
-  Product = (gpvec **) malloc((NrPcGens + 1) * sizeof(gpvec *));
-  if (Product == NULL)
+  pc.Product = (gpvec **) malloc((pc.NrPcGens + 1) * sizeof(gpvec *));
+  if (pc.Product == NULL)
     abortprintf(2, "InitPcPres: malloc(Product) failed");
 }
 
-void FreePcPres(presentation &Pres) {
-  for (unsigned i = 1; i <= NrPcGens; i++) {
-    if (Power[i] != NULL)
-      FreeVec(Power[i]);
-    coeff_clear(Exponent[i]);
-    coeff_clear(Annihilator[i]);
+void FreePcPres(pcpresentation &pc, presentation &pres) {
+  for (unsigned i = 1; i <= pc.NrPcGens; i++) {
+    if (pc.Power[i] != NULL)
+      FreeVec(pc.Power[i]);
+    coeff_clear(pc.Exponent[i]);
+    coeff_clear(pc.Annihilator[i]);
     for (unsigned j = 1; j < i; j++)
-      FreeVec(Product[i][j]);
-    free(Product[i]);
+      FreeVec(pc.Product[i][j]);
+    free(pc.Product[i]);
   }
-  for (unsigned i = 1; i <= Pres.NrGens; i++)
-    FreeVec(Epimorphism[i]);
-  free(Epimorphism);
-  free(Power);
-  free(Exponent);
-  free(Annihilator);
-  free(Product);
-  free(Definition);
-  free(Weight);
+  for (unsigned i = 1; i <= pres.NrGens; i++)
+    FreeVec(pc.Epimorphism[i]);
+  free(pc.Epimorphism);
+  free(pc.Power);
+  free(pc.Exponent);
+  free(pc.Annihilator);
+  free(pc.Product);
+  free(pc.Definition);
+  free(pc.Weight);
 }
 
 /*
@@ -111,38 +106,38 @@ void FreePcPres(presentation &Pres) {
 **  In order to do that we define new generators for the images
 **  of the generators of the finite presentation which are not definitions.
 */
-void AddNewTails(presentation &Pres) {
-  NrTotalGens = NrPcGens;
+void AddNewTails(pcpresentation &pc, presentation &pres) {
+  NrTotalGens = pc.NrPcGens;
 
   /* inverse lookup tables:
      - is_dgen[i] == (exist g: Definition[g] = {DGEN,i}), so fp generator i is used to define a pc generator or an alias
      is_dpow[i] == (exist g: Definition[g] = {DPOW,i}), so ai^Exponent[i] = ag
      is_dcomm[i][j] == (exist g: Definition[g] = {DCOMM,i,j}), so [ai,aj] = ag
   */
-  std::vector<bool> is_dgen(Pres.NrGens+1,false);
-  std::vector<bool> is_dpow(NrPcGens+1,false);
-  std::vector<std::vector<bool>> is_dcomm(NrPcGens+1);
+  std::vector<bool> is_dgen(pres.NrGens+1,false);
+  std::vector<bool> is_dpow(pc.NrPcGens+1,false);
+  std::vector<std::vector<bool>> is_dcomm(pc.NrPcGens+1);
 
   /* first mark aliases */
-  for (unsigned i = 0; i < Pres.NrAliases; i++) {
-    gen g = Pres.Aliases[i]->cont.bin.l->cont.g;
+  for (node *n : pres.Aliases) {
+    gen g = n->cont.bin.l->cont.g;
     if (is_dgen[g])
       abortprintf(3, "(At least) two definitions for generator %d", g);
     is_dgen[g] = true;
   }
     
-  for (unsigned i = 1; i <= NrPcGens; i++) {
+  for (unsigned i = 1; i <= pc.NrPcGens; i++) {
     is_dcomm[i] = std::vector<bool>(i,false);
 
-    switch (Definition[i].t) {
+    switch (pc.Definition[i].t) {
     case DCOMM:
-      is_dcomm[Definition[i].g][Definition[i].h] = true;
+      is_dcomm[pc.Definition[i].g][pc.Definition[i].h] = true;
       break;
     case DGEN:
-      is_dgen[Definition[i].g] = true;
+      is_dgen[pc.Definition[i].g] = true;
       break;
     case DPOW:
-      is_dpow[Definition[i].g] = true;
+      is_dpow[pc.Definition[i].g] = true;
       break;
     }
   }
@@ -151,12 +146,12 @@ void AddNewTails(presentation &Pres) {
      If x is an fp generator of degree d, add a pc generator in degree d,
      in the graded case, and in degree >= d, in the ungraded case.
   */
-  for (unsigned i = 1; i <= Pres.NrGens; i++) {
-    if (is_dgen[i] || Pres.Weight[i] >= Class || Graded)
+  for (unsigned i = 1; i <= pres.NrGens; i++) {
+    if (is_dgen[i] || pres.Weight[i] >= pc.Class || pc.Graded)
       continue;
-    AddSingleGenerator(Epimorphism[i], {.t = DINVALID, .g = i});
+    AddSingleGenerator(pc, pc.Epimorphism[i], {.t = DINVALID, .g = i});
     if (Debug >= 2)
-      fprintf(LogFile, "# added tail a%d to epimorphic image of %s\n", NrTotalGens, Pres.GeneratorName[i]);
+      fprintf(LogFile, "# added tail a%d to epimorphic image of %s\n", NrTotalGens, pres.GeneratorName[i].c_str());
   }
 
   /* now add new generators ("tails") to powers and commutators.
@@ -175,19 +170,19 @@ void AddNewTails(presentation &Pres) {
        - g is defined as a power
        - we're in graded, torsion mode (so producing a (Z/TorsionExp)[t]-algebra) and g has degree < Class-1
     */
-    if (pass == (TorsionExp > 0)) {
-      for (unsigned i = 1; i <= NrPcGens; i++) {
-	if (is_dpow[i] || !coeff_nz_p(Exponent[i]))
+    if (pass == (pc.TorsionExp > 0)) {
+      for (unsigned i = 1; i <= pc.NrPcGens; i++) {
+	if (is_dpow[i] || !coeff_nz_p(pc.Exponent[i]))
 	  continue;
-	if (Graded && (TorsionExp == 0 || Weight[i]+1 != Class))
+	if (pc.Graded && (pc.TorsionExp == 0 || pc.Weight[i]+1 != pc.Class))
 	  continue;
-	AddSingleGenerator(Power[i], {.t = (TorsionExp == 0 ? DINVALID : DPOW), .g = i});
+	AddSingleGenerator(pc, pc.Power[i], {.t = (pc.TorsionExp == 0 ? DINVALID : DPOW), .g = i});
 	if (Debug >= 2)
 	  fprintf(LogFile, "# added tail a%d to non-defining torsion generator a%d\n", NrTotalGens, i);
       }
     }
 
-    if (pass == (TorsionExp == 0)) {
+    if (pass == (pc.TorsionExp == 0)) {
       /* for all non-power pc generators g of weight <=Class-k and all
 	 defining pc generators h of weight k, with g > h, and such
 	 that [g,h] is not defining, add a tail to Product[g][h].
@@ -195,19 +190,19 @@ void AddNewTails(presentation &Pres) {
 	 all other tails will be computed in Tails() out of these:
 	 - if h is not defining, using Jacobi or Z-linearity;
 	 - if g is a power, using Z-linearity */
-      for (unsigned i = 1; i <= NrPcGens; i++) {
-	if (Definition[i].t != DGEN)
+      for (unsigned i = 1; i <= pc.NrPcGens; i++) {
+	if (pc.Definition[i].t != DGEN)
 	  continue;
-	for (unsigned j = i+1; j <= NrPcGens; j++) {
+	for (unsigned j = i+1; j <= pc.NrPcGens; j++) {
 	  if (is_dcomm[j][i])
 	    continue;
-	  if (Definition[j].t == DPOW)
+	  if (pc.Definition[j].t == DPOW)
 	    continue;
-	  unsigned totalweight = Weight[i]+Weight[j];
-	  if (totalweight > Class || (Graded && totalweight != Class))
+	  unsigned totalweight = pc.Weight[i]+pc.Weight[j];
+	  if (totalweight > pc.Class || (pc.Graded && totalweight != pc.Class))
 	    continue;
 	    
-	  AddSingleGenerator(Product[j][i], {.t = DCOMM, .g = j, .h = i});
+	  AddSingleGenerator(pc, pc.Product[j][i], {.t = DCOMM, .g = j, .h = i});
 	  if (Debug >= 2)
 	    fprintf(LogFile, "# added tail a%d to non-defining commutator [a%d, a%d]\n", NrTotalGens, j, i);
 	}
@@ -217,12 +212,12 @@ void AddNewTails(presentation &Pres) {
 
   /* finally, add new pc generators for the new fp generators.
   */
-  for (unsigned i = 1; i <= Pres.NrGens; i++) {
-    if (Pres.Weight[i] != Class)
+  for (unsigned i = 1; i <= pres.NrGens; i++) {
+    if (pres.Weight[i] != pc.Class)
       continue;
-    AddSingleGenerator(Epimorphism[i], {.t = DGEN, .g = i});
+    AddSingleGenerator(pc, pc.Epimorphism[i], {.t = DGEN, .g = i});
     if (Debug >= 2)
-      fprintf(LogFile, "# added tail a%d as epimorphic image of %s\n", NrTotalGens, Pres.GeneratorName[i]);
+      fprintf(LogFile, "# added tail a%d as epimorphic image of %s\n", NrTotalGens, pres.GeneratorName[i].c_str());
   }
 
   /*
@@ -232,30 +227,30 @@ void AddNewTails(presentation &Pres) {
   **  and also they have coefficients 0.
   */
 
-  Exponent = (coeff *) realloc(Exponent, (NrTotalGens + 1) * sizeof(coeff));
-  if (Exponent == NULL)
+  pc.Exponent = (coeff *) realloc(pc.Exponent, (NrTotalGens + 1) * sizeof(coeff));
+  if (pc.Exponent == NULL)
     abortprintf(2, "AddNewTails: realloc(Exponent) failed");
-  for (unsigned i = NrPcGens + 1; i <= NrTotalGens; i++)
-    coeff_init_set_si(Exponent[i], TorsionExp);
+  for (unsigned i = pc.NrPcGens + 1; i <= NrTotalGens; i++)
+    coeff_init_set_si(pc.Exponent[i], pc.TorsionExp);
 
-  Annihilator = (coeff *) realloc(Annihilator, (NrTotalGens + 1) * sizeof(coeff));
-  if (Annihilator == NULL)
+  pc.Annihilator = (coeff *) realloc(pc.Annihilator, (NrTotalGens + 1) * sizeof(coeff));
+  if (pc.Annihilator == NULL)
     abortprintf(2, "AddNewTails: realloc(Annihilator) failed");
-  for (unsigned i = NrPcGens + 1; i <= NrTotalGens; i++)
-    coeff_init_set_si(Annihilator[i], 0);
+  for (unsigned i = pc.NrPcGens + 1; i <= NrTotalGens; i++)
+    coeff_init_set_si(pc.Annihilator[i], 0);
 
-  Power = (gpvec *) realloc(Power, (NrTotalGens + 1) * sizeof(gpvec));
-  if (Power == NULL)
+  pc.Power = (gpvec *) realloc(pc.Power, (NrTotalGens + 1) * sizeof(gpvec));
+  if (pc.Power == NULL)
     abortprintf(2, "AddNewTails: realloc(Power) failed");
-  for (unsigned i = NrPcGens + 1; i <= NrTotalGens; i++)
-    Power[i] = NULL;
+  for (unsigned i = pc.NrPcGens + 1; i <= NrTotalGens; i++)
+    pc.Power[i] = NULL;
 
-  Weight = (unsigned *) realloc(Weight, (NrTotalGens + 1) * sizeof(unsigned));
-  if (Weight == NULL)
+  pc.Weight = (unsigned *) realloc(pc.Weight, (NrTotalGens + 1) * sizeof(unsigned));
+  if (pc.Weight == NULL)
     abortprintf(2, "ExtendPcPres: realloc(Weight) failed");
 
-  for (unsigned i = NrPcGens + 1; i <= NrTotalGens; i++)
-    Weight[i] = Class;
+  for (unsigned i = pc.NrPcGens + 1; i <= NrTotalGens; i++)
+    pc.Weight[i] = pc.Class;
 
   /* The Product array is not extended yet, because anyways it won't be used.
      we'll extend it later, in ReducePcPres */
@@ -276,7 +271,7 @@ void AddNewTails(presentation &Pres) {
       operation can be done in-place
 */
 
-void EliminateTrivialGenerators(gpvec *rels, gpvec &v, int renumber[]) {
+static void EliminateTrivialGenerators(pcpresentation &pc, gpvec *rels, gpvec &v, int renumber[]) {
   bool copied = false;
   unsigned pos = 0;
 
@@ -304,11 +299,11 @@ void EliminateTrivialGenerators(gpvec *rels, gpvec &v, int renumber[]) {
   }
   if (copied)
     v = ResizeVec(v, NrTotalGens, pos);
-  ShrinkCollect(v);
+  ShrinkCollect(pc, v);
 }
 
 /* quotient the centre by the relations rels */
-void ReducePcPres(presentation &Pres, gpvec *rels, unsigned numrels) {
+void ReducePcPres(pcpresentation &pc, presentation &pres, gpvec *rels, unsigned numrels) {
   unsigned trivialgens = 0;
 
   if (Debug >= 2) {
@@ -328,9 +323,9 @@ void ReducePcPres(presentation &Pres, gpvec *rels, unsigned numrels) {
       continue;
 
     if (coeff_cmp_si(rels[i]->c, 1)) { /* k is torsion, nontrivial */
-      coeff_set(Exponent[newk], rels[i]->c);
-      Power[newk] = NewVec(Length(rels[i]+1));
-      Neg(Power[newk], rels[i]+1);
+      coeff_set(pc.Exponent[newk], rels[i]->c);
+      pc.Power[newk] = NewVec(Length(rels[i]+1));
+      Neg(pc.Power[newk], rels[i]+1);
     } else { /* k is trivial, and will be eliminated */
       trivialgens++;
       renumber[k] = -i; /* mark as trivial */
@@ -350,32 +345,32 @@ void ReducePcPres(presentation &Pres, gpvec *rels, unsigned numrels) {
   /* Modify the torsions first, in decreasing order, since they're needed
      for Collect */
   for (unsigned j = NrTotalGens; j >= 1; j--)
-    if (Power[j] != NULL)
-      EliminateTrivialGenerators(rels, Power[j], renumber);
+    if (pc.Power[j] != NULL)
+      EliminateTrivialGenerators(pc, rels, pc.Power[j], renumber);
   
   /*  Modify the epimorphisms: */
-  for (unsigned j = 1; j <= Pres.NrGens; j++)
-    EliminateTrivialGenerators(rels, Epimorphism[j], renumber);
+  for (unsigned j = 1; j <= pres.NrGens; j++)
+    EliminateTrivialGenerators(pc, rels, pc.Epimorphism[j], renumber);
   
   /*  Modify the products: */
-  for (unsigned j = 1; j <= NrPcGens; j++)
+  for (unsigned j = 1; j <= pc.NrPcGens; j++)
     for (unsigned l = 1; l < j; l++)
-      EliminateTrivialGenerators(rels, Product[j][l], renumber);
+      EliminateTrivialGenerators(pc, rels, pc.Product[j][l], renumber);
 
   /* Let us alter the Definition as well. Recall that dead generator cannot
   have definition at all. It is only the right of the living ones. */
-  for (unsigned i = NrPcGens + 1; i <= NrTotalGens; i++)
+  for (unsigned i = pc.NrPcGens + 1; i <= NrTotalGens; i++)
     if (renumber[i] >= 1)
-      Definition[renumber[i]] = Definition[i];
+      pc.Definition[renumber[i]] = pc.Definition[i];
 
-  if (TorsionExp == 0) /* sanity check */
+  if (pc.TorsionExp == 0) /* sanity check */
     for (unsigned i = 1; i <= newnrpcgens; i++)
-      if (Definition[i].t == DINVALID)
+      if (pc.Definition[i].t == DINVALID)
 	abortprintf(5, "Generator %d should have been eliminated", i);
   
   for (unsigned i = newnrpcgens+1; i <= NrTotalGens; i++) {
-    coeff_clear(Exponent[i]);
-    coeff_clear(Annihilator[i]);
+    coeff_clear(pc.Exponent[i]);
+    coeff_clear(pc.Annihilator[i]);
   }
 
   delete[] renumber;
@@ -383,20 +378,20 @@ void ReducePcPres(presentation &Pres, gpvec *rels, unsigned numrels) {
      Weight, but it's not worth it */
 
   /* finally extend the Product array, by trivial elements */
-  Product = (gpvec **) realloc(Product, (newnrpcgens + 1) * sizeof(gpvec *));
-  if (Product == NULL)
+  pc.Product = (gpvec **) realloc(pc.Product, (newnrpcgens + 1) * sizeof(gpvec *));
+  if (pc.Product == NULL)
     abortprintf(2, "ReducePcPres: realloc(Product) failed");
 
-  for (unsigned i = NrPcGens + 1; i <= newnrpcgens; i++) {
-    Product[i] = (gpvec *) malloc(i * sizeof(gpvec));
-    if (Product[i] == NULL)
+  for (unsigned i = pc.NrPcGens + 1; i <= newnrpcgens; i++) {
+    pc.Product[i] = (gpvec *) malloc(i * sizeof(gpvec));
+    if (pc.Product[i] == NULL)
       abortprintf(2, "ReducePcPres: realloc(Product[%d]) failed", i);
 
     for (unsigned j = 1; j < i; j++)
-      Product[i][j] = NewVec(0);
+      pc.Product[i][j] = NewVec(0);
   }
   
   TimeStamp("ReducePcPres()");
 
-  NrPcGens = newnrpcgens;
+  pc.NrPcGens = newnrpcgens;
 }

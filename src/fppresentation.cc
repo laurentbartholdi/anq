@@ -6,11 +6,9 @@
 */
 
 #include "lienq.h"
-#include <string.h>
 #include <ctype.h>
 #include <stdio.h>
 #include <stdarg.h>
-#include <vector>
 
 enum token {
   LPAREN, RPAREN, LBRACK, RBRACK, LBRACE, RBRACE,
@@ -57,11 +55,10 @@ static int Line;          /* Current line number. */
 static int TLine;         /* Line number where token starts. */
 static int Char;          /* Current character number. */
 static int TChar;         /* Character number where token starts. */
-static const char *InFileName;  /* Current input file name. */
+static const char *InFileName; /* Current input file name. */
 static FILE *InFp;        /* Current input file pointer. */
 static coeff N;           /* Contains the integer just read. */
-static char *GenName;     /* Contains the generator name. */
-//static presentation *Pres;
+static std::string GenName; /* Contains the generator name. */
 
 void FreeNode(node *n) {
   switch (n->type) {
@@ -91,11 +88,11 @@ enum genstatus { NOCREATE, CREATE };
 
 static gen GenNumber(presentation &pres, genstatus status, unsigned weight) {
   if (status == CREATE && pres.NrGens == 0) {
-    pres.GeneratorName = (char **) malloc(2 * sizeof(char *));
-    pres.Weight = (unsigned *) malloc(2 * sizeof(unsigned));
+    pres.Weight.resize(1); // we start indexing at 1
+    pres.GeneratorName.resize(1);
   }
   for (unsigned i = 1; i <= pres.NrGens; i++) {
-    if (!strcmp(GenName, pres.GeneratorName[i])) {
+    if (GenName == pres.GeneratorName[i]) {
       if (status == CREATE)
         return (gen) 0;
       return (gen) i;
@@ -103,12 +100,12 @@ static gen GenNumber(presentation &pres, genstatus status, unsigned weight) {
   }
   if (status == NOCREATE)
     return (gen) 0;
+
   pres.NrGens++;
-  pres.GeneratorName = (char **) realloc(pres.GeneratorName, (pres.NrGens + 1) * sizeof(char *));
-  pres.Weight = (unsigned *) realloc(pres.Weight, (pres.NrGens + 1) * sizeof(unsigned));
-  pres.GeneratorName[pres.NrGens] = (char *) malloc(strlen(GenName) + 1);
-  strcpy(pres.GeneratorName[pres.NrGens], GenName);
+  pres.Weight.resize(pres.NrGens + 1);
   pres.Weight[pres.NrGens] = weight;
+  pres.GeneratorName.resize(pres.NrGens + 1);
+  pres.GeneratorName[pres.NrGens].assign(GenName);
   
   return pres.NrGens;
 }
@@ -292,17 +289,14 @@ static void NextToken(void) {
 
   default: {
     Token = GEN;
-    int len;
+    GenName.clear();
 
-    for (len = 0; isalnum(Ch) || Ch == '_' || Ch == '.'; len++) {
-      if (len > 100)
-	GenName = (char *) realloc(GenName, len+2);
-      GenName[len] = Ch;
+    while (isalnum(Ch) || Ch == '_' || Ch == '.') {
+      GenName.push_back(Ch);
       ReadCh();
     }
-    GenName[len] = '\0';
 
-    if (len == 0)
+    if (GenName.empty())
       SyntaxError("Illegal character '%c'", Ch);
 
     break;
@@ -373,7 +367,7 @@ node *Term(presentation &pres) {
   if (Token == GEN) {
     node *n = NewNode(TGEN);
     if ((n->cont.g = GenNumber(pres, NOCREATE, 0)) == (gen) 0)
-      SyntaxError("Unkown generator %s", GenName);
+      SyntaxError("Unkown generator %s", GenName.c_str());
     NextToken();
     return n;
   }
@@ -459,7 +453,7 @@ static void ValidateLieExpression(node *n, gen g) {
 }
 
 unsigned ReadPresentation(presentation &pres, const char *InputFileName) {
-  bool readstdin = !strcmp(InputFileName, "-");
+  bool readstdin = (InputFileName[0] == '-' && InputFileName[1] == 0);
   unsigned uptoclass = 0;
   
   if (readstdin)
@@ -476,7 +470,6 @@ unsigned ReadPresentation(presentation &pres, const char *InputFileName) {
   Char = 0;
   Line = 1;
   coeff_init(N);
-  GenName = (char *) malloc(102);
   
   NextToken(); // start parsing
 
@@ -504,7 +497,7 @@ unsigned ReadPresentation(presentation &pres, const char *InputFileName) {
       SyntaxError("Generator expected");
     gen g = GenNumber(pres, CREATE, weight);
     if (g == (gen) 0)
-      SyntaxError("Duplicate generator %s", GenName);
+      SyntaxError("Duplicate generator %s", GenName.c_str());
     NextToken();
 
     if (Token == PIPE)
@@ -519,9 +512,6 @@ unsigned ReadPresentation(presentation &pres, const char *InputFileName) {
   NextToken();
 
   /* get relators */
-  pres.NrRels = pres.NrAliases = 0;
-  pres.Relators = (node **) malloc(sizeof(node *));
-  pres.Aliases = (node **) malloc(sizeof(node *));
   while (is_relation(Token)) {
     node *n = Expression(pres, 0);
 
@@ -539,13 +529,10 @@ unsigned ReadPresentation(presentation &pres, const char *InputFileName) {
     } else
       ValidateLieExpression(n, (gen) -1);
 
-    if (n->type == TDREL) {
-      pres.Aliases = (node **) realloc(pres.Aliases, (pres.NrAliases+1) * sizeof(node *));
-      pres.Aliases[pres.NrAliases++] = n;
-    } else {
-      pres.Relators = (node **) realloc(pres.Relators, (pres.NrRels+1) * sizeof(node *));
-      pres.Relators[pres.NrRels++] = n;
-    }
+    if (n->type == TDREL)
+      pres.Aliases.push_back(n);
+    else
+      pres.Relators.push_back(n);
     
     if (Token == COMMA)
       NextToken();
@@ -554,25 +541,19 @@ unsigned ReadPresentation(presentation &pres, const char *InputFileName) {
   }
 
   /* get extra elements to evaluate in result */
-  pres.NrExtra = 0;
   if (Token == PIPE) {
     NextToken();
 
-    pres.Extra = (node **) malloc(sizeof(node *));
     while (is_relation(Token)) {
       node *n = Expression(pres, 0);
       ValidateLieExpression(n, (gen) -1);
-    
-      pres.Extra = (node **) realloc(pres.Extra, (pres.NrExtra+1) * sizeof(node *));
-
-      pres.Extra[pres.NrExtra++] = n;
+      pres.Extra.push_back(n);
       if (Token == COMMA)
 	NextToken();
       else
 	break;
     }
-  } else
-    pres.Extra = NULL;
+  }
 
   if (Token != RANGLE)
     SyntaxError("'>' expected");
@@ -581,27 +562,17 @@ unsigned ReadPresentation(presentation &pres, const char *InputFileName) {
     fclose(InFp);
 
   coeff_clear(N);
-  free(GenName);
   
   return uptoclass;
 }
 
 void FreePresentation(presentation &Pres) {
-  for (unsigned i = 1; i <= Pres.NrGens; i++)
-    free(Pres.GeneratorName[i]);
-  free(Pres.GeneratorName);
-  free(Pres.Weight);
-  for (unsigned i = 0; i < Pres.NrRels; i++)
-    FreeNode(Pres.Relators[i]);
-  free(Pres.Relators);
-  for (unsigned i = 0; i < Pres.NrAliases; i++)
-    FreeNode(Pres.Aliases[i]);
-  free(Pres.Aliases);
-  if (Pres.Extra != NULL) {
-    for (unsigned i = 0; i < Pres.NrExtra; i++)
-      FreeNode(Pres.Extra[i]);
-    free(Pres.Extra);
-  }
+  for (auto n : Pres.Relators)
+    FreeNode(n);
+  for (auto n : Pres.Aliases)
+    FreeNode(n);
+  for (auto n : Pres.Extra)
+    FreeNode(n);
 }
 
 void PrintNode(FILE *f, presentation &pres, node *n) {
@@ -610,7 +581,7 @@ void PrintNode(FILE *f, presentation &pres, node *n) {
     coeff_out_str(f, n->cont.n);
     break;
   case TGEN:
-    fprintf(f, "%s", pres.GeneratorName[n->cont.g]);
+    fprintf(f, "%s", pres.GeneratorName[n->cont.g].c_str());
     break;
   case TNEG:
     fprintf(f, "-");
@@ -688,44 +659,44 @@ void PrintNode(FILE *f, presentation &pres, node *n) {
 ** generators.
 */
 
-void EvalRel(gpvec v, node *rel) {
+void EvalRel(pcpresentation &pc, gpvec v, node *rel) {
   gpvec vl, vr;
   switch (rel->type) {
   case TSUM:
     vl = FreshVec();
     vr = FreshVec();
-    EvalRel(vl, rel->cont.bin.l);
-    EvalRel(vr, rel->cont.bin.r);
+    EvalRel(pc, vl, rel->cont.bin.l);
+    EvalRel(pc, vr, rel->cont.bin.r);
     Sum(v, vl, vr);
     PopVec();
     PopVec();
     break;
   case TPROD:
-    EvalRel(v, rel->cont.bin.r);
+    EvalRel(pc, v, rel->cont.bin.r);
     Prod(v, rel->cont.bin.l->cont.n, v);
     break;
   case TBRACK:
     vl = FreshVec();
     vr = FreshVec();
-    EvalRel(vl, rel->cont.bin.l);
-    EvalRel(vr, rel->cont.bin.r);
-    Prod(v, vl, vr);
+    EvalRel(pc, vl, rel->cont.bin.l);
+    EvalRel(pc, vr, rel->cont.bin.r);
+    LieBracket(pc, v, vl, vr);
     PopVec();
     PopVec();
     break;
   case TGEN:
-    Copy(v, Epimorphism[rel->cont.g]);
+    Copy(v, pc.Epimorphism[rel->cont.g]);
     break;
   case TNEG:
-    EvalRel(v, rel->cont.u);
+    EvalRel(pc, v, rel->cont.u);
     Neg(v);
     break;
   case TDIFF:
   case TREL:
     vl = FreshVec();
     vr = FreshVec();
-    EvalRel(vl, rel->cont.bin.l);
-    EvalRel(vr, rel->cont.bin.r);
+    EvalRel(pc, vl, rel->cont.bin.l);
+    EvalRel(pc, vr, rel->cont.bin.r);
     Diff(v, vl, vr);
     PopVec();
     PopVec();
@@ -736,32 +707,32 @@ void EvalRel(gpvec v, node *rel) {
 }
 
 /* evaluate all relations, and add them to the relation matrix */
-void EvalAllRel(presentation &pres) {
+void EvalAllRel(pcpresentation &pc, presentation &pres) {
   gpvec v = FreshVec();
 
-  for (unsigned i = 0; i < pres.NrAliases; i++) {
+  for (auto n : pres.Aliases) {
     gpvec temp = FreshVec();
-    EvalRel(temp, pres.Aliases[i]->cont.bin.r);
-    Collect(v, temp);
+    EvalRel(pc, temp, n->cont.bin.r);
+    Collect(pc, v, temp);
     PopVec();
     if (Debug >= 2) {
       fprintf(LogFile, "# aliasing relation: ");
-      PrintNode(LogFile, pres, pres.Aliases[i]);
+      PrintNode(LogFile, pres, n);
       fprintf(LogFile, " ("); PrintVec(LogFile, v); fprintf(LogFile, ")\n");
     }
-    gen g = pres.Aliases[i]->cont.bin.l->cont.g;
-    Epimorphism[g] = ResizeVec(Epimorphism[g], Length(Epimorphism[g]), Length(v));
-    Copy(Epimorphism[g], v);
+    gen g = n->cont.bin.l->cont.g;
+    pc.Epimorphism[g] = ResizeVec(pc.Epimorphism[g], Length(pc.Epimorphism[g]), Length(v));
+    Copy(pc.Epimorphism[g], v);
   }
   
-  for (unsigned i = 0; i < pres.NrRels; i++) {
+  for (auto n : pres.Relators) {
     gpvec temp = FreshVec();
-    EvalRel(temp, pres.Relators[i]);
-    Collect(v, temp);
+    EvalRel(pc, temp, n);
+    Collect(pc, v, temp);
     PopVec();
     if (Debug >= 2) {
       fprintf(LogFile, "# relation: ");
-      PrintNode(LogFile, pres, pres.Relators[i]);
+      PrintNode(LogFile, pres, n);
       fprintf(LogFile, " ("); PrintVec(LogFile, v); fprintf(LogFile, ")\n");
     }
     AddRow(v);

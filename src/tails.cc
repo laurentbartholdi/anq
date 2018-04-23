@@ -19,58 +19,55 @@
  * - if i is defined as N*g, compute [j,i] = N*[j,g]
  * - if j is defined as N*g, compute [j,i] = N*[g,i] or -N*[i,g]
  */
-bool AdjustTail(gen j, gen i) {
-  if (Definition[i].t == DGEN && Definition[j].t != DPOW) /* nothing to do, [aj,ai] is a defining generator */
-    return true;
-
-  if (Weight[j] + Weight[i] > Class) /* the tail would go too far out */
+static bool AdjustTail(pcpresentation &pc, gen j, gen i) {
+  if (pc.Definition[i].t == DGEN && pc.Definition[j].t != DPOW) /* nothing to do, [aj,ai] is a defining generator */
     return true;
 
   gpvec tail = FreshVec();
 
-  if (Definition[i].t == DCOMM) { /* ai = [g,h] */
-    gen g = Definition[i].g, h = Definition[i].h;
+  if (pc.Definition[i].t == DCOMM) { /* ai = [g,h] */
+    gen g = pc.Definition[i].g, h = pc.Definition[i].h;
 
     gpvec agh = FreshVec();
-    TripleProduct(agh, j, g, h);
+    TripleProduct(pc, agh, j, g, h);
     gpvec ahg = FreshVec();
-    TripleProduct(ahg, j, h, g);
+    TripleProduct(pc, ahg, j, h, g);
     gpvec v = FreshVec();
     Diff(v, agh, ahg);
-    Collect(tail, v);
+    Collect(pc, tail, v);
     PopVec();
     PopVec();
     PopVec();
 
     if (Debug >= 2)
       fprintf(LogFile, "# tail: [a%d,a%d] = [a%d,[a%d,a%d]] = ", j, i, j, g, h);
-  } else if (Definition[i].t == DPOW) { /* ai=N*g */
-    gen g = Definition[i].g;
+  } else if (pc.Definition[i].t == DPOW) { /* ai=N*g */
+    gen g = pc.Definition[i].g;
     gpvec v = FreshVec();
-    Prod(v, Exponent[g], Product[j][g]);
-    Collect(tail, v);
+    Prod(v, pc.Exponent[g], pc.Product[j][g]);
+    Collect(pc, tail, v);
     PopVec();
 
     if (Debug >= 2) {
       fprintf(LogFile, "# tail: [a%d,a%d] = ", j, i);
-      coeff_out_str(LogFile, Exponent[g]);
+      coeff_out_str(LogFile, pc.Exponent[g]);
       fprintf(LogFile, "*[a%d,a%d] = ", j, g);
     }
   } else { /* aj = N*g */
-    gen g = Definition[j].g;
+    gen g = pc.Definition[j].g;
     gpvec v = FreshVec();
     if (g > i)
-      Prod(v, Exponent[g], Product[g][i]);
+      Prod(v, pc.Exponent[g], pc.Product[g][i]);
     else if (g < i) {
-      Prod(v, Exponent[g], Product[i][g]);
+      Prod(v, pc.Exponent[g], pc.Product[i][g]);
       Neg(v);
     }
-    Collect(tail, v);
+    Collect(pc, tail, v);
     PopVec();
 
     if (Debug >= 2) {
       fprintf(LogFile, "# tail: [a%d,a%d] = ", j, i);
-      coeff_out_str(LogFile, Exponent[g]);
+      coeff_out_str(LogFile, pc.Exponent[g]);
       fprintf(LogFile, "*[a%d,a%d] = ", g, i);
     }
   }
@@ -81,26 +78,27 @@ bool AdjustTail(gen j, gen i) {
   }
 
   unsigned k;
-  for (k = 0; Product[j][i][k].g != EOW; k++)
-    if (Product[j][i][k].g != tail[k].g || coeff_cmp(Product[j][i][k].c,tail[k].c))
+  for (k = 0; pc.Product[j][i][k].g != EOW; k++)
+    if (pc.Product[j][i][k].g != tail[k].g || coeff_cmp(pc.Product[j][i][k].c,tail[k].c))
       return false;
 
   if (tail[k].g != EOW) {
-    Product[j][i] = ResizeVec(Product[j][i], k, Length(tail));
-    Copy(Product[j][i]+k, tail+k);
+    pc.Product[j][i] = ResizeVec(pc.Product[j][i], k, Length(tail));
+    Copy(pc.Product[j][i]+k, tail+k);
   }
 
   PopVec(); /* tail */
   return true;
 }
 
-void ComputeTails(void) {
-  for (unsigned i = 1; i <= NrPcGens; i++) {
-    for (unsigned j = i + 1; j <= NrPcGens; j++) {
-      if (Graded && Weight[i]+Weight[j] != Class)
+void ComputeTails(pcpresentation &pc) {
+  for (unsigned i = 1; i <= pc.NrPcGens; i++) {
+    for (unsigned j = i + 1; j <= pc.NrPcGens; j++) {
+      unsigned totalweight = pc.Weight[i]+pc.Weight[j];
+      if (totalweight > pc.Class || (pc.Graded && totalweight != pc.Class))
 	continue;
-
-      if (!AdjustTail(j, i))
+      
+      if (!AdjustTail(pc, j, i))
 	abortprintf(5, "Adjustment to tail of [a%d,a%d] doesn't lie in centre", j, i);
     }
   }

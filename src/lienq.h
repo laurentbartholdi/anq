@@ -10,6 +10,8 @@
 #include <stdlib.h>
 #include <time.h>
 #include "coeff.h"
+#include <vector>
+#include <string>
 
 /****************************************************************
  * generators
@@ -60,9 +62,10 @@ struct node {
 };
 
 struct presentation {
-  unsigned NrGens, NrRels, NrAliases, NrExtra, *Weight;
-  char **GeneratorName;
-  node **Relators, **Aliases, **Extra;
+  unsigned NrGens;
+  std::vector<unsigned> Weight;
+  std::vector<std::string> GeneratorName;
+  std::vector<node *> Relators, Aliases, Extra;
 };
 
 /****************************************************************
@@ -111,39 +114,42 @@ void FreeVec(gpvec, unsigned);
 void FreeVec(gpvec);
 gpvec ResizeVec(gpvec, unsigned, unsigned);
 
+/* pcpresentation functions */
+extern unsigned  NrTotalGens; // during extension of pc presentation, NrTotalGens = new NrPcGens
+
+struct pcpresentation {
+  gpvec **Product, // the Lie bracket: [aj,ai] = ...
+    *Power, // powers: Exponent[i]*ai = ...
+    *Epimorphism; // epimorphism from fppresentation: Epimorphism[xi] = ...
+  coeff *Exponent, // the Exponent[i]*ai in next class
+    *Annihilator; // Annihilator[i]*ai = 0 was enforced earlier
+  deftype *Definition; // Definition[i] defines ai in terms of previous aj
+  unsigned *Weight; // Weight[i] = class in which ai is introduced
+  unsigned Class, // current class
+    NrPcGens; // number of ai in current consistent pc presentation
+  bool Graded; // is it a graded Lie algebra?
+  unsigned long TorsionExp; // if >0, enforce TorsionExp*ai in next class
+};
+
+void InitPcPres(pcpresentation &, presentation &);
+void FreePcPres(pcpresentation &, presentation &);
+void AddNewTails(pcpresentation &, presentation &);
+void ReducePcPres(pcpresentation &, presentation &, gpvec *, unsigned);
+
 /* tails functions */
-void ComputeTails(void);
+void ComputeTails(pcpresentation &);
 
 /* consistency functions */
-void TripleProduct(gpvec &, gen, gen, gen);
-void Consistency(void);
+void TripleProduct(pcpresentation &, gpvec &, gen, gen, gen);
+void Consistency(pcpresentation &);
 
 /* print functions */
-extern void abortprintf(int, const char *, ...) __attribute__((format(printf, 2, 3),noreturn));
+void abortprintf(int, const char *, ...) __attribute__((format(printf, 2, 3),noreturn));
 void PrintVec(FILE *f, gpvec);
-void PrintPcPres(FILE *f, presentation &, bool, bool, bool);
-void PrintGAPPres(FILE *f, presentation &);
+void PrintPcPres(FILE *f, pcpresentation &, presentation &, bool, bool, bool);
+void PrintGAPPres(FILE *f, pcpresentation &, presentation &);
 void TimeStamp(const char *);
   
-/* pcpresentation functions */
-/****************************************************************
- * global variables containing a Pc presentation
- ****************************************************************/
-extern gpvec **Product, *Power, *Epimorphism;
-extern coeff *Exponent, *Annihilator;
-extern deftype *Definition;
-extern unsigned *Weight;
-extern unsigned Class,
-  NrPcGens, // during extension of pc presentation, will be previous NrTotalGens
-  NrTotalGens;
-extern bool Graded;
-extern unsigned long TorsionExp;
-
-void InitPcPres(presentation &);
-void FreePcPres(presentation &);
-void AddNewTails(presentation &);
-void ReducePcPres(presentation &, gpvec *, unsigned);
-
 /* operation functions */
 void Sum(gpvec, constgpvec, constgpvec);
 void Sum(gpvec, constgpvec, const coeff, constgpvec);
@@ -181,19 +187,19 @@ inline void Neg(gpvec vec1) {
   for (; vec1->g != EOW; vec1++)
     coeff_neg(vec1->c, vec1->c);
 }
-void Prod(gpvec, constgpvec, constgpvec);
-void Collect(gpvec, constgpvec);
-void ShrinkCollect(gpvec &);
+void LieBracket(pcpresentation &pc, gpvec, constgpvec, constgpvec);
+void Collect(pcpresentation &pc, gpvec, constgpvec);
+void ShrinkCollect(pcpresentation &pc, gpvec &);
 
 /* fppresentation functions */
 unsigned ReadPresentation(presentation &, const char *);
 void FreePresentation(presentation &);
-void EvalRel(gpvec, node *);
-void EvalAllRel(presentation &);
+void EvalRel(pcpresentation &, gpvec, node *);
+void EvalAllRel(pcpresentation &, presentation &);
 void PrintNode(FILE *f, presentation &, node *);
 
 /* matrix functions */
 void HermiteNormalForm(gpvec **, unsigned *);
 bool AddRow(gpvec);
-void InitMatrix(void);
+void InitMatrix(pcpresentation &);
 void FreeMatrix(void);

@@ -50,13 +50,13 @@ void PrintVec(FILE *f, gpvec gv) {
   }
 }
 
-void PrintPcPres(FILE *f, presentation &Pres, bool PrintCompact, bool PrintDefs, bool PrintZeros) {
+void PrintPcPres(FILE *f, pcpresentation &pc, presentation &pres, bool PrintCompact, bool PrintDefs, bool PrintZeros) {
   fprintf(f, "<\n");
 
   unsigned curclass = 0;
   bool first;
-  for (unsigned i = 1; i <= NrPcGens; i++) {
-    while (Weight[i] > curclass) {
+  for (unsigned i = 1; i <= pc.NrPcGens; i++) {
+    while (pc.Weight[i] > curclass) {
       if (curclass++ > 0)
 	fprintf(f, ";\n");
       fprintf(f, "# generators of weight %d:\n", curclass);
@@ -70,50 +70,50 @@ void PrintPcPres(FILE *f, presentation &Pres, bool PrintCompact, bool PrintDefs,
   fprintf(f, " |\n");
   
   fprintf(f, "# The epimorphism:\n");
-  for (unsigned i = 1; i <= Pres.NrGens; i++) {
-    gen g = Epimorphism[i]->g;
-    fprintf(f, "# %10s |-->", Pres.GeneratorName[i]);
-    if (g && Definition[g].t == DGEN && Definition[g].g == i)
+  for (unsigned i = 1; i <= pres.NrGens; i++) {
+    gen g = pc.Epimorphism[i]->g;
+    fprintf(f, "# %10s |-->", pres.GeneratorName[i].c_str());
+    if (g && pc.Definition[g].t == DGEN && pc.Definition[g].g == i)
       fprintf(f, ": a%d\n", g);
     else {
       fprintf(f, " ");
-      PrintVec(f, Epimorphism[i]);
+      PrintVec(f, pc.Epimorphism[i]);
       fprintf(f, "\n");
     }
   }
   if (PrintDefs) {
     fprintf(f, "# The definitions:\n");
-    for (unsigned i = 1; i <= NrPcGens; i++) {
+    for (unsigned i = 1; i <= pc.NrPcGens; i++) {
       /* we know each element is defined as an iterated multiple of an iterated commutator of generators */
       
       fprintf(f, "#%10s a%d = ", "", i);
-      switch (Definition[i].t) {
+      switch (pc.Definition[i].t) {
       case DCOMM:
-	fprintf(f, "[a%d,a%d] = ", Definition[i].g, Definition[i].h);
+	fprintf(f, "[a%d,a%d] = ", pc.Definition[i].g, pc.Definition[i].h);
 	break;
       case DPOW:
-	coeff_out_str(f, Exponent[i]);
-	fprintf(f, "*a%d = ", Definition[i].g);
+	coeff_out_str(f, pc.Exponent[i]);
+	fprintf(f, "*a%d = ", pc.Definition[i].g);
 	break;
       case DGEN:;
       }
 
       gen g = i;
-      while (Definition[g].t == DPOW) {
-	coeff_out_str(f, Exponent[g]);
+      while (pc.Definition[g].t == DPOW) {
+	coeff_out_str(f, pc.Exponent[g]);
 	fprintf(f,"*");
-	g = Definition[g].g;
+	g = pc.Definition[g].g;
       }
       std::vector<gen> cv;
-      while (Definition[g].t == DCOMM) {
-	cv.push_back(Definition[g].h);
-	g = Definition[g].g;
+      while (pc.Definition[g].t == DCOMM) {
+	cv.push_back(pc.Definition[g].h);
+	g = pc.Definition[g].g;
       }
       fprintf(f, "[");
       for (;;) {
-	if (Definition[g].t != DGEN)
+	if (pc.Definition[g].t != DGEN)
 	  abortprintf(5, "Generator %d is not iterated multiple of iterated commutator of generators", i);
-	fprintf(f, "%s", Pres.GeneratorName[Definition[g].g]);
+	fprintf(f, "%s", pres.GeneratorName[pc.Definition[g].g].c_str());
 	if (cv.empty())
 	  break;
 	g = cv.back();
@@ -127,19 +127,19 @@ void PrintPcPres(FILE *f, presentation &Pres, bool PrintCompact, bool PrintDefs,
 
   first = true;
   fprintf(f, "# The torsion relations:\n");
-  for (unsigned i = 1; i <= NrPcGens; i++) {
-    if (coeff_nz_p(Exponent[i])) {
+  for (unsigned i = 1; i <= pc.NrPcGens; i++) {
+    if (coeff_nz_p(pc.Exponent[i])) {
       if (!first)
 	  fprintf(f, ",\n");
       fprintf(f, "%10s", "");
-      coeff_out_str(f, Exponent[i]);
+      coeff_out_str(f, pc.Exponent[i]);
       fprintf(f, "*a%d", i);
-      if (Power[i] != NULL && Power[i]->g != EOW) {
-	if (Definition[Power[i]->g].t == DPOW && Definition[Power[i]->g].g == i)
-	  fprintf(f, " =: a%d", Power[i]->g);
+      if (pc.Power[i] != NULL && pc.Power[i]->g != EOW) {
+	if (pc.Definition[pc.Power[i]->g].t == DPOW && pc.Definition[pc.Power[i]->g].g == i)
+	  fprintf(f, " =: a%d", pc.Power[i]->g);
 	else {
 	  fprintf(f, " = ");
-	  PrintVec(f, Power[i]);
+	  PrintVec(f, pc.Power[i]);
 	}
       }
       first = false;
@@ -148,11 +148,11 @@ void PrintPcPres(FILE *f, presentation &Pres, bool PrintCompact, bool PrintDefs,
   
   fprintf(f, "%s# The product relations:\n", first ? "" : ",\n");
   first = true;
-  for (unsigned j = 1; j <= NrPcGens; j++)
+  for (unsigned j = 1; j <= pc.NrPcGens; j++)
     for (unsigned i = 1; i < j; i++) {
-      gen g = Product[j][i]->g;
+      gen g = pc.Product[j][i]->g;
       if (PrintCompact) {
-	if (Definition[i].t != DGEN || Definition[j].t == DPOW)
+	if (pc.Definition[i].t != DGEN || pc.Definition[j].t == DPOW)
 	  continue;
       } else {
 	if (!PrintZeros && g == EOW)
@@ -162,24 +162,24 @@ void PrintPcPres(FILE *f, presentation &Pres, bool PrintCompact, bool PrintDefs,
 	fprintf(f, ",\n");
       fprintf(f, "%10s[ a%d, a%d ]", "", j, i);
       if (g != EOW) {
-	if (Definition[g].g == j && Definition[g].h == i)
-	  fprintf(f, " =: a%d", Product[j][i]->g);
+	if (pc.Definition[g].g == j && pc.Definition[g].h == i)
+	  fprintf(f, " =: a%d", pc.Product[j][i]->g);
 	else {
 	  fprintf(f, " = ");
-	  PrintVec(f, Product[j][i]);
+	  PrintVec(f, pc.Product[j][i]);
 	}
       }
       first = false;
     }
   
-  if (Pres.NrExtra > 0) {
+  if (!pres.Extra.empty()) {
     fprintf(f, " |\n# The extra elements:\n");
     first = true;
     gpvec v = FreshVec();
-    for (unsigned i = 0; i < Pres.NrExtra; i++) {
+    for (node *n : pres.Extra) {
       gpvec temp = FreshVec();
-      EvalRel(temp, Pres.Extra[i]);
-      Collect(v, temp);
+      EvalRel(pc, temp, n);
+      Collect(pc, v, temp);
       PopVec();
       if (!first)
 	fprintf(f, ",\n");
@@ -203,22 +203,22 @@ bool PrintGAPVec(FILE *f, gpvec v, bool first) {
   return first;
 }
   
-void PrintGAPPres(FILE *f, presentation &Pres) {
+void PrintGAPPres(FILE *f, pcpresentation &pc, presentation &pres) {
   fprintf(f, "LoadPackage(\"liering\");\n"
 	  "F := FreeLieRing(Integers,[");
-  for (unsigned i = 1; i <= Pres.NrGens; i++)
-    fprintf(f, "%s\"%s\"", i > 1 ? "," : "", Pres.GeneratorName[i]);
+  for (unsigned i = 1; i <= pres.NrGens; i++)
+    fprintf(f, "%s\"%s\"", i > 1 ? "," : "", pres.GeneratorName[i].c_str());
   fprintf(f, "]);\n");
   fprintf(f, "L := CallFuncList(function()\n"
 	  "\tlocal T, L, bas, epi, src, genimgs, eval;\n"
-	  "\tT := EmptySCTable(%d,0,\"antisymmetric\");\n", NrPcGens);
-  for (unsigned j = 1; j <= NrPcGens; j++)
+	  "\tT := EmptySCTable(%d,0,\"antisymmetric\");\n", pc.NrPcGens);
+  for (unsigned j = 1; j <= pc.NrPcGens; j++)
     for (unsigned i = 1; i < j; i++) {
-      gen g = Product[j][i]->g;
+      gen g = pc.Product[j][i]->g;
       if (g != EOW) {
         fprintf(f, "\tSetEntrySCTable(T,%d,%d,[", j, i);
 	bool first = true;
-	for (gpvec v = Product[j][i]; v->g != EOW; v++) {
+	for (gpvec v = pc.Product[j][i]; v->g != EOW; v++) {
 	  if (!first) fprintf(f, ",");
 	  coeff_out_str(f, v->c);
 	  fprintf(f, ",%d", v->g);
@@ -227,43 +227,45 @@ void PrintGAPPres(FILE *f, presentation &Pres) {
 	fprintf(f, "]);\n");
       }
     }
-  fprintf(f, "\tL := LieRingByStructureConstants(ListWithIdenticalEntries(%d,0), T);\n", NrPcGens);
+  fprintf(f, "\tL := LieRingByStructureConstants(ListWithIdenticalEntries(%d,0), T);\n", pc.NrPcGens);
   fprintf(f, "\tbas := Basis(L);\n"
 	  "\tepi := NaturalHomomorphismByIdeal(L,LieRingIdeal(L,[");
   bool first = true;
-  for (unsigned i = 1; i <= NrPcGens; i++) {
-    if (coeff_nz_p(Exponent[i])) {
+  for (unsigned i = 1; i <= pc.NrPcGens; i++) {
+    if (coeff_nz_p(pc.Exponent[i])) {
       fprintf(f, "%s-", first ? "" : ",\n\t\t");
-      coeff_out_str(f, Exponent[i]);
+      coeff_out_str(f, pc.Exponent[i]);
       fprintf(f, "*bas[%d]", i);
-      if (Power[i] != NULL)
-	PrintGAPVec(f, Power[i], false);
+      if (pc.Power[i] != NULL)
+	PrintGAPVec(f, pc.Power[i], false);
       first = false;
     }
   }
   fprintf(f, "],\"basis\"));\n");
 
   fprintf(f, "\tgenimgs := [");
-  for (unsigned i = 1; i <= Pres.NrGens; i++) {
+  for (unsigned i = 1; i <= pres.NrGens; i++) {
     fprintf(f, "%s(", i == 1 ? "" : ",");
-    if (PrintGAPVec(f, Epimorphism[i], true))
+    if (PrintGAPVec(f, pc.Epimorphism[i], true))
       fprintf(f, "Zero(L)");
     fprintf(f, ")^epi");
   }
   fprintf(f,"];\n");
 
-  if (Pres.NrExtra > 0) {
+  if (!pres.Extra.empty()) {
     fprintf(f, "\tRange(epi)!.extra := [");
     gpvec v = FreshVec();
-    for (unsigned i = 0; i < Pres.NrExtra; i++) {
+    bool first = true;
+    for (node *n : pres.Extra) {
       gpvec temp = FreshVec();
-      EvalRel(temp, Pres.Extra[i]);
-      Collect(v, temp);
+      EvalRel(pc, temp, n);
+      Collect(pc, v, temp);
       PopVec();
-      fprintf(f, "%s(", i == 0 ? "" : ",");
+      fprintf(f, "%s(", first ? "" : ",");
       if (PrintGAPVec(f, v, true))
 	fprintf(f,"Zero(L)");
       fprintf(f, ")^epi");
+      first = false;
     }
     PopVec();
     fprintf(f, "];\n");
