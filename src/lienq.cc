@@ -16,9 +16,6 @@
 FILE *OutputFile = stdout, *LogFile = stdout;
 unsigned Debug = 0;
 
-bool Graded = false;
-unsigned long TorsionExp = 0;
-
 const char USAGE[] = "Usage: lienq <options> (<inputfile> | \"-\") [<maximal class>]\n"
   "\t[-A]\ttoggle GAP output, default false\n"
   "\t[-C]\ttoggle printing compact form of multiplication table, default true\n"
@@ -44,7 +41,8 @@ static const char *plural(unsigned n) {
 int main(int argc, char **argv) {
   char flags[24] = "";
   int c;
-  bool PrintZeros = false, PrintCompact = true, PrintDefs = false, Gap = false;
+  bool PrintZeros = false, PrintCompact = true, PrintDefs = false, Gap = false, Graded = false;
+  unsigned long TorsionExp = 0;
   
   while ((c = getopt (argc, argv, "ADF:GL:PX:Z")) != -1)
     switch (c) {
@@ -124,7 +122,7 @@ int main(int argc, char **argv) {
 
   pcpresentation pc;
   
-  InitPcPres(pc, fppres);
+  InitPcPres(pc, fppres, Graded, TorsionExp);
 
   TimeStamp("initialization");
   
@@ -137,7 +135,7 @@ int main(int argc, char **argv) {
 
     ComputeTails(pc); // compute other tails
     
-    InitMatrix(pc);
+    InitMatrix(pc, NrTotalGens-pc.NrPcGens);
 
     Consistency(pc); // enforce Jacobi and Z-linearity
     

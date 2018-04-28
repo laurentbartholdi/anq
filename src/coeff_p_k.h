@@ -103,7 +103,6 @@ const inline uint64_t coeff2uint64_t(coeff c) {
 }
 
 /****************************************************************/
-inline void coeff_set_si(coeff &, const long);
 inline void coeff_mul(coeff &, const coeff &, const coeff &);
 
 /* addition */
@@ -113,17 +112,6 @@ inline bool coeff_nz_p(const coeff &a) {
 
 inline bool coeff_z_p(const coeff &a) {
   return a.data == 0;
-}
-
-inline void coeff_init(coeff &a) {
-}
-
-inline void coeff_init_set(coeff &result, const coeff &a) {
-  result.data = a.data;
-}
-
-inline void coeff_init_set_si(coeff &result, const long a) {
-  coeff_set_si(result, a);
 }
 
 inline void coeff_set(coeff &result, const coeff &a) {
@@ -136,6 +124,17 @@ inline void coeff_set_si(coeff &result, const long a) {
 
 inline long coeff_get_si(const coeff &a) {
   return montgomery_redc(a.data);
+}
+
+inline void coeff_init(coeff &a) {
+}
+
+inline void coeff_init_set(coeff &result, const coeff &a) {
+  result.data = a.data;
+}
+
+inline void coeff_init_set_si(coeff &result, const long a) {
+  coeff_set_si(result, a);
 }
 
 inline void coeff_clear(coeff &a) {
@@ -284,7 +283,7 @@ const inline bool coeff_reduced_p(const coeff &a, const coeff &b) {
 }
 
 /* addition, returns unit and generator of annihilator ideal:
-   a*unit is canonical (2^n) and a*annihilator=0 */
+   a*unit is canonical (MODULUS_PRIME^n) and a*annihilator=0 */
 const inline void coeff_unit_annihilator(coeff &unit, coeff &annihilator, const coeff &a) {
   uint64_t va = coeff2uint64_t(a), vgcd = 1;
 

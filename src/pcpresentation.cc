@@ -34,7 +34,7 @@ static void AddSingleGenerator(pcpresentation &pc, gpvec &v, deftype def) {
 }
 
 /* initialize Pc presentation, at class 0. No products or powers are set yet. */
-void InitPcPres(pcpresentation &pc, presentation &pres) {
+void InitPcPres(pcpresentation &pc, presentation &pres, bool Graded, unsigned long TorsionExp) {
   /*
   ** The epimorphism maps from the Lie-algebra given by finite presentation to
   ** the nilpotent factor-algebra computed by the LieNQ algorithm.
@@ -47,7 +47,9 @@ void InitPcPres(pcpresentation &pc, presentation &pres) {
 */
   pc.NrPcGens = 0;
   pc.Class = 0;
-  
+  pc.Graded = Graded;
+  pc.TorsionExp = TorsionExp;
+    
   pc.Epimorphism = (gpvec *) malloc((pres.NrGens + 1) * sizeof(gpvec));
   if (pc.Epimorphism == NULL)
     abortprintf(2, "InitPcPres: malloc(Epimorphism) failed");

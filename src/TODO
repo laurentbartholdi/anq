@@ -1,10 +1,10 @@
 * Accept groups: *, ^-1, {a,b} = a^-1*b^-1*a*b, a^b, and combinatorial collector
 
+* Renumber arrays and generators from 0; use std::set, std::vector rather than C lists
+
 * Improve matrix code: use shorter arrays to improve cache locality, avoid fillin, avoid coefficient explosion, use finite fields, (in local rings) permute basis to get rid of redundant generators
 
-* GAP output is LieRing format
-
-* Check graded Lie algebra generation
+* Check/debug graded Lie algebra generation
 
 * Make LieNQ a library: accept calls to
   - NewLiePresentation
@@ -12,4 +12,11 @@
   - AddGen(lpres, string)
   - AddRel(lpres, node)
   - LieNQ(lpres, maxclass)
-  Make (almost!) all variables local!
+
+* Make TotalGens local to pcpresentation.cc, possibly with an "ExtendPresentation" doing all the work
+
+* Add high-precision modular arithmetic
+
+* Finish z.h fastint arithmetic
+
+* Add option to kill all N-fold commutators

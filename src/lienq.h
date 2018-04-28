@@ -131,7 +131,7 @@ struct pcpresentation {
   unsigned long TorsionExp; // if >0, enforce TorsionExp*ai in next class
 };
 
-void InitPcPres(pcpresentation &, presentation &);
+void InitPcPres(pcpresentation &, presentation &, bool, unsigned long);
 void FreePcPres(pcpresentation &, presentation &);
 void AddNewTails(pcpresentation &, presentation &);
 void ReducePcPres(pcpresentation &, presentation &, gpvec *, unsigned);
@@ -201,5 +201,5 @@ void PrintNode(FILE *f, presentation &, node *);
 /* matrix functions */
 void HermiteNormalForm(gpvec **, unsigned *);
 bool AddRow(gpvec);
-void InitMatrix(pcpresentation &);
+void InitMatrix(pcpresentation &, unsigned);
 void FreeMatrix(void);

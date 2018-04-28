@@ -8,12 +8,12 @@
 #include "lienq.h"
 #include <algorithm>
 
-static unsigned NrRows, FirstCentral;
+static unsigned NrRows, FirstCentral, NrCols;
 static gpvec *Matrix;
 
-void InitMatrix(pcpresentation &pc) {
+void InitMatrix(pcpresentation &pc, unsigned nrcentralgens) {
   FirstCentral = pc.NrPcGens + 1;
-  unsigned nrcentralgens = NrTotalGens-pc.NrPcGens;
+  NrCols = nrcentralgens;
   Matrix = (gpvec *) malloc((nrcentralgens+1) * sizeof(gpvec));
   if (Matrix == NULL)
     abortprintf(2, "InitMatrix: malloc(Matrix) failed");
@@ -23,22 +23,30 @@ void InitMatrix(pcpresentation &pc) {
   else {
     NrRows = nrcentralgens;
     for (unsigned i = 0; i < nrcentralgens; i++) {
-      Matrix[i] = NewVec(NrTotalGens);
+      Matrix[i] = NewVec(NrCols);
       Matrix[i][0].g = pc.NrPcGens + i + 1;
       coeff_set_si(Matrix[i][0].c, pc.TorsionExp);
       Matrix[i][1].g = EOW;
     }
   }
 
-  Matrix[NrRows] = NewVec(NrTotalGens); // scratch row
+  Matrix[NrRows] = NewVec(NrCols); // scratch row
 }
 
 void FreeMatrix(void) {
   for (unsigned i = 0; i <= NrRows; i++)
-    FreeVec(Matrix[i], NrTotalGens);
+    FreeVec(Matrix[i], NrCols);
   free(Matrix);
 }
 
+// for debugging purposes
+void PrintMatrix(void) {
+  for (unsigned i = 0; i < NrRows; i++) {
+    PrintVec(stdout, Matrix[i]);
+    printf("\n");
+  }
+}
+    
 inline void SwapRows(unsigned i, unsigned j) {
   gpvec v = Matrix[i];
   Matrix[i] = Matrix[j];
@@ -113,7 +121,7 @@ bool AddRow(gpvec cv) {
 
       for (unsigned i = ++NrRows; i > row; i--)
 	Matrix[i] = Matrix[i-1];
-      Matrix[row] = NewVec(NrTotalGens);
+      Matrix[row] = NewVec(NrCols);
       Prod(Matrix[row], unit, p[parity]);
 
       for (unsigned j = row+1; j < NrRows; j++)
