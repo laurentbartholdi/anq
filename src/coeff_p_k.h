@@ -79,23 +79,22 @@ const uint64_t MONTGOMERY_RINV = (montgomery_gcdext(MONTGOMERY_R, MONTGOMERY_N, 
 const uint64_t MONTGOMERY_NPRIME = -montgomery_gcdext(MONTGOMERY_N, MONTGOMERY_R, 1, 0, 0, 1);
 
 const inline uint64_t montgomery_redc(uint128_t T) {
-  uint64_t m = ((uint64_t) T)*MONTGOMERY_NPRIME;
-  uint64_t t = (T + (uint128_t) m*MONTGOMERY_N) >> 64;
-  //  printf("m=%llu, t=%llu: ",m,t);
-  //  print_u128_u(T + (uint128_t) m*(uint128_t) MONTGOMERY_N); printf("\n");
-  return (t >= MONTGOMERY_N) ? t - MONTGOMERY_N : t;
+  uint64_t t_lo = T;
+  uint128_t m = t_lo * MONTGOMERY_NPRIME;
+  uint128_t s = T + m * MONTGOMERY_N;
+  uint128_t u = s >> 64;
+  if (s < T) u += MONTGOMERY_R - MONTGOMERY_N; // lost carry
+  if (u >= MONTGOMERY_N) u -= MONTGOMERY_N;
+  return u;
 }
 
 const inline coeff long2coeff(long l) {
-  return { .data = montgomery_redc((uint128_t) MONTGOMERY_RR * (uint128_t) l) };
-}
-
-const inline long coeff2long2(coeff c) {
-  return montgomery_redc(c.data);
+  uint64_t ul = (l >= 0) ? l : (int64_t) MONTGOMERY_N + l;
+  return { .data = montgomery_redc((uint128_t) MONTGOMERY_RR * ul) };
 }
 
 const inline coeff uint64_t2coeff(uint64_t l) {
-  return { .data = montgomery_redc((uint128_t) MONTGOMERY_RR * (uint128_t) l) };
+  return { .data = montgomery_redc((uint128_t) MONTGOMERY_RR * l) };
 }
 
 const inline uint64_t coeff2uint64_t(coeff c) {
@@ -123,7 +122,11 @@ inline void coeff_set_si(coeff &result, const long a) {
 }
 
 inline long coeff_get_si(const coeff &a) {
-  return montgomery_redc(a.data);
+  uint64_t r = montgomery_redc(a.data);
+  if (r > MONTGOMERY_N/2)
+    return r-MONTGOMERY_N;
+  else
+    return r;
 }
 
 inline void coeff_init(coeff &a) {
@@ -247,7 +250,8 @@ const inline coeff coeff_inverse_mod_si(uint64_t va) {
 #endif
 #endif
   for (unsigned i = 1; i < MODULUS_EXPONENT; i <<= 1) {
-    coeff temp = long2coeff(2);
+    coeff temp;
+    coeff_set_si(temp, 2);
     coeff_submul(temp, a, inverse);
     coeff_mul(inverse, inverse, temp);
   }

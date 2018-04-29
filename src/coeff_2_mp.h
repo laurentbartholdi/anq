@@ -47,6 +47,10 @@ struct coeff {
 };
 
 /* addition */
+inline void coeff_zero(coeff &a) {
+  mpn_zero(a.data, COEFF_WORDS);
+}
+
 inline bool coeff_z_p(const coeff &a) {
   return mpn_zero_p(a.data, COEFF_WORDS);
 }
@@ -60,7 +64,7 @@ inline void coeff_set(coeff &result, const coeff &a) {
 }
 
 inline void coeff_set_si(coeff &result, const long a) {
-  mpn_zero(result.data, COEFF_WORDS);
+  coeff_zero(result);
   if (a >= 0)
     result.data[0] = a;
   else {
@@ -114,12 +118,12 @@ inline int coeff_cmp(const coeff &a, const coeff &b) {
 /* I don't know how to implement a meaningful compare on residue classes. Let's return 0 or 1 */
 inline int coeff_cmp_si(const coeff &a, long b) {
   if (b >= 0)
-    return a.data[0] != b || !mpn_zero_p(a.data+1, COEFF_WORDS-1);
+    return a.data[0] != (unsigned long) b || !mpn_zero_p(a.data+1, COEFF_WORDS-1);
   else {
     coeff c;
     mpn_add_1(c.data, a.data, COEFF_WORDS, -b);
     c.data[COEFF_WORDS-1] &= COEFF_MASK;
-    return !mpn_zero(c.data, COEFF_WORDS);
+    return coeff_nz_p(c);
   }
 }
 
@@ -129,7 +133,7 @@ inline unsigned __nzlimbs(const mp_limb_t *a, unsigned na) {
 }
 
 inline void __singlebit(coeff &a, unsigned shift) {
-  mpn_zero(a.data, COEFF_WORDS);
+  coeff_zero(a);
   a.data[shift / GMP_LIMB_BITS] = 1ULL << (shift % GMP_LIMB_BITS);
 }
 		     
@@ -198,16 +202,16 @@ inline void coeff_swap(coeff &a, coeff &b, coeff &tmp) {
 }
 
 inline void inverse_mod_2_k(coeff &result, const coeff &a, unsigned shift) {
-  mp_limb_t shifteda[COEFF_WORDS];
+  coeff shifteda;
 
-  mpn_zero(shifteda, COEFF_WORDS);
-  mpn_rshift(shifteda, a.data + shift/GMP_LIMB_BITS, COEFF_WORDS - shift/GMP_LIMB_BITS, shift%GMP_LIMB_BITS);
+  coeff_zero(shifteda);
+  mpn_rshift(shifteda.data, a.data + shift/GMP_LIMB_BITS, COEFF_WORDS - shift/GMP_LIMB_BITS, shift%GMP_LIMB_BITS);
 
-  mpn_copyi(result.data, shifteda, COEFF_WORDS); // already 3 correct bits
+  coeff_set(result, shifteda); // already 3 correct bits
   for (unsigned i = 3; i < MODULUS_EXPONENT; i <<= 1) {
     // result *= 2-shifteda*result
     mp_limb_t temp[2*COEFF_WORDS], temp2[2*COEFF_WORDS];
-    mpn_mul_n(temp, shifteda, result.data, COEFF_WORDS);
+    mpn_mul_n(temp, shifteda.data, result.data, COEFF_WORDS);
     mpn_sub_1(temp2, temp, COEFF_WORDS, 2);
     mpn_neg(temp, temp2, COEFF_WORDS);
     mpn_mul_n(temp2, result.data, temp, COEFF_WORDS);
@@ -216,7 +220,7 @@ inline void inverse_mod_2_k(coeff &result, const coeff &a, unsigned shift) {
 }
 
 inline void coeff_gcdext(coeff &gcd, coeff &s, coeff &t, const coeff &a, const coeff &b) {
-  unsigned aval = mpn_zero_p(a.data, COEFF_WORDS) ? -1 : mpn_scan1(a.data, 0),
+  unsigned aval = coeff_z_p(a) ? -1 : mpn_scan1(a.data, 0),
     bval = mpn_scan1(b.data, 0);
 
   if (aval >= bval) {

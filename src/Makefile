@@ -24,11 +24,10 @@ endif
 
 LIENQ_OBJ = fppresentation.o pcpresentation.o print.o operations.o matrix.o consistency.o tails.o auxiliary.o lienq.o
 
-all: lienq_long lienq_2_64 lienq_2_320 lienq_3_39 lienq_5_27 lienq_mpz
-
+all: lienq_2_64 lienq_2_320 lienq_3_39 lienq_5_27 lienq_5_100 lienq_long lienq_mpz
 
 clean:
-	rm -f *.o lienq
+	rm -fr *.o lienq_[0-9]*_[0-9]* lienq_mpz lienq_long lienq_z *.dSYM
 
 lienq_mpz: $(subst .o,_mpz.o,$(LIENQ_OBJ))
 	$(CXX) -o $@ $^ -lgmp
@@ -99,6 +98,9 @@ lienq_5_100: $(subst .o,_5_100.o,$(LIENQ_OBJ))
 
 %_5_100.o: %.cc lienq.h coeff.h coeff_p_mp.h
 	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=5 -DMODULUS_EXPONENT=100 $(CXXFLAGS) $(LIENQVERSION) $< -o $@
+
+coeff_test: coeff_test.cc coeff.h coeff_2_k.h coeff_p_k.h coeff_2_mp.h coeff_p_mp.h
+	$(CXX) -o $@ coeff_test.cc -lgmp
 
 test: test.cc
 
