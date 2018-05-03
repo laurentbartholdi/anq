@@ -452,9 +452,8 @@ static void ValidateLieExpression(node *n, gen g) {
   }
 }
 
-unsigned ReadPresentation(presentation &pres, const char *InputFileName) {
+void ReadPresentation(presentation &pres, const char *InputFileName) {
   bool readstdin = (InputFileName[0] == '-' && InputFileName[1] == 0);
-  unsigned uptoclass = 0;
   
   if (readstdin)
     InFp = stdin;
@@ -473,11 +472,6 @@ unsigned ReadPresentation(presentation &pres, const char *InputFileName) {
   
   NextToken(); // start parsing
 
-  if (Token == NUMBER) {
-    uptoclass = coeff_get_si(N);
-    NextToken();
-  }
-  
   if (Token == LANGLE)
     NextToken();
   else
@@ -520,14 +514,14 @@ unsigned ReadPresentation(presentation &pres, const char *InputFileName) {
       n->cont.bin = {.l = n->cont.bin.r, .r = n->cont.bin.l};
     }
     if (n->type == TREL) {
-      ValidateLieExpression(n->cont.bin.l, (gen) -1);
-      ValidateLieExpression(n->cont.bin.r, (gen) -1);
+      ValidateLieExpression(n->cont.bin.l, EOW);
+      ValidateLieExpression(n->cont.bin.r, EOW);
     } else if (n->type == TDREL) {
       if (n->cont.bin.l->type != TGEN)
 	SyntaxError("LHS should be generator, not %s", nodename[n->cont.bin.l->type]);
       ValidateLieExpression(n->cont.bin.r, n->cont.bin.l->cont.g);
     } else
-      ValidateLieExpression(n, (gen) -1);
+      ValidateLieExpression(n, EOW);
 
     if (n->type == TDREL)
       pres.Aliases.push_back(n);
@@ -546,7 +540,7 @@ unsigned ReadPresentation(presentation &pres, const char *InputFileName) {
 
     while (is_relation(Token)) {
       node *n = Expression(pres, 0);
-      ValidateLieExpression(n, (gen) -1);
+      ValidateLieExpression(n, EOW);
       pres.Extra.push_back(n);
       if (Token == COMMA)
 	NextToken();
@@ -562,8 +556,6 @@ unsigned ReadPresentation(presentation &pres, const char *InputFileName) {
     fclose(InFp);
 
   coeff_clear(N);
-  
-  return uptoclass;
 }
 
 void FreePresentation(presentation &Pres) {
@@ -575,7 +567,7 @@ void FreePresentation(presentation &Pres) {
     FreeNode(n);
 }
 
-void PrintNode(FILE *f, presentation &pres, node *n) {
+void PrintNode(FILE *f, const presentation &pres, node *n) {
   switch (n->type) {
   case TNUM:
     coeff_out_str(f, n->cont.n);
@@ -659,7 +651,7 @@ void PrintNode(FILE *f, presentation &pres, node *n) {
 ** generators.
 */
 
-void EvalRel(pcpresentation &pc, gpvec v, node *rel) {
+void EvalRel(const pcpresentation &pc, gpvec v, node *rel) {
   gpvec vl, vr;
   switch (rel->type) {
   case TSUM:
@@ -707,7 +699,7 @@ void EvalRel(pcpresentation &pc, gpvec v, node *rel) {
 }
 
 /* evaluate all relations, and add them to the relation matrix */
-void EvalAllRel(pcpresentation &pc, presentation &pres) {
+void EvalAllRel(const pcpresentation &pc, const presentation &pres) {
   gpvec v = FreshVec();
 
   for (auto n : pres.Aliases) {

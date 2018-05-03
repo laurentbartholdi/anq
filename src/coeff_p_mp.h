@@ -74,15 +74,14 @@ const coeff COEFF_N = __mpn_pow_ui(__mpn_ui(MODULUS_PRIME), MODULUS_EXPONENT);
 #if 0 // Montgomery arithmetic -- doesn't seem worth it
 const coeff MONTGOMERY_N = COEFF_N;
 
-inline doublecoeff __montgomery_r(void) {
+const doublecoeff MONTGOMERY_R = []{
   doublecoeff c;
   mpn_zero(c.data, 2*COEFF_WORDS);
   c.data[COEFF_WORDS] = 1;
   return c;
-}
-const doublecoeff MONTGOMERY_R = __montgomery_r();
+}();
 
-inline doublecoeff __montgomery_rr(void) {
+const doublecoeff MONGOMERY_RR = []{
   doublecoeff q, r, rr;
 
   // sanity check, do it once
@@ -97,16 +96,13 @@ inline doublecoeff __montgomery_rr(void) {
   mpn_tdiv_qr(q.data, r.data, 0, rr.data, 2*COEFF_WORDS, MONTGOMERY_N.data, COEFF_WORDS);
   mpn_zero(r.data+COEFF_WORDS, COEFF_WORDS);
   return r;
-}
-const doublecoeff MONGOMERY_RR = __montgomery_rr();
+}();
 
-coeff __montgomery_rinv(void) {
-}
-const coeff MONTGOMERY_RINV = __montgomery_rinv();
+const coeff MONTGOMERY_RINV = []{
+}();
 
-coeff __montgomery_nprime(void) {
-}
-const coeff MONTGOMERY_NPRIME = __montgomery_nprime();
+const coeff MONTGOMERY_NPRIME = []{
+}();
 #endif
 
 inline void __reduce(coeff &result, doublecoeff a, unsigned len)
@@ -216,25 +212,29 @@ inline int coeff_cmp_si(const coeff &a, long b) {
 
 inline void coeff_fdiv_q(coeff &result, const coeff &a, const coeff &b) {
   unsigned nzlimbs = __nzlimbs(b.data, COEFF_WORDS);
-  mp_limb_t q[COEFF_WORDS], r[COEFF_WORDS];
-  mpn_tdiv_qr(q, r, 0, a.data, COEFF_WORDS, b.data, nzlimbs);
-
+  coeff r;
   coeff_zero(result);
-  mpn_copyi(result.data, q, COEFF_WORDS-nzlimbs+1);
+  mpn_tdiv_qr(result.data, r.data, 0, a.data, COEFF_WORDS, b.data, nzlimbs);
 }
+
+#ifdef AVOID_MPN_DIVEXACT // internal to gmp >= 6, probably not portable
+#define coeff_divexact coeff_fdiv_q
+#else
+#define mpn_divexact __gmpn_divexact
+extern "C" void mpn_divexact (mp_ptr, mp_srcptr, mp_size_t, mp_srcptr, mp_size_t);
 
 inline void coeff_divexact(coeff &result, const coeff &a, const coeff &b) {
-  return coeff_fdiv_q(result, a, b);
-  // we should be able to call mpn_divexact !!!
+  unsigned nzlimbs = __nzlimbs(b.data, COEFF_WORDS);
+  coeff_zero(result);
+  mpn_divexact(result.data, a.data, COEFF_WORDS, b.data, nzlimbs);
 }
+#endif
 
 inline void coeff_fdiv_r(coeff &result, const coeff &a, const coeff &b) {
   unsigned nzlimbs = __nzlimbs(b.data, COEFF_WORDS);
-  mp_limb_t q[COEFF_WORDS], r[COEFF_WORDS];
-  mpn_tdiv_qr(q, r, 0, a.data, COEFF_WORDS, b.data, nzlimbs);
-
+  coeff q;
   coeff_zero(result);
-  mpn_copyi(result.data, r, nzlimbs);
+  mpn_tdiv_qr(q.data, result.data, 0, a.data, COEFF_WORDS, b.data, nzlimbs);
 }
 
 inline void coeff_mul(coeff &result, const coeff &a, const coeff &b) {
@@ -296,40 +296,76 @@ inline void coeff_inverse(coeff &result, const coeff &a) {
     mpn_copyi(result.data, s.data, slen);
 }
 
-inline unsigned coeff_pval(const coeff &a) {
-  coeff c = a;
-  unsigned val = 0;
+constexpr inline mp_limb_t powint(mp_limb_t x, mp_limb_t p) {
+  return p ? (p & 1 ? x : 1)*powint(x*x, p>>1) : 1;
+}
 
-  /* optimize: at minimum, divide by chunks of MODULUS_MAXEXPONENT first */
-  while (mpn_divrem_1(c.data, 0, c.data, COEFF_WORDS, MODULUS_PRIME) == 0)
-    val++;
+const mp_limb_t MODULUS_POWERS2[] = { MODULUS_PRIME,
+				  powint(MODULUS_PRIME,2),
+				  powint(MODULUS_PRIME,4),
+				  powint(MODULUS_PRIME,8),
+				  powint(MODULUS_PRIME,16),
+				  powint(MODULUS_PRIME,32) };
+constexpr inline unsigned lgint(mp_limb_t n) {
+  return n ? 1+lgint(n/2) : -1;
+}
+const mp_limb_t MODULUS_POWMAX = powint(MODULUS_PRIME,MODULUS_MAXEXPONENT);
+const unsigned logMODULUS_MAXEXPONENT = lgint(MODULUS_MAXEXPONENT);
 
+/* addition, MODULUS_PRIME-valuation of a.
+   Set result to a / largest power of MODULUS_PRIME dividing it */
+const inline unsigned coeff_val(coeff &result, const coeff &a) {
+  if (coeff_z_p(a))
+    return MODULUS_EXPONENT; // or infinity
+  
+  coeff c[2];
+  c[0] = a;
+  bool parity = false;
+    unsigned val = 0;
+
+  while (mpn_divrem_1(c[!parity].data, 0, c[parity].data, COEFF_WORDS, MODULUS_POWMAX) == 0) {
+    val += MODULUS_MAXEXPONENT;
+    parity = !parity;
+  }
+
+  for (int i = logMODULUS_MAXEXPONENT; i >= 0; i--)
+    if (mpn_divrem_1(c[!parity].data, 0, c[parity].data, COEFF_WORDS, MODULUS_POWERS2[i]) == 0) {
+      val += 1 << i;
+      parity = !parity;
+    }
+
+  result = c[parity];
   return val;
 }
   
 /* gcd = s*a + t*b */
 const inline void coeff_gcdext(coeff &gcd, coeff &s, coeff &t, const coeff &a, const coeff &b) {
-  coeff_set_si(gcd, 1);
+#if 0 // 0 has valuation MODULUS_EXPONENT, everything fine
+  if (coeff_z_p(a)) {
+    coeff_set(gcd, b);
+    coeff_set_si(s, 0);
+    coeff_set_si(t, 1);
+    return;
+  }
+  if (coeff_z_p(b)) {
+    coeff_set(gcd, a);
+    coeff_set_si(s, 1);
+    coeff_set_si(t, 0);
+    return;
+  }
+#endif
 
-  coeff c[2], d[2];
-  bool parity = false;
-  c[parity] = a;
-  d[parity] = b;
+  coeff va, vb;
+  unsigned vala = coeff_val(va, a), valb = coeff_val(vb, b);
 
-  for (;;) {
-    mp_limb_t ra = mpn_divrem_1(c[!parity].data, 0, c[parity].data, COEFF_WORDS, MODULUS_PRIME);
-    mp_limb_t rb = mpn_divrem_1(d[!parity].data, 0, d[parity].data, COEFF_WORDS, MODULUS_PRIME);
-    if (rb != 0) {
-      coeff_zero(s);
-      coeff_inverse(t, d[parity]);
-      break;
-    } else if (ra != 0) {
-      coeff_inverse(s, c[parity]);
-      coeff_zero(t);
-      break;
-    }
-    mpn_mul_1(gcd.data, gcd.data, COEFF_WORDS, MODULUS_PRIME);
-    parity = !parity;
+  if (vala > valb) {
+    gcd = __mpn_pow_ui(__mpn_ui(MODULUS_PRIME), valb);
+    coeff_zero(s);
+    coeff_inverse(t, vb);
+  } else {
+    gcd = __mpn_pow_ui(__mpn_ui(MODULUS_PRIME), vala);
+    coeff_inverse(s, va);
+    coeff_zero(t);
   }
 }
 
@@ -346,24 +382,11 @@ const inline void coeff_unit_annihilator(coeff &unit, coeff &annihilator, const 
     coeff_set_si(annihilator, 1);
     return;
   }
-  
-  coeff c[2];
-  bool parity = false, first = true;
-  coeff_set(annihilator, COEFF_N);  
-  c[parity] = a;
 
-  for (;;) {
-    mp_limb_t ra = mpn_divrem_1(c[!parity].data, 0, c[parity].data, COEFF_WORDS, MODULUS_PRIME);
-    if (ra != 0) {
-      coeff_inverse(unit, c[parity]);
-      if (first)
-	coeff_zero(annihilator);
-      break;
-    }
-    mpn_divexact_1(annihilator.data, annihilator.data, COEFF_WORDS, MODULUS_PRIME);
-    parity = !parity;
-    first = false;
-  }
+  coeff va;
+  unsigned vala = coeff_val(va, a);
+  coeff_inverse(unit, va);
+  annihilator = __mpn_pow_ui(__mpn_ui(MODULUS_PRIME), MODULUS_EXPONENT-vala);
 }
 
 inline int coeff_out_str(FILE *f, const coeff &a)

@@ -7,28 +7,28 @@
 
 #include "lienq.h"
 #include <algorithm>
+#include <map>
 
 static unsigned NrRows, FirstCentral, NrCols;
 static gpvec *Matrix;
 
-void InitMatrix(pcpresentation &pc, unsigned nrcentralgens) {
+void InitMatrix(const pcpresentation &pc, unsigned nrcentralgens) {
   FirstCentral = pc.NrPcGens + 1;
   NrCols = nrcentralgens;
   Matrix = (gpvec *) malloc((nrcentralgens+1) * sizeof(gpvec));
   if (Matrix == NULL)
     abortprintf(2, "InitMatrix: malloc(Matrix) failed");
 
-  if (pc.TorsionExp == 0)
-    NrRows = 0;
-  else {
+  if (pc.PAlgebra) {
     NrRows = nrcentralgens;
     for (unsigned i = 0; i < nrcentralgens; i++) {
       Matrix[i] = NewVec(NrCols);
       Matrix[i][0].g = pc.NrPcGens + i + 1;
-      coeff_set_si(Matrix[i][0].c, pc.TorsionExp);
+      coeff_set(Matrix[i][0].c, pc.TorsionExp);
       Matrix[i][1].g = EOW;
     }
-  }
+  } else
+    NrRows = 0;
 
   Matrix[NrRows] = NewVec(NrCols); // scratch row
 }
@@ -70,14 +70,17 @@ void ReduceRow(unsigned row, gpvec &w) {
     }
 }
 
-void HermiteNormalForm(gpvec **rels, unsigned *numrels) {
+relmatrix HermiteNormalForm(void) {
   /* reduce all the head columns, to achieve Hermite normal form. */
   for (unsigned i = 1; i < NrRows; i++)
     for (unsigned j = 0; j < i; j++)
       ReduceRow(j, Matrix[i]);
 
-  *rels = Matrix;
-  *numrels = NrRows;
+  relmatrix r;
+  r.reserve(NrRows);
+  for (unsigned i = 0; i < NrRows; i++)
+    r.push_back(Matrix[i]);
+  return r;
 }
 
 #if 0

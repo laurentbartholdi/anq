@@ -8,9 +8,9 @@
 #define MODULUS_PRIME 18446744073709551557ULL
 #elif 0
 #define MODULUS_PRIME 4294967291ULL
-#elif 1
-#define MODULUS_PRIME 5
 #elif 0
+#define MODULUS_PRIME 5
+#elif 1
 #define MODULUS_PRIME 3
 #elif 0
 #define MODULUS_PRIME 2

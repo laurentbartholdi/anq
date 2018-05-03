@@ -19,7 +19,7 @@
 */
 
 /* v += [[a,b],c] */
-void TripleProduct(pcpresentation &pc, gpvec &v, gen a, gen b, gen c) {
+void TripleProduct(const pcpresentation &pc, gpvec &v, gen a, gen b, gen c) {
   gpvec temp[2];
   temp[0] = FreshVec();
   temp[1] = FreshVec();
@@ -56,7 +56,7 @@ void TripleProduct(pcpresentation &pc, gpvec &v, gen a, gen b, gen c) {
 **  and  <a> < <b> < <c>  with respect to the linear ordering of the
 **  generators.
 */
-static void CheckJacobi(pcpresentation &pc, gen a, gen b, gen c) {
+static void CheckJacobi(const pcpresentation &pc, gen a, gen b, gen c) {
   gpvec temp1 = FreshVec();
   gpvec temp2 = FreshVec();
   gpvec temp3 = FreshVec();
@@ -86,7 +86,7 @@ static void CheckJacobi(pcpresentation &pc, gen a, gen b, gen c) {
 **  of the argument with its relation.
 **
 */
-static void CheckPower(pcpresentation &pc, gen a, gen b) {
+static void CheckPower(const pcpresentation &pc, gen a, gen b) {
   gpvec temp[2];
   temp[0] = FreshVec();
   temp[1] = FreshVec();
@@ -125,7 +125,7 @@ static void CheckPower(pcpresentation &pc, gen a, gen b) {
 /* if N*v = 0 in our ring, and we have a power relation A*g = w,
  * enforce (N/A)*w = 0
  */
-static void CheckTorsion(pcpresentation &pc, unsigned i) {
+static void CheckTorsion(const pcpresentation &pc, unsigned i) {
   gpvec temp1 = FreshVec(), temp2 = FreshVec();
   coeff annihilator, unit;
   coeff_init(annihilator);
@@ -153,13 +153,13 @@ static void CheckTorsion(pcpresentation &pc, unsigned i) {
   PopVec();
 }
 
-void Consistency(pcpresentation &pc) {
+void Consistency(const pcpresentation &pc) {
   for (unsigned i = 1; i <= pc.NrPcGens; i++) {
-    if (pc.Definition[i].t != DGEN)
+    if (pc.Generator[i].t != DGEN)
       continue;
     for (unsigned j = i + 1; j <= pc.NrPcGens; j++)
       for (unsigned k = j + 1; k <= pc.NrPcGens; k++) {
-	unsigned totalweight = pc.Weight[i] + pc.Weight[j] + pc.Weight[k];
+	unsigned totalweight = pc.Generator[i].w + pc.Generator[j].w + pc.Generator[k].w;
 	if (totalweight > pc.Class || (pc.Graded && totalweight != pc.Class))
 	  continue;
 	
@@ -172,7 +172,7 @@ void Consistency(pcpresentation &pc) {
       CheckTorsion(pc, i);
 
       for (unsigned j = 1; j <= pc.NrPcGens; j++) {
-	unsigned totalweight = pc.Weight[i] + pc.Weight[j];
+	unsigned totalweight = pc.Generator[i].w + pc.Generator[j].w;
 	if (totalweight > pc.Class || (pc.Graded && totalweight != pc.Class))
 	  continue;
   	

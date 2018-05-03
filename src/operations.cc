@@ -168,7 +168,7 @@ void Diff(gpvec vec0, constgpvec vec1, constgpvec vec2) {
  there into vec0.
 ****************************************************************/
 /* vec0 = [ vec1, vec2 ] */
-void LieBracket(pcpresentation &pc, gpvec vec0, constgpvec vec1, constgpvec vec2) {
+void LieBracket(const pcpresentation &pc, gpvec vec0, constgpvec vec1, constgpvec vec2) {
   gpvec temp[2];
   bool parity = false;
   temp[0] = FreshVec();
@@ -178,7 +178,7 @@ void LieBracket(pcpresentation &pc, gpvec vec0, constgpvec vec1, constgpvec vec2
   
   for (constgpvec p1 = vec1; p1->g != EOW; p1++)
     for (constgpvec p2 = vec2; p2->g != EOW; p2++)
-      if (p1->g <= pc.NrPcGens && p2->g <= pc.NrPcGens && pc.Weight[p1->g] + pc.Weight[p2->g] <= pc.Class) {
+      if (p1->g <= pc.NrPcGens && p2->g <= pc.NrPcGens && pc.Generator[p1->g].w + pc.Generator[p2->g].w <= pc.Class) {
         if (p1->g > p2->g) {
 	  coeff_mul(c, p1->c, p2->c);
 	  Sum(temp[!parity], temp[parity], c, pc.Product[p1->g][p2->g]);
@@ -202,7 +202,7 @@ void LieBracket(pcpresentation &pc, gpvec vec0, constgpvec vec1, constgpvec vec2
 
    We should do it with a container such as <map>
 */
-void Collect(pcpresentation &pc, gpvec vec0, constgpvec v) {
+void Collect(const pcpresentation &pc, gpvec vec0, constgpvec v) {
   gpvec temp[2], p;
   temp[0] = FreshVec();
   temp[1] = FreshVec();
@@ -242,7 +242,7 @@ void Collect(pcpresentation &pc, gpvec vec0, constgpvec v) {
   -- if shift<0, or reduced coeff=0, we may have space to accomodate Power[g]
   -- we should use a std::map in the full collect, see above
 */
-void ShrinkCollect(pcpresentation &pc, gpvec &v) {
+void ShrinkCollect(const pcpresentation &pc, gpvec &v) {
   int shift = 0;
   unsigned pos;
   for (pos = 0; v[pos].g != EOW; pos++) {

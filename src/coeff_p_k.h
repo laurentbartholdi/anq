@@ -226,56 +226,89 @@ const inline uint64_t inverse_mod_p(uint64_t a) {
   int64_t i = inverse_mod_p_rec(a, MODULUS_PRIME, 1, 0);
   if (i < 0) return i + MODULUS_PRIME; else return i;
 }
-				   
-const inline coeff coeff_inverse_mod_si(uint64_t va) {
-  coeff a = uint64_t2coeff(va);
-  coeff inverse =
+
+/* addition, modular inverse. result*a == 1 */
+const inline void coeff_inverse(coeff &result, const coeff &a) {
+  result =
 #if MODULUS_PRIME == 2
-#error Use COEFF_IS_MOD2_64 for MODULUS_PRIME=2
+#error Use coeff_2_k.h for MODULUS_PRIME=2
 #elif MODULUS_PRIME > 7
-  uint64_t2coeff(inverse_mod_p(va));
+  uint64_t2coeff(inverse_mod_p(coeff2uint64_t(a)));
 #else
-    a;
+  a;
 #if MODULUS_PRIME == 3 // a == a^-1 mod 3
 #elif MODULUS_PRIME == 5 // a^3 == a^-1 mod 5
-  coeff_mul(inverse, inverse, a);
-  coeff_mul(inverse, inverse, a);
+  coeff_mul(result, result, a);
+  coeff_mul(result, result, a);
 #elif MODULUS_PRIME == 7 // a^5 == a^-1 mod 7
   {
     coeff aa = a;
     coeff_mul(aa, a, a);
-    coeff_mul(inverse, inverse, aa);
-    coeff_mul(inverse, inverse, aa);
+    coeff_mul(result, result, aa);
+    coeff_mul(result, result, aa);
   }
 #endif
 #endif
   for (unsigned i = 1; i < MODULUS_EXPONENT; i <<= 1) {
     coeff temp;
     coeff_set_si(temp, 2);
-    coeff_submul(temp, a, inverse);
-    coeff_mul(inverse, inverse, temp);
+    coeff_submul(temp, a, result);
+    coeff_mul(result, result, temp);
   }
-  return inverse;
+}
+
+const uint64_t MODULUS_POWERS2[] = { MODULUS_PRIME,
+				  powint(MODULUS_PRIME,2),
+				  powint(MODULUS_PRIME,4),
+				  powint(MODULUS_PRIME,8),
+				  powint(MODULUS_PRIME,16),
+				  powint(MODULUS_PRIME,32) };
+constexpr inline unsigned lgint(uint64_t n) {
+  return n ? 1+lgint(n/2) : -1;
+}
+const unsigned logMODULUS_EXPONENT = lgint(MODULUS_EXPONENT);
+
+/* addition, MODULUS_PRIME-valuation of a.
+   Set result to a / largest power of MODULUS_PRIME dividing it */
+const inline unsigned coeff_val(coeff &result, const coeff &a) {
+  unsigned val = 0;
+  result = a;
+  for (int i = logMODULUS_EXPONENT; i >= 0; i--) {
+    if (result.data % MODULUS_POWERS2[i] == 0) {
+      result.data /= MODULUS_POWERS2[i];
+      val += 1 << i;
+    }
+  }
+  return val;
 }
 
 const inline void coeff_gcdext(coeff &gcd, coeff &s, coeff &t, const coeff &a, const coeff &b) {
-  uint64_t va = coeff2uint64_t(a), vb = coeff2uint64_t(b), vgcd = 1;
-
-  /* this could be written in log(MODULUS_EXPONENT) steps rather than MODULUS_EXPONENT */
-  while (va % MODULUS_PRIME == 0 && vb % MODULUS_PRIME == 0) {
-    va /= MODULUS_PRIME;
-    vb /= MODULUS_PRIME;
-    vgcd *= MODULUS_PRIME;
+#if 0 // 0 has valuation 2^(logMODULUS_EXPONENT+1)-1, everything fine
+  if (coeff_z_p(a)) {
+    coeff_set(gcd, b);
+    coeff_set_si(s, 0);
+    coeff_set_si(t, 1);
+    return;
   }
+  if (coeff_z_p(b)) {
+    coeff_set(gcd, a);
+    coeff_set_si(s, 1);
+    coeff_set_si(t, 0);
+    return;
+  }
+#endif
 
-  gcd = uint64_t2coeff(vgcd);
+  coeff va, vb;
+  unsigned vala = coeff_val(va, a), valb = coeff_val(vb, b);
 
-  if (va % MODULUS_PRIME == 0) {
-    s.data = 0;
-    t = coeff_inverse_mod_si(vb);
+  if (vala > valb) {
+    gcd = uint64_t2coeff(powint(MODULUS_PRIME,valb));
+    s = uint64_t2coeff(0);
+    coeff_inverse(t, vb);
   } else {
-    s = coeff_inverse_mod_si(va);
-    t.data = 0;
+    gcd = uint64_t2coeff(powint(MODULUS_PRIME,vala));
+    coeff_inverse(s, va);
+    t = uint64_t2coeff(0);
   }
 }   
 
@@ -289,22 +322,16 @@ const inline bool coeff_reduced_p(const coeff &a, const coeff &b) {
 /* addition, returns unit and generator of annihilator ideal:
    a*unit is canonical (MODULUS_PRIME^n) and a*annihilator=0 */
 const inline void coeff_unit_annihilator(coeff &unit, coeff &annihilator, const coeff &a) {
-  uint64_t va = coeff2uint64_t(a), vgcd = 1;
-
-  if (va == 0) {
+  if (a.data == 0) {
     unit = uint64_t2coeff(0);
     annihilator = uint64_t2coeff(1);
     return;
   }
 
-  /* this could be written in log(MODULUS_EXPONENT) steps rather than MODULUS_EXPONENT */
-  while (va % MODULUS_PRIME == 0) {
-    va /= MODULUS_PRIME;
-    vgcd *= MODULUS_PRIME;
-  }
-
-  unit = coeff_inverse_mod_si(va);
-  annihilator = uint64_t2coeff(MONTGOMERY_N / vgcd);
+  coeff va;
+  unsigned vala = coeff_val(va, a);
+  coeff_inverse(unit, va);
+  annihilator = uint64_t2coeff(powint(MODULUS_PRIME,MODULUS_EXPONENT-vala));
 }
 
 inline int coeff_out_str(FILE *f, const coeff &a)

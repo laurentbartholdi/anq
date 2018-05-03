@@ -42,7 +42,7 @@ void TimeStamp(const char *s) {
   }
 }
 
-void PrintVec(FILE *f, gpvec gv) {
+void PrintVec(FILE *f, constgpvec gv) {
   for (unsigned i = 0; gv[i].g != EOW; i++) {
     if (i) fprintf(f, " + ");
     coeff_out_str(f, gv[i].c);
@@ -50,13 +50,13 @@ void PrintVec(FILE *f, gpvec gv) {
   }
 }
 
-void PrintPcPres(FILE *f, pcpresentation &pc, presentation &pres, bool PrintCompact, bool PrintDefs, bool PrintZeros) {
+void PrintPcPres(FILE *f, const pcpresentation &pc, const presentation &pres, bool PrintCompact, bool PrintDefs, bool PrintZeros) {
   fprintf(f, "<\n");
 
   unsigned curclass = 0;
   bool first;
   for (unsigned i = 1; i <= pc.NrPcGens; i++) {
-    while (pc.Weight[i] > curclass) {
+    while (pc.Generator[i].w > curclass) {
       if (curclass++ > 0)
 	fprintf(f, ";\n");
       fprintf(f, "# generators of weight %d:\n", curclass);
@@ -73,7 +73,7 @@ void PrintPcPres(FILE *f, pcpresentation &pc, presentation &pres, bool PrintComp
   for (unsigned i = 1; i <= pres.NrGens; i++) {
     gen g = pc.Epimorphism[i]->g;
     fprintf(f, "# %10s |-->", pres.GeneratorName[i].c_str());
-    if (g && pc.Definition[g].t == DGEN && pc.Definition[g].g == i)
+    if (g && pc.Generator[g].t == DGEN && pc.Generator[g].g == i)
       fprintf(f, ": a%d\n", g);
     else {
       fprintf(f, " ");
@@ -87,33 +87,33 @@ void PrintPcPres(FILE *f, pcpresentation &pc, presentation &pres, bool PrintComp
       /* we know each element is defined as an iterated multiple of an iterated commutator of generators */
       
       fprintf(f, "#%10s a%d = ", "", i);
-      switch (pc.Definition[i].t) {
+      switch (pc.Generator[i].t) {
       case DCOMM:
-	fprintf(f, "[a%d,a%d] = ", pc.Definition[i].g, pc.Definition[i].h);
+	fprintf(f, "[a%d,a%d] = ", pc.Generator[i].g, pc.Generator[i].h);
 	break;
       case DPOW:
 	coeff_out_str(f, pc.Exponent[i]);
-	fprintf(f, "*a%d = ", pc.Definition[i].g);
+	fprintf(f, "*a%d = ", pc.Generator[i].g);
 	break;
       case DGEN:;
       }
 
       gen g = i;
-      while (pc.Definition[g].t == DPOW) {
+      while (pc.Generator[g].t == DPOW) {
 	coeff_out_str(f, pc.Exponent[g]);
 	fprintf(f,"*");
-	g = pc.Definition[g].g;
+	g = pc.Generator[g].g;
       }
       std::vector<gen> cv;
-      while (pc.Definition[g].t == DCOMM) {
-	cv.push_back(pc.Definition[g].h);
-	g = pc.Definition[g].g;
+      while (pc.Generator[g].t == DCOMM) {
+	cv.push_back(pc.Generator[g].h);
+	g = pc.Generator[g].g;
       }
       fprintf(f, "[");
       for (;;) {
-	if (pc.Definition[g].t != DGEN)
+	if (pc.Generator[g].t != DGEN)
 	  abortprintf(5, "Generator %d is not iterated multiple of iterated commutator of generators", i);
-	fprintf(f, "%s", pres.GeneratorName[pc.Definition[g].g].c_str());
+	fprintf(f, "%s", pres.GeneratorName[pc.Generator[g].g].c_str());
 	if (cv.empty())
 	  break;
 	g = cv.back();
@@ -135,7 +135,7 @@ void PrintPcPres(FILE *f, pcpresentation &pc, presentation &pres, bool PrintComp
       coeff_out_str(f, pc.Exponent[i]);
       fprintf(f, "*a%d", i);
       if (pc.Power[i] != NULL && pc.Power[i]->g != EOW) {
-	if (pc.Definition[pc.Power[i]->g].t == DPOW && pc.Definition[pc.Power[i]->g].g == i)
+	if (pc.Generator[pc.Power[i]->g].t == DPOW && pc.Generator[pc.Power[i]->g].g == i)
 	  fprintf(f, " =: a%d", pc.Power[i]->g);
 	else {
 	  fprintf(f, " = ");
@@ -152,7 +152,7 @@ void PrintPcPres(FILE *f, pcpresentation &pc, presentation &pres, bool PrintComp
     for (unsigned i = 1; i < j; i++) {
       gen g = pc.Product[j][i]->g;
       if (PrintCompact) {
-	if (pc.Definition[i].t != DGEN || pc.Definition[j].t == DPOW)
+	if (pc.Generator[i].t != DGEN || pc.Generator[j].t == DPOW)
 	  continue;
       } else {
 	if (!PrintZeros && g == EOW)
@@ -162,7 +162,7 @@ void PrintPcPres(FILE *f, pcpresentation &pc, presentation &pres, bool PrintComp
 	fprintf(f, ",\n");
       fprintf(f, "%10s[ a%d, a%d ]", "", j, i);
       if (g != EOW) {
-	if (pc.Definition[g].g == j && pc.Definition[g].h == i)
+	if (pc.Generator[g].g == j && pc.Generator[g].h == i)
 	  fprintf(f, " =: a%d", pc.Product[j][i]->g);
 	else {
 	  fprintf(f, " = ");
@@ -192,7 +192,7 @@ void PrintPcPres(FILE *f, pcpresentation &pc, presentation &pres, bool PrintComp
   fprintf(f, " >\n");
 }
 
-bool PrintGAPVec(FILE *f, gpvec v, bool first) {
+bool PrintGAPVec(FILE *f, constgpvec v, bool first) {
   for (; v->g != EOW; v++) {
     if (first)
       fprintf(f, " + ");
@@ -203,7 +203,7 @@ bool PrintGAPVec(FILE *f, gpvec v, bool first) {
   return first;
 }
   
-void PrintGAPPres(FILE *f, pcpresentation &pc, presentation &pres) {
+void PrintGAPPres(FILE *f, const pcpresentation &pc, const presentation &pres) {
   fprintf(f, "LoadPackage(\"liering\");\n"
 	  "F := FreeLieRing(Integers,[");
   for (unsigned i = 1; i <= pres.NrGens; i++)

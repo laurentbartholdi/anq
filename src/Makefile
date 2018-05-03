@@ -5,7 +5,7 @@
 ##                                                           schcs@math.klte.hu
 ##
 
-LIENQVERSION = -DVERSION='"3.2.0 2018-04-27"'
+LIENQVERSION = -DVERSION='"3.2.1 2018-05-02"'
 OPT = -O0 #3
 DEBUG = -g -ggdb
 CXXFLAGS = -std=gnu++11 -Wall -Werror $(DEBUG) $(OPT)

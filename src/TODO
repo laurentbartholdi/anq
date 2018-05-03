@@ -15,8 +15,12 @@
 
 * Make TotalGens local to pcpresentation.cc, possibly with an "ExtendPresentation" doing all the work
 
-* Add high-precision modular arithmetic
-
 * Finish z.h fastint arithmetic
 
 * Add option to kill all N-fold commutators
+
+* Complete arithmetic test suite
+
+* Use C++ streams rather than fprintf
+
+* Make TorsionExp a coeff, not a ulong

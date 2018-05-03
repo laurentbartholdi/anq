@@ -19,14 +19,14 @@
  * - if i is defined as N*g, compute [j,i] = N*[j,g]
  * - if j is defined as N*g, compute [j,i] = N*[g,i] or -N*[i,g]
  */
-static bool AdjustTail(pcpresentation &pc, gen j, gen i) {
-  if (pc.Definition[i].t == DGEN && pc.Definition[j].t != DPOW) /* nothing to do, [aj,ai] is a defining generator */
+static bool AdjustTail(const pcpresentation &pc, gen j, gen i) {
+  if (pc.Generator[i].t == DGEN && pc.Generator[j].t != DPOW) /* nothing to do, [aj,ai] is a defining generator */
     return true;
 
   gpvec tail = FreshVec();
 
-  if (pc.Definition[i].t == DCOMM) { /* ai = [g,h] */
-    gen g = pc.Definition[i].g, h = pc.Definition[i].h;
+  if (pc.Generator[i].t == DCOMM) { /* ai = [g,h] */
+    gen g = pc.Generator[i].g, h = pc.Generator[i].h;
 
     gpvec agh = FreshVec();
     TripleProduct(pc, agh, j, g, h);
@@ -41,8 +41,8 @@ static bool AdjustTail(pcpresentation &pc, gen j, gen i) {
 
     if (Debug >= 2)
       fprintf(LogFile, "# tail: [a%d,a%d] = [a%d,[a%d,a%d]] = ", j, i, j, g, h);
-  } else if (pc.Definition[i].t == DPOW) { /* ai=N*g */
-    gen g = pc.Definition[i].g;
+  } else if (pc.Generator[i].t == DPOW) { /* ai=N*g */
+    gen g = pc.Generator[i].g;
     gpvec v = FreshVec();
     Prod(v, pc.Exponent[g], pc.Product[j][g]);
     Collect(pc, tail, v);
@@ -54,7 +54,7 @@ static bool AdjustTail(pcpresentation &pc, gen j, gen i) {
       fprintf(LogFile, "*[a%d,a%d] = ", j, g);
     }
   } else { /* aj = N*g */
-    gen g = pc.Definition[j].g;
+    gen g = pc.Generator[j].g;
     gpvec v = FreshVec();
     if (g > i)
       Prod(v, pc.Exponent[g], pc.Product[g][i]);
@@ -91,10 +91,10 @@ static bool AdjustTail(pcpresentation &pc, gen j, gen i) {
   return true;
 }
 
-void ComputeTails(pcpresentation &pc) {
+void ComputeTails(const pcpresentation &pc) {
   for (unsigned i = 1; i <= pc.NrPcGens; i++) {
     for (unsigned j = i + 1; j <= pc.NrPcGens; j++) {
-      unsigned totalweight = pc.Weight[i]+pc.Weight[j];
+      unsigned totalweight = pc.Generator[i].w+pc.Generator[j].w;
       if (totalweight > pc.Class || (pc.Graded && totalweight != pc.Class))
 	continue;
       

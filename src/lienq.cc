@@ -23,7 +23,9 @@ const char USAGE[] = "Usage: lienq <options> (<inputfile> | \"-\") [<maximal cla
   "\t[-F <outputfile>]\n"
   "\t[-G]\ttoggle graded Lie algebra, default false\n"
   "\t[-L <logfile>]\n"
+  "\t[-N <nilpotency class>]\n"
   "\t[-P]\ttoggle printing definitions of basic commutators, default false\n"
+  "\t[-W <maximal weight>]\n"
   "\t[-X <exponent>]\tset exponent for p-central series, default 0\n"
   "\t[-Z]\ttoggle printing zeros in multiplication table, default false";
 
@@ -39,12 +41,14 @@ static const char *plural(unsigned n) {
 }
 
 int main(int argc, char **argv) {
-  char flags[24] = "";
+  char flags[1000] = "";
   int c;
-  bool PrintZeros = false, PrintCompact = true, PrintDefs = false, Gap = false, Graded = false;
-  unsigned long TorsionExp = 0;
-  
-  while ((c = getopt (argc, argv, "ADF:GL:PX:Z")) != -1)
+  bool PrintZeros = false, PrintCompact = true, PrintDefs = false, Gap = false, Graded = false, PAlgebra = false;
+  coeff TorsionExp;
+  coeff_init_set_si(TorsionExp, 0);
+  unsigned MaxWeight = INFINITY, NilpotencyClass = INFINITY;
+
+  while ((c = getopt (argc, argv, "ADF:GL:N:PX:W:Z")) != -1)
     switch (c) {
     case 'A':
       Gap = !Gap;
@@ -62,7 +66,7 @@ int main(int argc, char **argv) {
       OutputFile = fopen(optarg, "w");
       if (OutputFile == NULL)
 	abortprintf(1, "I can't open output file '%s'", optarg);
-      sprintf(flags + strlen(flags), "-F '%s' ", optarg);
+      sprintf(flags + strlen(flags), "-F'%s' ", optarg);
       break;
     case 'G':
       Graded = !Graded;
@@ -72,15 +76,25 @@ int main(int argc, char **argv) {
       LogFile = fopen(optarg, "w");
       if (LogFile == NULL)
 	abortprintf(1, "I can't open log file '%s'", optarg);
-      sprintf(flags + strlen(flags), "-L '%s' ", optarg);
+      sprintf(flags + strlen(flags), "-L'%s' ", optarg);
+      break;
+    case 'N':
+      NilpotencyClass = atoi(optarg);
+      sprintf(flags + strlen(flags), "-N%u ", NilpotencyClass);
       break;
     case 'P':
       PrintDefs = !PrintDefs;
       strcat(flags, "-P ");
       break;
     case 'X':
-      TorsionExp = atol(optarg);
-      sprintf(flags + strlen(flags), "-X %lu ", TorsionExp);
+      PAlgebra = true;
+      // replace by: coeff_get_str !!!
+      coeff_set_si(TorsionExp, atol(optarg));
+      sprintf(flags + strlen(flags), "-X%lu ", coeff_get_si(TorsionExp));
+      break;
+    case 'W':
+      MaxWeight = atoi(optarg);
+      sprintf(flags + strlen(flags), "-W%u ", MaxWeight);
       break;
     case 'Z':
       PrintZeros = !PrintZeros;
@@ -90,31 +104,24 @@ int main(int argc, char **argv) {
       abortprintf(1, "Undefined flag '%c'\n%s", c, USAGE);
     }
   
-  if (optind >= argc)
-    abortprintf(1, "I need at least one name as input file\n%s", USAGE);
+  if (optind != argc-1)
+    abortprintf(1, "I need precisely one name as input file\n%s", USAGE);
 
   char *InputFileName = argv[optind++];
   presentation fppres;
-  unsigned UpToClass = ReadPresentation(fppres, InputFileName);
+  ReadPresentation(fppres, InputFileName);
   
-  if (optind < argc)
-    UpToClass = atoi(argv[optind]);
-
   char hostname[128];
-  char timestring[26];
-  time_t t = time((time_t *) 0);
-  strcpy(timestring, ctime(&t));
-  
   gethostname(hostname, 128);
-  fprintf(LogFile, "# The Lie algebra Nilpotent Quotient Program\n"
-	  "# for calculating nilpotent quotients in finitely presented Lie rings by Csaba Schneider.\n");
-  fprintf(LogFile, "# Program:\t%s, version %s\n", argv[0], VERSION);
-  fprintf(LogFile, "# Machine:\t%s\n", hostname);
-  fprintf(LogFile, "# Coefficients:\t%s\n", COEFF_ID);
-  fprintf(LogFile, "# Input file:\t%s\n", InputFileName);
-  fprintf(LogFile, "# Start time:\t%s", timestring);
-  fprintf(LogFile, "# Class:\t%d\n", UpToClass);
-  fprintf(LogFile, "# Flags:\t'%s'\n\n", flags);
+  
+  time_t t = time((time_t *) 0);
+  char timestring[128];
+  strftime(timestring, 128, "%c", localtime(&t));
+  
+  fprintf(LogFile, "# The Lie algebra Nilpotent Quotient Program, by Csaba Schneider & Laurent Bartholdi\n");
+  fprintf(LogFile, "# Version %s, coefficients %s\n", VERSION, COEFF_ID);
+  fprintf(LogFile, "# \"%s %s%s\" started %s on %s\n", argv[0], flags, InputFileName, timestring, hostname);
+  fprintf(LogFile, "# nilpotency class %u; maximal weight %u\n\n", NilpotencyClass, MaxWeight);
 
 #ifdef MEMCHECK
   mtrace();
@@ -122,11 +129,11 @@ int main(int argc, char **argv) {
 
   pcpresentation pc;
   
-  InitPcPres(pc, fppres, Graded, TorsionExp);
+  InitPcPres(pc, fppres, Graded, PAlgebra, TorsionExp, NilpotencyClass);
 
   TimeStamp("initialization");
   
-  for (pc.Class = 1; UpToClass == 0 || pc.Class <= UpToClass; pc.Class++) {
+  for (pc.Class = 1; pc.Class <= MaxWeight; pc.Class++) {
     unsigned oldnrpcgens = pc.NrPcGens;
 
     AddNewTails(pc, fppres); // add fresh tails
@@ -141,11 +148,9 @@ int main(int argc, char **argv) {
     
     EvalAllRel(pc, fppres); // evaluate relations
 
-    gpvec *rels;
-    unsigned numrels;
-    HermiteNormalForm(&rels, &numrels);
+    relmatrix rels = HermiteNormalForm();
     
-    ReducePcPres(pc, fppres, rels, numrels); // enforce relations
+    ReducePcPres(pc, fppres, rels); // enforce relations
 
     FreeMatrix();
     FreeStack();
@@ -162,7 +167,7 @@ int main(int argc, char **argv) {
     }
     fprintf(LogFile,"\n");
 
-    if (UpToClass == 0 && newgens == 0)
+    if (MaxWeight == INFINITY && newgens == 0)
       break;
   }
 
@@ -177,6 +182,7 @@ int main(int argc, char **argv) {
 
   FreePcPres(pc, fppres);
   FreePresentation(fppres);
-
+  coeff_clear(TorsionExp);
+  
   return 0;
 }

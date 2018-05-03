@@ -13,11 +13,13 @@
 #include <vector>
 #include <string>
 
+const unsigned INFINITY = -1;
+
 /****************************************************************
  * generators
  ****************************************************************/
 typedef unsigned gen;
-const gen EOW = (gen) 0;
+const gen EOW = (gen) -1; // larger than all others
 
 /****************************************************************
  * generator-coefficient pairs and vectors.
@@ -30,6 +32,8 @@ struct gpower {
 typedef gpower *gpvec;
 typedef const gpower *constgpvec;
 
+typedef std::vector<constgpvec> relmatrix;
+  
 /*
 ** An element in a lie-algebra is a sum of several multiplications. Hence it
 ** will be represented as a expresson-tree. For simplicity (from the user's
@@ -82,8 +86,9 @@ enum gendeftype {
 const gendeftype DINVALID = (gendeftype) -1;
   
 struct deftype {
-  gendeftype t;
-  gen g, h;
+  gendeftype t; // type
+  gen g, h; // arguments, at most two
+  unsigned w, cw; // weight and commutator weight
 };
 
 /****************************************************************
@@ -104,7 +109,7 @@ inline void Copy(gpvec vec1, constgpvec vec2) {
     coeff_set(vec1->c, vec2->c), vec1->g = vec2->g;
   vec1->g = EOW;
 }
-inline unsigned Length(gpvec vec) {
+inline unsigned Length(constgpvec vec) {
   unsigned l = 0;
   while (vec[l].g != EOW) l++;
   return l;
@@ -123,31 +128,32 @@ struct pcpresentation {
     *Epimorphism; // epimorphism from fppresentation: Epimorphism[xi] = ...
   coeff *Exponent, // the Exponent[i]*ai in next class
     *Annihilator; // Annihilator[i]*ai = 0 was enforced earlier
-  deftype *Definition; // Definition[i] defines ai in terms of previous aj
-  unsigned *Weight; // Weight[i] = class in which ai is introduced
+  deftype *Generator; // Generator[i] defines ai in terms of previous aj
   unsigned Class, // current class
     NrPcGens; // number of ai in current consistent pc presentation
   bool Graded; // is it a graded Lie algebra?
-  unsigned long TorsionExp; // if >0, enforce TorsionExp*ai in next class
+  bool PAlgebra; // is it a p-Lie algebra?
+  coeff TorsionExp; // if PAlgebra, enforce TorsionExp*ai in next class
+  unsigned NilpotencyClass; // commutators of longer length must die
 };
 
-void InitPcPres(pcpresentation &, presentation &, bool, unsigned long);
-void FreePcPres(pcpresentation &, presentation &);
-void AddNewTails(pcpresentation &, presentation &);
-void ReducePcPres(pcpresentation &, presentation &, gpvec *, unsigned);
+void InitPcPres(pcpresentation &, const presentation &, bool, bool, coeff &, unsigned);
+void FreePcPres(pcpresentation &, const presentation &);
+void AddNewTails(pcpresentation &, const presentation &);
+void ReducePcPres(pcpresentation &, const presentation &, const relmatrix &);
 
 /* tails functions */
-void ComputeTails(pcpresentation &);
+void ComputeTails(const pcpresentation &);
 
 /* consistency functions */
-void TripleProduct(pcpresentation &, gpvec &, gen, gen, gen);
-void Consistency(pcpresentation &);
+void TripleProduct(const pcpresentation &, gpvec &, gen, gen, gen);
+void Consistency(const pcpresentation &);
 
 /* print functions */
 void abortprintf(int, const char *, ...) __attribute__((format(printf, 2, 3),noreturn));
-void PrintVec(FILE *f, gpvec);
-void PrintPcPres(FILE *f, pcpresentation &, presentation &, bool, bool, bool);
-void PrintGAPPres(FILE *f, pcpresentation &, presentation &);
+void PrintVec(FILE *f, constgpvec);
+void PrintPcPres(FILE *f, const pcpresentation &, const presentation &, bool, bool, bool);
+void PrintGAPPres(FILE *f, const pcpresentation &, const presentation &);
 void TimeStamp(const char *);
   
 /* operation functions */
@@ -187,19 +193,19 @@ inline void Neg(gpvec vec1) {
   for (; vec1->g != EOW; vec1++)
     coeff_neg(vec1->c, vec1->c);
 }
-void LieBracket(pcpresentation &pc, gpvec, constgpvec, constgpvec);
-void Collect(pcpresentation &pc, gpvec, constgpvec);
-void ShrinkCollect(pcpresentation &pc, gpvec &);
+void LieBracket(const pcpresentation &pc, gpvec, constgpvec, constgpvec);
+void Collect(const pcpresentation &pc, gpvec, constgpvec);
+void ShrinkCollect(const pcpresentation &pc, gpvec &);
 
 /* fppresentation functions */
-unsigned ReadPresentation(presentation &, const char *);
+void ReadPresentation(presentation &, const char *);
 void FreePresentation(presentation &);
-void EvalRel(pcpresentation &, gpvec, node *);
-void EvalAllRel(pcpresentation &, presentation &);
-void PrintNode(FILE *f, presentation &, node *);
+void EvalRel(const pcpresentation &, gpvec, node *);
+void EvalAllRel(const pcpresentation &, const presentation &);
+void PrintNode(FILE *f, const presentation &, node *);
 
 /* matrix functions */
-void HermiteNormalForm(gpvec **, unsigned *);
+relmatrix HermiteNormalForm(void);
 bool AddRow(gpvec);
-void InitMatrix(pcpresentation &, unsigned);
+void InitMatrix(const pcpresentation &, unsigned);
 void FreeMatrix(void);
