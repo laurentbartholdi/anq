@@ -51,6 +51,11 @@ inline void coeff_set_si(coeff &result, const long a) {
   result.data = a;
 }
 
+/* addition */
+inline void coeff_zero(coeff &result) {
+  coeff_set_si(result, 0);
+}
+
 inline long coeff_get_si(const coeff &a) {
   return a.data;
 }

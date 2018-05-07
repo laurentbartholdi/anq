@@ -27,6 +27,11 @@ inline bool coeff_z_p(const coeff a) {
 #define coeff_set_si mpz_set_si
 #define coeff_clear mpz_clear
 
+/* addition */
+inline void coeff_zero(coeff &result) {
+  coeff_set_si(result, 0);
+}
+
 #define coeff_add mpz_add
 inline void coeff_add_si(coeff &result, coeff &a, long l) {
   if (l >= 0) mpz_add_ui(result, a, l); else mpz_sub_ui(result, a, -l);

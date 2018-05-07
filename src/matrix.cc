@@ -16,59 +16,79 @@ unsigned NrCols, FirstCentral;
 bool Torsion;
 const coeff *TorsionExp;
 
-// y += a*x. scratch is available as temporary storage.
-// this routine takes 80% of the runtime! optimize generously.
-inline void SAXPY(gpvec y, coeff &a, constgpvec x, gpvec scratch)
+typedef std::vector<coeff> coeffvec;
+
+inline coeffvec NEW(unsigned length)
 {
-  if (coeff_z_p(a))
-    return;
+  coeffvec v(length);
+  for (unsigned i = 0; i < length; i++)
+    coeff_init_set_si(v[i], 0);
+  return v;
+}
 
-  /* initially, we follow y and try to add a*x to it.
+inline void FREE(coeffvec &v)
+{
+  for (coeff &c : v)
+    coeff_clear(c);
+}
 
-     if we're out of space, then we copy the remainder of y to
-     scratch, and add from scratch and a*x into y.
-
-     if on the contrary we got an extra cancellation, we keep track of
-     yin and yout */
-
-  while (x->g != EOW) {
-    while (y->g < x->g) y++;
-    if (y->g == x->g) {
-      coeff_addmul(y->c, a, x->c);
-      x++;
-      if (coeff_z_p(y->c)) { // extra cancellation
-	gpvec yout = y++;
-	while (yout < y) {
-	  if (x->g == EOW) {
-	    Copy(yout, y);
-	    return;
-	  }
-	  while (y->g < x->g) {
-	    coeff_set(yout->c, y->c);
-	    (yout++)->g = (y++)->g;
-	  }
-	  if (y->g == x->g) {
-	    coeff_set(yout->c, y->c);
-	    coeff_addmul(yout->c, a, x->c);
-	    if (coeff_nz_p(yout->c))
-	      (yout++)->g = y->g;
-	    y++;
-	    x++;
-	  } else {
-	    coeff_mul(yout->c, a, x->c);
-	    if (coeff_nz_p(yout->c))
-	      (yout++)->g = x->g;
-	    x++;
-	  }
-	}
-      } else
-	y++;
-    } else {
-      Copy(scratch, y);
-      Sum(y, scratch, a, x);
-      return;
-    }
+inline gpvec GET(coeffvec &v)
+{
+  unsigned len = 0;
+  for (coeff &c : v)
+    if (coeff_nz_p(c))
+      len++;
+  gpvec r = NewVec(len), p = r;
+  for (unsigned i = 0; i < v.size(); i++) {
+    if (coeff_z_p(v[i]))
+      continue;
+    p->g = i + FirstCentral;
+    coeff_set(p->c, v[i]);
+    coeff_zero(v[i]);
+    p++;
   }
+  p->g = EOW;
+  return r;
+}
+
+inline gpvec GET(coeffvec &v, coeff &a)
+{
+  unsigned len = 0;
+  gpvec r = NewVec(v.size()), p = r;
+  for (unsigned i = 0; i < v.size(); i++) {
+    p->g = i + FirstCentral;
+    coeff_mul(p->c, v[i], a);
+    coeff_zero(v[i]);
+    if (coeff_nz_p(p->c))
+      p++, len++;
+  }
+  p->g = EOW;
+  return ResizeVec(r, v.size(), len);
+}
+
+inline void CX(constgpvec x, coeffvec &y)
+{
+  for (; x->g != EOW; x++)
+    coeff_set(y[x->g - FirstCentral], x->c);
+}
+
+inline void CAX(const coeff &a, constgpvec x, coeffvec &y)
+{
+  for (; x->g != EOW; x++)
+    coeff_mul(y[x->g - FirstCentral], a, x->c);
+}
+
+inline void CAXPY(const coeff &a, constgpvec x, coeffvec &y)
+{
+  for (; x->g != EOW; x++)
+    coeff_addmul(y[x->g - FirstCentral], a, x->c);
+}
+
+inline void CAXPBYZ(const coeff &a, const coeffvec &x, const coeff &b, constgpvec y, coeffvec &z)
+{
+  for (unsigned i = 0; i < x.size(); i++)
+    coeff_mul(z[i], a, x[i]);
+  CAXPY(b, y, z);
 }
 
 std::vector<gpvec> Matrix;
@@ -158,6 +178,10 @@ void LU(void) {
     }
     ind.push_back(intmat.size());
 
+    if (Debug >= 2) {
+      fprintf(LogFile, "# about to collect %ld relations (%ld nnz)\n", Matrix.size(), intmat.size());
+    }
+  
     size_t alloc = colamd_recommended(intmat.size(), NrCols, Matrix.size());
     intmat.reserve(alloc);
     int ok = colamd(NrCols, Matrix.size(), alloc, intmat.data(), ind.data(), NULL, stats);
@@ -177,7 +201,7 @@ void LU(void) {
   Matrix.swap(oldrels);
   InitTorsion();
 
-  gpvec scratch[3] = { NewVec(NrCols), NewVec(NrCols), NewVec(NrCols) };
+  coeffvec newrow = NEW(NrCols), scratch = NEW(NrCols);
   coeff a, b, c, d;
   coeff_init(a);
   coeff_init(b);
@@ -187,45 +211,43 @@ void LU(void) {
   /* add rows of oldrels into Matrix, reducing them along the way, and in
      the order specified by the permutation ind */
   for (unsigned i = 0; i < oldrels.size(); i++) {
-    {
-      gpvec v = oldrels[ind[i]];
-      Copy(scratch[0], v);
-      FreeVec(v);
-    }
-    
-    while (scratch[0]->g != EOW) {
-      unsigned row = scratch[0]->g - FirstCentral;
+    CX(oldrels[ind[i]], newrow);
+    FreeVec(oldrels[ind[i]]);
+
+    for (unsigned row = 0; row < NrCols; row++) {
+      if (coeff_z_p(newrow[row]))
+	continue;
       
       if (Matrix[row] == NULL) { /* Insert v in Matrix at position row */
-	coeff_unit_annihilator(b, a, scratch[0]->c);
-	Matrix[row] = NewVec(NrCols);
-	Prod(Matrix[row], b, scratch[0]);
-	Prod(scratch[0], a, scratch[0]);
+	coeff_unit_annihilator(b, a, newrow[row]);
+	Matrix[row] = GET(newrow, b);
+	CAX(a, Matrix[row], newrow);
       
 	if (Debug >= 3) {
 	  fprintf(LogFile, "# Adding row %d: ",row); PrintVec(LogFile, Matrix[row]); fprintf(LogFile, "\n");
 	}
       } else { /* two rows with same pivot. Merge them */
-	coeff_gcdext(d, a, b, scratch[0]->c, Matrix[row]->c); /* d = a*v[head]+b*Matrix[row][head] */
+	coeff_gcdext(d, a, b, newrow[row], Matrix[row]->c); /* d = a*v[head]+b*Matrix[row][head] */
 	if (!coeff_cmp(d, Matrix[row]->c)) { /* likely case: Matrix[row][head]=d, b=1, a=0 */
-	  coeff_divexact(d, scratch[0]->c, d);
+	  coeff_divexact(d, newrow[row], d);
 	  coeff_neg(d, d);
-	  SAXPY(scratch[0], d, Matrix[row], scratch[1]);
+	  CAXPY(d, Matrix[row], newrow);
 #ifdef COEFF_IS_MPZ // check coefficient explosion
 	  if (Debug >= 1) {
 	    long maxsize = 0;
-	    for (gpvec q = scratch[0]; q->g != EOW; q++)
-	      maxsize = std::max(maxsize, labs(q->c->_mp_size));
+	    for (coeff &c : newrow)
+	      maxsize = std::max(maxsize, labs(c->_mp_size));
 	    fprintf(LogFile, "# Changed v: max coeff size %ld\n", maxsize);
 	  }
 #endif
 	} else {
-	  coeff_divexact(c, scratch[0]->c, d);
+	  coeff_divexact(c, newrow[row], d);
 	  coeff_divexact(d, Matrix[row]->c, d);
-	  Sum(scratch[1], a, scratch[0], b, Matrix[row]);
-	  Diff(scratch[2], c, Matrix[row], d, scratch[0]);
-	  std::swap(Matrix[row], scratch[1]);
-	  std::swap(scratch[0], scratch[2]);
+	  CAXPBYZ(a, newrow, b, Matrix[row], scratch);
+	  coeff_neg(d, d);
+	  CAXPBYZ(d, newrow, c, Matrix[row], newrow);
+	  FreeVec(Matrix[row]);
+	  Matrix[row] = GET(scratch);
 
 	  if (Debug >= 3) {
 	    fprintf(LogFile, "# Change row %d: ",row); PrintVec(LogFile, Matrix[row]); fprintf(LogFile, "\n");
@@ -239,7 +261,8 @@ void LU(void) {
   coeff_clear(b);
   coeff_clear(c);
   coeff_clear(d);
-  for (gpvec v : scratch) FreeVec(v);
+  FREE(newrow);
+  FREE(scratch);
 
   TimeStamp("LU");
 }
@@ -247,40 +270,43 @@ void LU(void) {
 relmatrix GetRelMatrix(void) {
   LU();
 
-  /* reduce all the head columns, to achieve Hermite normal form. */
-  {
-    gpvec scratch = NewVec(NrCols);
-    coeff q;
-    coeff_init(q);
-    for (gpvec &v : Matrix) { // !!! would this be faster looping backwards?
-      if (!v)
-	continue;
-
-      for (unsigned i = 1; v[i].g != EOW;) {
-	gpvec w = Matrix[v[i].g - FirstCentral];
-	if (!w)
-	  goto skip;
-	
-	coeff_fdiv_q(q, v[i].c, w->c);
-	if (coeff_nz_p(q)) {
-	  Diff(scratch, v, q, w); // !!! could only subtract from position v[i]
-	  std::swap(v, scratch);
-	  continue;
-	}
-      skip:
-	i++;
-      }
-    }
-    coeff_clear(q);
-    FreeVec(scratch);
-  }
-  TimeStamp("Hermite");
-
   relmatrix rels;
   rels.reserve(NrCols);
-  for (constgpvec v : Matrix)
-    if (v != NULL)
-      rels.push_back(v);
+  
+  /* reduce all the head columns, to achieve Hermite normal form. */
+  coeffvec newrow = NEW(NrCols);
+  coeff q;
+  coeff_init(q);
+  for (unsigned j = 0; j < NrCols; j++) { // !!! would this be faster looping backwards?
+    if (!Matrix[j])
+      continue;
+    CX(Matrix[j], newrow);
+    FreeVec(Matrix[j]);
+    
+    for (unsigned i = j+1; i < NrCols; i++) {
+      gpvec w = Matrix[i];
+      if (!w)
+	continue;
+
+      if (!coeff_reduced_p(newrow[i], w->c)) {
+	coeff_fdiv_q(q, newrow[i], w->c);
+	coeff_neg(q, q);
+	CAXPY(q, w, newrow);
+      }
+    }
+    Matrix[j] = GET(newrow);
+    rels.push_back(Matrix[j]);
+  }
+
+  /* !!! we could also improve this code by eliminating redundant
+   generators; e.g. [2 1;0 2] could become [4 0;0 1] and allow
+   elimination of the second vector. this requires a different format,
+   and is perhaps best done outside this matrix code. */
+  
+  coeff_clear(q);
+  FREE(newrow);
+
+  TimeStamp("Hermite");
   return rels;
 }
 
