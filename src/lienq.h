@@ -193,6 +193,18 @@ inline void Neg(gpvec vec1) {
   for (; vec1->g != EOW; vec1++)
     coeff_neg(vec1->c, vec1->c);
 }
+inline int Compare(constgpvec vec1, constgpvec vec2) {
+  for (;;) {
+    if (vec1->g != vec2->g)
+      return vec1->g > vec2->g ? 1 : -1;
+    if (vec1->g == EOW)
+      return 0;
+    int c = coeff_cmp(vec1->c, vec2->c);
+    if (c)
+      return c;
+    vec1++; vec2++;
+  }
+}
 void LieBracket(const pcpresentation &pc, gpvec, constgpvec, constgpvec);
 void Collect(const pcpresentation &pc, gpvec, constgpvec);
 void ShrinkCollect(const pcpresentation &pc, gpvec &);
@@ -205,7 +217,7 @@ void EvalAllRel(const pcpresentation &, const presentation &);
 void PrintNode(FILE *f, const presentation &, node *);
 
 /* matrix functions */
-relmatrix HermiteNormalForm(void);
-bool AddRow(gpvec);
-void InitMatrix(const pcpresentation &, unsigned);
-void FreeMatrix(void);
+relmatrix GetRelMatrix(void);
+void AddToRelMatrix(gpvec);
+void InitRelMatrix(const pcpresentation &, unsigned);
+void FreeRelMatrix(void);

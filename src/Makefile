@@ -10,7 +10,7 @@ OPT = -O0 #3
 DEBUG = -g -ggdb
 CXXFLAGS = -std=gnu++11 -Wall -Werror $(DEBUG) $(OPT)
 CFLAGS = -Wall -Werror $(DEBUG) $(OPT)
-LDFLAGS = $(DEBUG)
+LDFLAGS = $(DEBUG) -lcolamd -lgmp
 
 ## LieNQ prefers GNU C compiler.
 
@@ -30,7 +30,6 @@ clean:
 	rm -fr *.o lienq_[0-9]*_[0-9]* lienq_mpz lienq_long lienq_z *.dSYM
 
 lienq_mpz: $(subst .o,_mpz.o,$(LIENQ_OBJ))
-	$(CXX) -o $@ $^ -lgmp
 
 %_mpz.o: %.cc lienq.h coeff.h coeff_mpz.h
 	$(CXX) -c -DCOEFF_IS_MPZ $(CXXFLAGS) $(LIENQVERSION) $< -o $@
@@ -62,13 +61,11 @@ lienq_2_64: $(subst .o,_2_64.o,$(LIENQ_OBJ))
 	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=2 $(CXXFLAGS) $(LIENQVERSION) $< -o $@
 
 lienq_2_257: $(subst .o,_2_257.o,$(LIENQ_OBJ))
-	$(CXX) -o $@ $^ -lgmp
 
 %_2_257.o: %.cc lienq.h coeff.h coeff_2_mp.h
 	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=2 -DMODULUS_EXPONENT=257 $(CXXFLAGS) $(LIENQVERSION) $< -o $@
 
 lienq_2_320: $(subst .o,_2_320.o,$(LIENQ_OBJ))
-	$(CXX) -o $@ $^ -lgmp
 
 %_2_320.o: %.cc lienq.h coeff.h coeff_2_mp.h
 	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=2 -DMODULUS_EXPONENT=320 $(CXXFLAGS) $(LIENQVERSION) $< -o $@
@@ -94,7 +91,6 @@ lienq_5_27: $(subst .o,_5_27.o,$(LIENQ_OBJ))
 	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=5 -DMODULUS_EXPONENT=27 $(CXXFLAGS) $(LIENQVERSION) $< -o $@
 
 lienq_5_100: $(subst .o,_5_100.o,$(LIENQ_OBJ))
-	$(CXX) -o $@ $^ -lgmp
 
 %_5_100.o: %.cc lienq.h coeff.h coeff_p_mp.h
 	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=5 -DMODULUS_EXPONENT=100 $(CXXFLAGS) $(LIENQVERSION) $< -o $@

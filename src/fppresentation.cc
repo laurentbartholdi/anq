@@ -727,7 +727,7 @@ void EvalAllRel(const pcpresentation &pc, const presentation &pres) {
       PrintNode(LogFile, pres, n);
       fprintf(LogFile, " ("); PrintVec(LogFile, v); fprintf(LogFile, ")\n");
     }
-    AddRow(v);
+    AddToRelMatrix(v);
   }
   PopVec();
   

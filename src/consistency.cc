@@ -73,7 +73,7 @@ static void CheckJacobi(const pcpresentation &pc, gen a, gen b, gen c) {
     fprintf(LogFile, "\n");
   }
 
-  AddRow(temp1);
+  AddToRelMatrix(temp1);
   
   PopVec();
   PopVec();
@@ -116,7 +116,7 @@ static void CheckPower(const pcpresentation &pc, gen a, gen b) {
     fprintf(LogFile, "\n");
   }
 
-  AddRow(temp[parity]);
+  AddToRelMatrix(temp[parity]);
   
   PopVec();
   PopVec();
@@ -145,7 +145,7 @@ static void CheckTorsion(const pcpresentation &pc, unsigned i) {
     fprintf(LogFile, "\n");
   }
 
-  AddRow(temp2);
+  AddToRelMatrix(temp2);
 
   coeff_clear(unit);
   coeff_clear(annihilator);
