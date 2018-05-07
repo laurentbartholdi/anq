@@ -142,17 +142,17 @@ int main(int argc, char **argv) {
 
     ComputeTails(pc); // compute other tails
     
-    InitMatrix(pc, NrTotalGens-pc.NrPcGens);
+    InitRelMatrix(pc, NrTotalGens-pc.NrPcGens);
 
     Consistency(pc); // enforce Jacobi and Z-linearity
     
     EvalAllRel(pc, fppres); // evaluate relations
 
-    relmatrix rels = HermiteNormalForm();
+    relmatrix rels = GetRelMatrix();
     
     ReducePcPres(pc, fppres, rels); // enforce relations
 
-    FreeMatrix();
+    FreeRelMatrix();
     FreeStack();
 
     int newgens = pc.NrPcGens-oldnrpcgens;
