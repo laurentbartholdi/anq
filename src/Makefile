@@ -15,8 +15,8 @@ LDFLAGS = $(DEBUG)
 ## LieNQ prefers GNU C compiler.
 
 ifeq ($(shell uname -s),Darwin)
-    CC = g++-7
-    CXX = g++-7
+    CC = g++-8
+    CXX = g++-8
 else
     CC = g++
     CXX = g++

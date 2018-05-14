@@ -189,25 +189,34 @@ void AddNewTails(pcpresentation &pc, const presentation &pres) {
 
 	 all other tails will be computed in Tails() out of these:
 	 - if h is not defining, using Jacobi or Z-linearity;
-	 - if g is a power, using Z-linearity */
-      for (unsigned i = 1; i <= pc.NrPcGens; i++) {
-	if (pc.Generator[i].t != DGEN)
+	 - if g is a power, using Z-linearity.
+
+	 we have to first add weights of low class, and then higher,
+	 to be sure that the generator that will be kept after consistency
+	 and relations are imposed is a valid defining generator (namely,
+	 of totalweight = pc.Class). */
+      for (unsigned weight = 2; weight <= pc.Class; weight++) {
+	if (pc.Graded && weight != pc.Class)
 	  continue;
-	for (unsigned j = i+1; j <= pc.NrPcGens; j++) {
-	  if (is_dcomm[j][i])
+	for (unsigned i = 1; i <= pc.NrPcGens; i++) {
+	  if (pc.Generator[i].t != DGEN)
 	    continue;
-	  if (pc.Generator[j].t == DPOW)
-	    continue;
-	  unsigned totalweight = pc.Generator[i].w+pc.Generator[j].w;
-	  if (totalweight > pc.Class || (pc.Graded && totalweight != pc.Class))
-	    continue;
-	  unsigned totalcweight = pc.Generator[i].cw + pc.Generator[j].cw;
-	  if (totalcweight > pc.NilpotencyClass)
-	    continue;
+	  for (unsigned j = i+1; j <= pc.NrPcGens; j++) {
+	    if (is_dcomm[j][i])
+	      continue;
+	    if (pc.Generator[j].t == DPOW)
+	      continue;
+	    unsigned totalweight = pc.Generator[i].w+pc.Generator[j].w;
+	    if (totalweight != weight)
+	      continue;
+	    unsigned totalcweight = pc.Generator[i].cw + pc.Generator[j].cw;
+	    if (totalcweight > pc.NilpotencyClass)
+	      continue;
 	  
-	  AddSingleGenerator(pc, pc.Product[j][i], {.t = DCOMM, .g = j, .h = i, .w = pc.Class, .cw = totalcweight});
-	  if (Debug >= 2)
-	    fprintf(LogFile, "# added tail a%d to non-defining commutator [a%d, a%d]\n", NrTotalGens, j, i);
+	    AddSingleGenerator(pc, pc.Product[j][i], {.t = (weight == pc.Class ? DCOMM : DINVALID), .g = j, .h = i, .w = pc.Class, .cw = totalcweight});
+	    if (Debug >= 2)
+	      fprintf(LogFile, "# added tail a%d to non-defining commutator [a%d,a%d]\n", NrTotalGens, j, i);
+	  }
 	}
       }
     }

@@ -73,7 +73,7 @@ void PrintPcPres(FILE *f, const pcpresentation &pc, const presentation &pres, bo
   for (unsigned i = 1; i <= pres.NrGens; i++) {
     gen g = pc.Epimorphism[i]->g;
     fprintf(f, "# %10s |-->", pres.GeneratorName[i].c_str());
-    if (g && pc.Generator[g].t == DGEN && pc.Generator[g].g == i)
+    if (g != EOW && pc.Generator[g].t == DGEN && pc.Generator[g].g == i)
       fprintf(f, ": a%d\n", g);
     else {
       fprintf(f, " ");
@@ -160,7 +160,7 @@ void PrintPcPres(FILE *f, const pcpresentation &pc, const presentation &pres, bo
       }  
       if (!first)
 	fprintf(f, ",\n");
-      fprintf(f, "%10s[ a%d, a%d ]", "", j, i);
+      fprintf(f, "%10s[a%d,a%d]", "", j, i);
       if (g != EOW) {
 	if (pc.Generator[g].g == j && pc.Generator[g].h == i)
 	  fprintf(f, " =: a%d", pc.Product[j][i]->g);

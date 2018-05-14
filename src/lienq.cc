@@ -48,7 +48,7 @@ int main(int argc, char **argv) {
   coeff_init_set_si(TorsionExp, 0);
   unsigned MaxWeight = INFINITY, NilpotencyClass = INFINITY;
 
-  while ((c = getopt (argc, argv, "ADF:GL:N:PX:W:Z")) != -1)
+  while ((c = getopt (argc, argv, "ACDF:GL:N:PX:W:Z")) != -1)
     switch (c) {
     case 'A':
       Gap = !Gap;
