@@ -13,7 +13,7 @@
 enum token {
   LPAREN, RPAREN, LBRACK, RBRACK, LBRACE, RBRACE,
   NUMBER, GEN,
-  MULT, DIV, POWER, PLUS, MINUS, INVERSE, EQUAL, DEQUALL, DEQUALR,
+  MULT, DIV, POWER, PLUS, MINUS, EQUAL, DEQUALL, DEQUALR, INVERSE,
   LANGLE, RANGLE, PIPE, COMMA, SEMICOLON,
   BADTOKEN };
 
@@ -318,11 +318,9 @@ node *Term(presentation &pres) {
       case TNEG:
 	coeff_neg(n->cont.n, u->cont.n);
 	break;
-#if 0 /* not implemented */
       case TINV:
 	coeff_inv(n->cont.n, u->cont.n);
 	break;
-#endif
       default:
 	abortprintf(3, "I can't evaluate a numerical expression with unary operator %s", nodename[n->type]);
       }
@@ -453,14 +451,15 @@ static void ValidateLieExpression(node *n, gen g) {
 }
 
 void ReadPresentation(presentation &pres, const char *InputFileName) {
-  bool readstdin = (InputFileName[0] == '-' && InputFileName[1] == 0);
+  bool readstdin = (InputFileName[0] == 0);
   
   if (readstdin)
     InFp = stdin;
-  else
+  else {
     InFp = fopen(InputFileName, "r");
-  if (InFp == NULL)
-    abortprintf(1, "Can't open input file '%s'", InputFileName);
+    if (InFp == NULL)
+      abortprintf(1, "Can't open input file '%s'", InputFileName);
+  }
   InFileName = InputFileName;
 
   pres.NrGens = 0;

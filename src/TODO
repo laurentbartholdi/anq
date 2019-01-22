@@ -4,8 +4,6 @@
 
 * Improve matrix code: use shorter arrays to improve cache locality, avoid fillin, avoid coefficient explosion, use finite fields, (in local rings) permute basis to get rid of redundant generators
 
-* Check/debug graded Lie algebra generation
-
 * Make LieNQ a library: accept calls to
   - NewLiePresentation
   - ProductNode, SumNode etc. to create relators
@@ -17,10 +15,12 @@
 
 * Finish z.h fastint arithmetic
 
-* Add option to kill all N-fold commutators
-
 * Complete arithmetic test suite
 
 * Use C++ streams rather than fprintf
 
 * Make TorsionExp a coeff, not a ulong
+
+* Introduce mpq or real(double) coeff, for torsion-free part
+
+* Find/fix bug "when adding tail to commutator, it's not necessarily the correct def. e.g. [a6,a2] = a11 + .... + a41, and a41 gets defined there. However, the correct definition of a41 is [a16,a6] probably. (at least, of correct degree!)"

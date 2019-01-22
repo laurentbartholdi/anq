@@ -281,7 +281,7 @@ inline void coeff_swap(coeff &a, coeff &b, coeff &tmp) {
 }
 
 /* addition, modular inverse. result*a == 1 mod COEFF_N */
-inline void coeff_inverse(coeff &result, const coeff &a) {
+inline void coeff_inv(coeff &result, const coeff &a) {
   coeff g;
   doublecoeff s;
   mp_size_t slen;
@@ -361,10 +361,10 @@ const inline void coeff_gcdext(coeff &gcd, coeff &s, coeff &t, const coeff &a, c
   if (vala > valb) {
     gcd = __mpn_pow_ui(__mpn_ui(MODULUS_PRIME), valb);
     coeff_zero(s);
-    coeff_inverse(t, vb);
+    coeff_inv(t, vb);
   } else {
     gcd = __mpn_pow_ui(__mpn_ui(MODULUS_PRIME), vala);
-    coeff_inverse(s, va);
+    coeff_inv(s, va);
     coeff_zero(t);
   }
 }
@@ -385,7 +385,7 @@ const inline void coeff_unit_annihilator(coeff &unit, coeff &annihilator, const 
 
   coeff va;
   unsigned vala = coeff_val(va, a);
-  coeff_inverse(unit, va);
+  coeff_inv(unit, va);
   annihilator = __mpn_pow_ui(__mpn_ui(MODULUS_PRIME), MODULUS_EXPONENT-vala);
 }
 

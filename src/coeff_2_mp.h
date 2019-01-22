@@ -219,6 +219,14 @@ inline void inverse_mod_2_k(coeff &result, const coeff &a, unsigned shift) {
   }
 }
 
+inline void coeff_inv(coeff &result, const coeff &a) {
+  unsigned aval = coeff_z_p(a) ? -1 : mpn_scan1(a.data, 0);
+  if (aval != 0)
+    coeff_set_si(result, 0);
+  else
+    inverse_mod_2_k(result, a, 0);
+}
+
 inline void coeff_gcdext(coeff &gcd, coeff &s, coeff &t, const coeff &a, const coeff &b) {
   unsigned aval = coeff_z_p(a) ? -1 : mpn_scan1(a.data, 0),
     bval = mpn_scan1(b.data, 0);

@@ -16,7 +16,8 @@
 FILE *OutputFile = stdout, *LogFile = stdout;
 unsigned Debug = 0;
 
-const char USAGE[] = "Usage: lienq <options> (<inputfile> | \"-\") [<maximal class>]\n"
+const char USAGE[] = "Usage: lienq <options> [<inputfile>]\n"
+  "(with no input file, presentation is read from STDIN)\n"
   "\t[-A]\ttoggle GAP output, default false\n"
   "\t[-C]\ttoggle printing compact form of multiplication table, default true\n"
   "\t[-D]\tincrease debug level\n"
@@ -28,6 +29,16 @@ const char USAGE[] = "Usage: lienq <options> (<inputfile> | \"-\") [<maximal cla
   "\t[-W <maximal weight>]\n"
   "\t[-X <exponent>]\tset exponent for p-central series, default 0\n"
   "\t[-Z]\ttoggle printing zeros in multiplication table, default false";
+
+const char EXTENDEDUSAGE[] = "Presentation format:\n"
+  "\tpresentation = '<' (';'* gen (',' gen)*)* '|' exprlist? ('|' exprlist?)? '>'\n"
+  "(each ';' in presentation increases weight, starting from 1.)\n"
+  "(second exprlist gives relations. third exprlist is evaluated in quotient)\n"
+  "\tgen = '[a-zA-Z_.]' '[a-zA-Z0-9_.]'*\n"
+  "\texprlist = expr (',' expr)*\n"
+  "\texpr = term | term ('*' | '/' | '^' | '+' | '-' | '=' | ':=' | '=:') term\n"
+  "\tterm = '-' expr | '~' expr | '(' expr ')' | '[' exprlist ']' | '{' exprlist '}' | number | gen (with usual precedence)\n"
+  "\tnumber = [0-9]+ (if starting with 0 then in given base, otherwise base 10)\n";
 
 static const char *ordinal(unsigned n) {
   if (n % 10 == 1 && n != 11) return "st";
@@ -47,8 +58,9 @@ int main(int argc, char **argv) {
   coeff TorsionExp;
   coeff_init_set_si(TorsionExp, 0);
   unsigned MaxWeight = INFINITY, NilpotencyClass = INFINITY;
-
-  while ((c = getopt (argc, argv, "ACDF:GL:N:PX:W:Z")) != -1)
+  const char *InputFileName;
+  
+  while ((c = getopt (argc, argv, "ACDF:GhL:N:PX:W:Z")) != -1)
     switch (c) {
     case 'A':
       Gap = !Gap;
@@ -72,6 +84,9 @@ int main(int argc, char **argv) {
       Graded = !Graded;
       strcat(flags, "-G ");
       break;
+    case 'h':
+      printf("%s\n\n%s", USAGE, EXTENDEDUSAGE);
+      return 0;
     case 'L':
       LogFile = fopen(optarg, "w");
       if (LogFile == NULL)
@@ -104,10 +119,13 @@ int main(int argc, char **argv) {
       abortprintf(1, "Undefined flag '%c'\n%s", c, USAGE);
     }
   
-  if (optind != argc-1)
-    abortprintf(1, "I need precisely one name as input file\n%s", USAGE);
+  if (optind == argc)
+    InputFileName = "";
+  else if (optind == argc-1)
+    InputFileName = argv[optind];
+  else
+    abortprintf(1, "I need precisely at most one argument as input filename\n%s", USAGE);
 
-  char *InputFileName = argv[optind++];
   presentation fppres;
   ReadPresentation(fppres, InputFileName);
   

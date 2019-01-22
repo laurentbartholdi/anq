@@ -50,6 +50,16 @@ inline void coeff_add_si(coeff &result, coeff &a, long l) {
 #define coeff_sub mpz_sub
 #define coeff_submul mpz_submul
 
+/* addition, invert number (or set to 0 if impossible) */
+inline void coeff_inv(coeff &result, const coeff &a) {
+  if (!coeff_cmp_si(a, 1))
+    coeff_set_si(result, 1);
+  else if (!coeff_cmp_si(a, -1))
+    coeff_set_si(result, -1);
+  else
+    coeff_set_si(result, 0);
+}
+
 /* addition, returns true if a in [0,b) or b=0 */
 inline bool coeff_reduced_p(coeff &a, coeff &b) {
   return !mpz_sgn(b) || (mpz_sgn(a) >= 0 && mpz_cmp(a, b) < 0);

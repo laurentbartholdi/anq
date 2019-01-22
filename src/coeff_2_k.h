@@ -138,6 +138,13 @@ inline coeff inverse_mod_2_k(uint64_t a, unsigned shift) {
   return { .data = inverse & COEFF_MASK };
 }
 
+inline void coeff_inv(coeff &result, const coeff &a) {
+  if (a.data & 1)
+    result = inverse_mod_2_k(a.data, 0);
+  else
+    coeff_set_si(result, 0);
+}
+
 inline void coeff_gcdext(coeff &gcd, coeff &s, coeff &t, const coeff &a, const coeff &b) {
   unsigned long aval = a.data & -a.data, bval = b.data & -b.data;
   if (a.data == 0 || aval >= bval) {

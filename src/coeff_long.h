@@ -165,6 +165,16 @@ inline void coeff_submul(coeff &result, const coeff &a, const coeff &b) {
 #endif
 }
 
+/* addition, invert number (or set to 0 if impossible) */
+inline void coeff_inv(coeff &result, const coeff &a) {
+  if (!coeff_cmp_si(a, 1))
+    coeff_set_si(result, 1);
+  else if (!coeff_cmp_si(a, -1))
+    coeff_set_si(result, -1);
+  else
+    coeff_set_si(result, 0);
+}
+
 /* addition, unused */
 inline void coeff_swap(coeff &a, coeff &b, coeff &tmp) {
   coeff_set(tmp, a);

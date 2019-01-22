@@ -233,7 +233,7 @@ const inline uint64_t inverse_mod_p(uint64_t a) {
 }
 
 /* addition, modular inverse. result*a == 1 */
-const inline void coeff_inverse(coeff &result, const coeff &a) {
+const inline void coeff_inv(coeff &result, const coeff &a) {
   result =
 #if MODULUS_PRIME == 2
 #error Use coeff_2_k.h for MODULUS_PRIME=2
@@ -309,10 +309,10 @@ const inline void coeff_gcdext(coeff &gcd, coeff &s, coeff &t, const coeff &a, c
   if (vala > valb) {
     gcd = uint64_t2coeff(powint(MODULUS_PRIME,valb));
     s = uint64_t2coeff(0);
-    coeff_inverse(t, vb);
+    coeff_inv(t, vb);
   } else {
     gcd = uint64_t2coeff(powint(MODULUS_PRIME,vala));
-    coeff_inverse(s, va);
+    coeff_inv(s, va);
     t = uint64_t2coeff(0);
   }
 }   
@@ -335,7 +335,7 @@ const inline void coeff_unit_annihilator(coeff &unit, coeff &annihilator, const 
 
   coeff va;
   unsigned vala = coeff_val(va, a);
-  coeff_inverse(unit, va);
+  coeff_inv(unit, va);
   annihilator = uint64_t2coeff(powint(MODULUS_PRIME,MODULUS_EXPONENT-vala));
 }
 
