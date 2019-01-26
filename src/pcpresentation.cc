@@ -5,7 +5,7 @@
 **                                                           schcs@math.klte.hu
 */
 
-#include "lienq.h"
+#include "nq.h"
 #include <vector>
 
 unsigned NrTotalGens;

@@ -5,7 +5,7 @@
 ##                                                           schcs@math.klte.hu
 ##
 
-LIENQVERSION = -DVERSION='"3.2.1 2018-05-02"'
+NQVERSION = -DVERSION='"3.2.1 2018-05-02"'
 OPT = -O0 #3
 DEBUG = -g -ggdb
 CXXFLAGS = -std=gnu++11 -Wall -Werror $(DEBUG) $(OPT)
@@ -22,78 +22,142 @@ else
     CXX = g++
 endif
 
-LIENQ_OBJ = fppresentation.o pcpresentation.o print.o operations.o matrix.o consistency.o tails.o auxiliary.o lienq.o
+LIENQ_OBJ = fppresentation.o pcpresentation.o print.o operations.o matrix.o consistency.o tails.o auxiliary.o nq.o
 
-all: lienq_2_64 lienq_2_320 lienq_3_39 lienq_5_27 lienq_5_100 lienq_long lienq_mpz
+all: lienq_2_64 lienq_2_320 lienq_3_39 lienq_5_27 lienq_5_100 lienq_long lienq_mpz gpnq_2_64 gpnq_2_320 gpnq_3_39 gpnq_5_27 gpnq_5_100 gpnq_long gpnq_mpz
 
 clean:
 	rm -fr *.o lienq_[0-9]*_[0-9]* lienq_mpz lienq_long lienq_z *.dSYM
 
-lienq_mpz: $(subst .o,_mpz.o,$(LIENQ_OBJ))
+lienq_mpz: $(subst .o,_lie_mpz.o,$(LIENQ_OBJ))
 
-%_mpz.o: %.cc lienq.h coeff.h coeff_mpz.h
-	$(CXX) -c -DCOEFF_IS_MPZ $(CXXFLAGS) $(LIENQVERSION) $< -o $@
+%_lie_mpz.o: %.cc nq.h coeff.h coeff_mpz.h
+	$(CXX) -c -DCOEFF_IS_MPZ -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
 
-lienq_z: $(subst .o,_z.o,$(LIENQ_OBJ))
-	$(CXX) -o $@ $^ -lgmp
+lienq_z: $(subst .o,_lie_z.o,$(LIENQ_OBJ))
 
-%_z.o: %.cc lienq.h coeff.h coeff_z.h
-	$(CXX) -c -DCOEFF_IS_Z $(CXXFLAGS) $(LIENQVERSION) $< -o $@
+%_lie_z.o: %.cc nq.h coeff.h coeff_z.h
+	$(CXX) -c -DCOEFF_IS_Z -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
 
-lienq_long: $(subst .o,_long.o,$(LIENQ_OBJ))
+lienq_long: $(subst .o,_lie_long.o,$(LIENQ_OBJ))
 
-%_long.o: %.cc lienq.h coeff.h coeff_long.h
-	$(CXX) -c -DCOEFF_IS_LONG $(CXXFLAGS) $(LIENQVERSION) $< -o $@
+%_lie_long.o: %.cc nq.h coeff.h coeff_long.h
+	$(CXX) -c -DCOEFF_IS_LONG -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
 
-lienq_2_3: $(subst .o,_2_3.o,$(LIENQ_OBJ))
+lienq_2_3: $(subst .o,_lie_2_3.o,$(LIENQ_OBJ))
 
-%_2_3.o: %.cc lienq.h coeff.h coeff_2_k.h
-	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=2 -DMODULUS_EXPONENT=3 $(CXXFLAGS) $(LIENQVERSION) $< -o $@
+%_lie_2_3.o: %.cc nq.h coeff.h coeff_2_k.h
+	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=2 -DMODULUS_EXPONENT=3 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
 
-lienq_2_63: $(subst .o,_2_63.o,$(LIENQ_OBJ))
+lienq_2_63: $(subst .o,_lie_2_63.o,$(LIENQ_OBJ))
 
-%_2_63.o: %.cc lienq.h coeff.h coeff_2_k.h
-	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=2 -DMODULUS_EXPONENT=63 $(CXXFLAGS) $(LIENQVERSION) $< -o $@
+%_lie_2_63.o: %.cc nq.h coeff.h coeff_2_k.h
+	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=2 -DMODULUS_EXPONENT=63 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
 
-lienq_2_64: $(subst .o,_2_64.o,$(LIENQ_OBJ))
+lienq_2_64: $(subst .o,_lie_2_64.o,$(LIENQ_OBJ))
 
-%_2_64.o: %.cc lienq.h coeff.h coeff_2_k.h
-	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=2 $(CXXFLAGS) $(LIENQVERSION) $< -o $@
+%_lie_2_64.o: %.cc nq.h coeff.h coeff_2_k.h
+	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=2 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
 
-lienq_2_257: $(subst .o,_2_257.o,$(LIENQ_OBJ))
+lienq_2_257: $(subst .o,_lie_2_257.o,$(LIENQ_OBJ))
 
-%_2_257.o: %.cc lienq.h coeff.h coeff_2_mp.h
-	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=2 -DMODULUS_EXPONENT=257 $(CXXFLAGS) $(LIENQVERSION) $< -o $@
+%_lie_2_257.o: %.cc nq.h coeff.h coeff_2_mp.h
+	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=2 -DMODULUS_EXPONENT=257 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
 
-lienq_2_320: $(subst .o,_2_320.o,$(LIENQ_OBJ))
+lienq_2_320: $(subst .o,_lie_2_320.o,$(LIENQ_OBJ))
 
-%_2_320.o: %.cc lienq.h coeff.h coeff_2_mp.h
-	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=2 -DMODULUS_EXPONENT=320 $(CXXFLAGS) $(LIENQVERSION) $< -o $@
+%_lie_2_320.o: %.cc nq.h coeff.h coeff_2_mp.h
+	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=2 -DMODULUS_EXPONENT=320 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
 
-lienq_3_38: $(subst .o,_3_38.o,$(LIENQ_OBJ))
+lienq_3_38: $(subst .o,_lie_3_38.o,$(LIENQ_OBJ))
 
-%_3_38.o: %.cc lienq.h coeff.h coeff_p_k.h
-	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=3 -DMODULUS_EXPONENT=38 $(CXXFLAGS) $(LIENQVERSION) $< -o $@
+%_lie_3_38.o: %.cc nq.h coeff.h coeff_p_k.h
+	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=3 -DMODULUS_EXPONENT=38 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
 
-lienq_3_39: $(subst .o,_3_39.o,$(LIENQ_OBJ))
+lienq_3_39: $(subst .o,_lie_3_39.o,$(LIENQ_OBJ))
 
-%_3_39.o: %.cc lienq.h coeff.h coeff_p_k.h
-	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=3 -DMODULUS_EXPONENT=39 $(CXXFLAGS) $(LIENQVERSION) $< -o $@
+%_lie_3_39.o: %.cc nq.h coeff.h coeff_p_k.h
+	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=3 -DMODULUS_EXPONENT=39 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
 
-lienq_5_26: $(subst .o,_5_26.o,$(LIENQ_OBJ))
+lienq_5_26: $(subst .o,_lie_5_26.o,$(LIENQ_OBJ))
 
-%_5_26.o: %.cc lienq.h coeff.h coeff_p_k.h
-	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=5 -DMODULUS_EXPONENT=26 $(CXXFLAGS) $(LIENQVERSION) $< -o $@
+%_lie_5_26.o: %.cc nq.h coeff.h coeff_p_k.h
+	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=5 -DMODULUS_EXPONENT=26 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
 
-lienq_5_27: $(subst .o,_5_27.o,$(LIENQ_OBJ))
+lienq_5_27: $(subst .o,_lie_5_27.o,$(LIENQ_OBJ))
 
-%_5_27.o: %.cc lienq.h coeff.h coeff_p_k.h
-	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=5 -DMODULUS_EXPONENT=27 $(CXXFLAGS) $(LIENQVERSION) $< -o $@
+%_lie_5_27.o: %.cc nq.h coeff.h coeff_p_k.h
+	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=5 -DMODULUS_EXPONENT=27 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
 
-lienq_5_100: $(subst .o,_5_100.o,$(LIENQ_OBJ))
+lienq_5_100: $(subst .o,_lie_5_100.o,$(LIENQ_OBJ))
 
-%_5_100.o: %.cc lienq.h coeff.h coeff_p_mp.h
-	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=5 -DMODULUS_EXPONENT=100 $(CXXFLAGS) $(LIENQVERSION) $< -o $@
+%_lie_5_100.o: %.cc nq.h coeff.h coeff_p_mp.h
+	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=5 -DMODULUS_EXPONENT=100 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
+
+gpnq_mpz: $(subst .o,_gp_mpz.o,$(LIENQ_OBJ))
+
+%_gp_mpz.o: %.cc nq.h coeff.h coeff_mpz.h
+	$(CXX) -c -DCOEFF_IS_MPZ -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
+
+gpnq_z: $(subst .o,_gp_z.o,$(LIENQ_OBJ))
+
+%_gp_z.o: %.cc nq.h coeff.h coeff_z.h
+	$(CXX) -c -DCOEFF_IS_Z -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
+
+gpnq_long: $(subst .o,_gp_long.o,$(LIENQ_OBJ))
+
+%_gp_long.o: %.cc nq.h coeff.h coeff_long.h
+	$(CXX) -c -DCOEFF_IS_LONG -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
+
+gpnq_2_3: $(subst .o,_gp_2_3.o,$(LIENQ_OBJ))
+
+%_gp_2_3.o: %.cc nq.h coeff.h coeff_2_k.h
+	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=2 -DMODULUS_EXPONENT=3 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
+
+gpnq_2_63: $(subst .o,_gp_2_63.o,$(LIENQ_OBJ))
+
+%_gp_2_63.o: %.cc nq.h coeff.h coeff_2_k.h
+	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=2 -DMODULUS_EXPONENT=63 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
+
+gpnq_2_64: $(subst .o,_gp_2_64.o,$(LIENQ_OBJ))
+
+%_gp_2_64.o: %.cc nq.h coeff.h coeff_2_k.h
+	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=2 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
+
+gpnq_2_257: $(subst .o,_gp_2_257.o,$(LIENQ_OBJ))
+
+%_gp_2_257.o: %.cc nq.h coeff.h coeff_2_mp.h
+	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=2 -DMODULUS_EXPONENT=257 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
+
+gpnq_2_320: $(subst .o,_gp_2_320.o,$(LIENQ_OBJ))
+
+%_gp_2_320.o: %.cc nq.h coeff.h coeff_2_mp.h
+	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=2 -DMODULUS_EXPONENT=320 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
+
+gpnq_3_38: $(subst .o,_gp_3_38.o,$(LIENQ_OBJ))
+
+%_gp_3_38.o: %.cc nq.h coeff.h coeff_p_k.h
+	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=3 -DMODULUS_EXPONENT=38 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
+
+gpnq_3_39: $(subst .o,_gp_3_39.o,$(LIENQ_OBJ))
+
+%_gp_3_39.o: %.cc nq.h coeff.h coeff_p_k.h
+	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=3 -DMODULUS_EXPONENT=39 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
+
+gpnq_5_26: $(subst .o,_gp_5_26.o,$(LIENQ_OBJ))
+
+%_gp_5_26.o: %.cc nq.h coeff.h coeff_p_k.h
+	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=5 -DMODULUS_EXPONENT=26 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
+
+gpnq_5_27: $(subst .o,_gp_5_27.o,$(LIENQ_OBJ))
+
+%_gp_5_27.o: %.cc nq.h coeff.h coeff_p_k.h
+	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=5 -DMODULUS_EXPONENT=27 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
+
+gpnq_5_100: $(subst .o,_gp_5_100.o,$(LIENQ_OBJ))
+
+%_gp_5_100.o: %.cc nq.h coeff.h coeff_p_mp.h
+	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=5 -DMODULUS_EXPONENT=100 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
 
 coeff_test: coeff_test.cc coeff.h coeff_2_k.h coeff_p_k.h coeff_2_mp.h coeff_p_mp.h
 	$(CXX) -o $@ coeff_test.cc -lgmp

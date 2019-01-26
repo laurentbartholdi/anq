@@ -5,7 +5,7 @@
 **                                                           schcs@math.klte.hu
 */
 
-#include "lienq.h"
+#include "nq.h"
 #include "colamd.h"
 #include <algorithm>
 #include <set>

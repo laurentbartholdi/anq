@@ -1,11 +1,11 @@
 /******************************************************************************
 **
 **                 Nilpotent Quotient for Lie Rings
-** lienq.c                                                      Csaba Schneider
+** nq.c                                                         Csaba Schneider
 **                                                           schcs@math.klte.hu
 */
 
-#include "lienq.h"
+#include "nq.h"
 #include <string.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -16,7 +16,7 @@
 FILE *OutputFile = stdout, *LogFile = stdout;
 unsigned Debug = 0;
 
-const char USAGE[] = "Usage: lienq <options> [<inputfile>]\n"
+const char USAGE[] = "Usage: nq <options> [<inputfile>]\n"
   "(with no input file, presentation is read from STDIN)\n"
   "\t[-A]\ttoggle GAP output, default false\n"
   "\t[-C]\ttoggle printing compact form of multiplication table, default true\n"
@@ -136,7 +136,7 @@ int main(int argc, char **argv) {
   char timestring[128];
   strftime(timestring, 128, "%c", localtime(&t));
   
-  fprintf(LogFile, "# The Lie algebra Nilpotent Quotient Program, by Csaba Schneider & Laurent Bartholdi\n");
+  fprintf(LogFile, "# The %s nilpotent quotient program, by Csaba Schneider & Laurent Bartholdi\n", LIEGPSTRING);
   fprintf(LogFile, "# Version %s, coefficients %s\n", VERSION, COEFF_ID);
   fprintf(LogFile, "# \"%s %s%s\" started %s on %s\n", argv[0], flags, InputFileName, timestring, hostname);
   fprintf(LogFile, "# nilpotency class %u; maximal weight %u\n\n", NilpotencyClass, MaxWeight);

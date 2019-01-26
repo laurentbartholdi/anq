@@ -5,7 +5,7 @@
 **                                                           schcs@math.klte.hu
 */
 
-#include "lienq.h"
+#include "nq.h"
 
 /****************************************************************
  to avoid malloc stress, we implement a simple stack for vector

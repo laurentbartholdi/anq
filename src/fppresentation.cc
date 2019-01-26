@@ -5,7 +5,7 @@
 **                                                           schcs@math.klte.hu
 */
 
-#include "lienq.h"
+#include "nq.h"
 #include <ctype.h>
 #include <stdio.h>
 #include <stdarg.h>
@@ -13,12 +13,13 @@
 enum token {
   LPAREN, RPAREN, LBRACK, RBRACK, LBRACE, RBRACE,
   NUMBER, GEN,
-  MULT, DIV, POWER, PLUS, MINUS, EQUAL, DEQUALL, DEQUALR, INVERSE,
+  MULT, DIV, LDIV, POWER, PLUS, MINUS, EQUAL, DEQUALL, DEQUALR, INVERSE,
   LANGLE, RANGLE, PIPE, COMMA, SEMICOLON,
   BADTOKEN };
 
-const char *nodename[] = {"TNUM", "TGEN", "TBRACK", "TBRACE", "TPROD", "TQUO",
-			  "TPOW", "TSUM", "TDIFF", "TREL", "TDREL", "TDRELR",
+const char *nodename[] = {"TNUM",
+			  "TGEN",
+			  "TBRACK", "TBRACE", "TPROD", "TQUO",  "TLQUO", "TPOW", "TSUM", "TDIFF", "TREL", "TDREL", "TDRELR",
 			  "TNEG", "TINV"};
 
 enum associativity {
@@ -37,7 +38,7 @@ constexpr int unary_prec(token t) {
   return t == INVERSE ? 6 : t == MINUS ? 4 : 0;
 }
 constexpr int binary_prec(token t) {
-  return (t == MINUS || t == PLUS) ? 3 : (t == MULT || t == DIV) ? 5 : t == POWER ? 7 : 0;
+  return (t == MINUS || t == PLUS) ? 3 : (t == MULT || t == DIV || t == LDIV) ? 5 : t == POWER ? 7 : 0;
 }
 constexpr bool is_relation(token t) {
   return t <= DEQUALR;
@@ -46,7 +47,7 @@ constexpr nodetype unary_node(token t) {
   return t == MINUS ? TNEG : t == INVERSE ? TINV : TINVALID;
 }
 constexpr nodetype binary_node(token t) {
-  return t == MULT ? TPROD : t == DIV ? TQUO : t == POWER ? TPOW : t == PLUS ? TSUM : t == MINUS ? TDIFF : t == EQUAL ? TREL : t == DEQUALL ? TDREL : t == DEQUALR ? TDRELR : TINVALID;
+  return t == MULT ? TPROD : t == DIV ? TQUO : t == LDIV ? TLQUO : t == POWER ? TPOW : t == PLUS ? TSUM : t == MINUS ? TDIFF : t == EQUAL ? TREL : t == DEQUALL ? TDREL : t == DEQUALR ? TDRELR : TINVALID;
 }
 
 static char Ch;           /* Contains the next char on the input. */
@@ -198,6 +199,11 @@ static void NextToken(void) {
   
   case '/':
     Token = DIV;
+    ReadCh();
+    break;
+  
+  case '\\':
+    Token = LDIV;
     ReadCh();
     break;
   
@@ -411,39 +417,73 @@ node *Expression(presentation &pres, int precedence) {
   return t;
 }
 
-static void ValidateLieExpression(node *n, gen g) {
-  /* check that n is a valid Lie expression, involving only generators of index < g.
+static void ValidateExpression(node *n, gen g) {
+  /* check that n is a valid expression, involving only generators of index < g.
 
-     For TPROD, LHS must be a number, and all other terms must be Lie expressions.
-     Forbid TINV, TQUO, TBRACE, TREL, TDREL.
+     in Lie algebras: for TPROD, LHS must be a number, and all other
+     terms must be Lie expressions.  Forbid TINV, TQUO, TLQUO, TBRACE, TREL,
+     TDREL.
+
+     in groups: forbid TSUM, TDIFF, TNEG, TBRACK, TREL, TDREL.
   */
 
   switch (n->type) {
   case TNUM:
-    SyntaxError("Lie expression expected, not number");
+    SyntaxError("Expected a %s expression, not a number", LIEGPSTRING);
   case TGEN:
     if (n->cont.g >= g)
       SyntaxError("Generator of rank <= %d expected, not %d", g, n->cont.g);
     break;
+#ifdef LIEALG
   case TINV:
   case TQUO:
+  case TLQUO:
   case TBRACE:
+#else
+  case TNEG:
+  case TSUM:
+  case TBRACK:
+#endif
   case TREL:
   case TDREL:
-    SyntaxError("Operator %s unexpected", nodename[n->type]);
+    SyntaxError("Invalid operator %s in %s expression", nodename[n->type], LIEGPSTRING);
   case TPROD:
+#ifdef LIEALG
     if (n->cont.bin.l->type != TNUM)
       SyntaxError("LHS of TPROD should be number, not %s", nodename[n->cont.bin.l->type]);
-    ValidateLieExpression(n->cont.bin.r, g);
+#else    
+    ValidateExpression(n->cont.bin.l, g);
+#endif
+    ValidateExpression(n->cont.bin.r, g);
     break;
+  case TPOW:
+#ifdef LIEALG
+    if (n->cont.bin.l->type != TNUM || n->cont.bin.r->type != TNUM)
+      SyntaxError("Arguments of TPOW should be numbers, not %s,%s", nodename[n->cont.bin.l->type], nodename[n->cont.bin.r->type]);
+#else
+    ValidateExpression(n->cont.bin.l, g);
+    if (n->cont.bin.r->type != TNUM)
+      ValidateExpression(n->cont.bin.r, g);
+#endif
+    break;
+#ifdef LIEALG
   case TBRACK:
   case TSUM:
   case TDIFF:
-    ValidateLieExpression(n->cont.bin.l, g);
-    ValidateLieExpression(n->cont.bin.r, g);
+#else
+  case TBRACE:
+  case TQUO:
+  case TLQUO:
+#endif    
+    ValidateExpression(n->cont.bin.l, g);
+    ValidateExpression(n->cont.bin.r, g);
     break;
+#ifdef LIEALG
   case TNEG:
-    ValidateLieExpression(n->cont.u, g);
+#else
+  case TINV:
+#endif
+    ValidateExpression(n->cont.u, g);
     break;
   default:
     SyntaxError("Invalid expression of type %s", nodename[n->type]);
@@ -513,14 +553,14 @@ void ReadPresentation(presentation &pres, const char *InputFileName) {
       n->cont.bin = {.l = n->cont.bin.r, .r = n->cont.bin.l};
     }
     if (n->type == TREL) {
-      ValidateLieExpression(n->cont.bin.l, EOW);
-      ValidateLieExpression(n->cont.bin.r, EOW);
+      ValidateExpression(n->cont.bin.l, EOW);
+      ValidateExpression(n->cont.bin.r, EOW);
     } else if (n->type == TDREL) {
       if (n->cont.bin.l->type != TGEN)
 	SyntaxError("LHS should be generator, not %s", nodename[n->cont.bin.l->type]);
-      ValidateLieExpression(n->cont.bin.r, n->cont.bin.l->cont.g);
+      ValidateExpression(n->cont.bin.r, n->cont.bin.l->cont.g);
     } else
-      ValidateLieExpression(n, EOW);
+      ValidateExpression(n, EOW);
 
     if (n->type == TDREL)
       pres.Aliases.push_back(n);
@@ -539,7 +579,7 @@ void ReadPresentation(presentation &pres, const char *InputFileName) {
 
     while (is_relation(Token)) {
       node *n = Expression(pres, 0);
-      ValidateLieExpression(n, EOW);
+      ValidateExpression(n, EOW);
       pres.Extra.push_back(n);
       if (Token == COMMA)
 	NextToken();
@@ -600,6 +640,11 @@ void PrintNode(FILE *f, const presentation &pres, node *n) {
   case TQUO:
     PrintNode(f, pres, n->cont.bin.l);
     fprintf(f, "/");
+    PrintNode(f, pres, n->cont.bin.r);
+    break;
+  case TLQUO:
+    PrintNode(f, pres, n->cont.bin.l);
+    fprintf(f, "\\");
     PrintNode(f, pres, n->cont.bin.r);
     break;
   case TPOW:
@@ -663,8 +708,37 @@ void EvalRel(const pcpresentation &pc, gpvec v, node *rel) {
     PopVec();
     break;
   case TPROD:
-    EvalRel(pc, v, rel->cont.bin.r);
-    Prod(v, rel->cont.bin.l->cont.n, v);
+    if (rel->cont.bin.l->type == TNUM) {
+      EvalRel(pc, v, rel->cont.bin.r);
+      Prod(v, rel->cont.bin.l->cont.n, v);
+    } else {
+      vl = FreshVec();
+      vr = FreshVec();
+      EvalRel(pc, vl, rel->cont.bin.l);
+      EvalRel(pc, vr, rel->cont.bin.r);
+      Prod(pc, v, vl, vr);
+      PopVec();
+      PopVec();
+      break;
+    }
+    break;
+  case TQUO:
+    vl = FreshVec();
+    vr = FreshVec();
+    EvalRel(pc, vl, rel->cont.bin.l);
+    EvalRel(pc, vr, rel->cont.bin.r);
+    Quo(pc, v, vl, vr);
+    PopVec();
+    PopVec();
+    break;
+  case TLQUO:
+    vl = FreshVec();
+    vr = FreshVec();
+    EvalRel(pc, vl, rel->cont.bin.l);
+    EvalRel(pc, vr, rel->cont.bin.r);
+    LQuo(pc, v, vl, vr);
+    PopVec();
+    PopVec();
     break;
   case TBRACK:
     vl = FreshVec();
@@ -675,12 +749,27 @@ void EvalRel(const pcpresentation &pc, gpvec v, node *rel) {
     PopVec();
     PopVec();
     break;
+  case TBRACE:
+    vl = FreshVec();
+    vr = FreshVec();
+    EvalRel(pc, vl, rel->cont.bin.l);
+    EvalRel(pc, vr, rel->cont.bin.r);
+    GroupBracket(pc, v, vl, vr);
+    PopVec();
+    PopVec();
+    break;
   case TGEN:
     Copy(v, pc.Epimorphism[rel->cont.g]);
     break;
   case TNEG:
     EvalRel(pc, v, rel->cont.u);
     Neg(v);
+    break;
+  case TINV:
+    vl = FreshVec();
+    EvalRel(pc, vl, rel->cont.u);
+    Inv(pc, v, vl);
+    PopVec();
     break;
   case TDIFF:
   case TREL:

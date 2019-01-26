@@ -1,6 +1,6 @@
 /******************************************************************************
 **
-**               Nilpotent Quotient for Lie Algebras
+**               Nilpotent Quotient for Groups and Lie Algebras
 ** lienq.h                                                      Csaba Schneider
 **                                                           schcs@math.klte.hu
 */
@@ -12,6 +12,15 @@
 #include "coeff.h"
 #include <vector>
 #include <string>
+
+#ifdef LIEALG
+#define LIEGPSTRING "Lie algebra"
+#elif defined(GROUP)
+#define LIEGPSTRING "group"
+#else
+#error GROUP or LIEALG must be defined
+#include /abort
+#endif
 
 const unsigned INFINITY = -1;
 
@@ -45,7 +54,7 @@ typedef std::vector<constgpvec> relmatrix;
 enum nodetype {
   TNUM,
   TGEN,
-  TBRACK, TBRACE, TPROD, TQUO, TPOW, TSUM, TDIFF, TREL, TDREL, TDRELR,
+  TBRACK, TBRACE, TPROD, TQUO, TLQUO, TPOW, TSUM, TDIFF, TREL, TDREL, TDRELR,
   TNEG, TINV
 };
 const nodetype TINVALID = (nodetype) -1;
@@ -205,7 +214,12 @@ inline int Compare(constgpvec vec1, constgpvec vec2) {
     vec1++; vec2++;
   }
 }
-void LieBracket(const pcpresentation &pc, gpvec, constgpvec, constgpvec);
+void LieBracket(const pcpresentation &, gpvec, constgpvec, constgpvec);
+void GroupBracket(const pcpresentation &, gpvec, constgpvec, constgpvec);
+void Prod(const pcpresentation &, gpvec, constgpvec, constgpvec);
+void Quo(const pcpresentation &, gpvec, constgpvec, constgpvec);
+void LQuo(const pcpresentation &, gpvec, constgpvec, constgpvec);
+void Inv(const pcpresentation &, gpvec, constgpvec);
 void Collect(const pcpresentation &pc, gpvec, constgpvec);
 void ShrinkCollect(const pcpresentation &pc, gpvec &);
 
