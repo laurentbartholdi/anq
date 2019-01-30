@@ -219,3 +219,8 @@ inline int coeff_out_str(FILE *f, const coeff &a)
 {
   return fprintf(f, "%ld", (long) a.data);
 }
+
+inline void coeff_parse(coeff &a, const char *s)
+{
+  coeff_set_si(a, atoll(s));
+}

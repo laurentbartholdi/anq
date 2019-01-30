@@ -103,8 +103,7 @@ int main(int argc, char **argv) {
       break;
     case 'X':
       PAlgebra = true;
-      // replace by: coeff_get_str !!!
-      coeff_set_si(TorsionExp, atol(optarg));
+      coeff_parse(TorsionExp, optarg);
       sprintf(flags + strlen(flags), "-X%lu ", coeff_get_si(TorsionExp));
       break;
     case 'W':

@@ -34,15 +34,47 @@ const gen EOW = (gen) -1; // larger than all others
  * generator-coefficient pairs and vectors.
  * Used for sparse matrix rows.
  ****************************************************************/
-struct gpower {
+struct gcoeff {
   gen g;
   coeff c;
 };
-typedef gpower *gpvec;
-typedef const gpower *constgpvec;
+struct gpvec {
+  struct iterator : public std::iterator<std::output_iterator_tag, int> {
+    explicit iterator(const gpvec *v) { if (v == NULL) ptr = NULL; else ptr = v->data; };
+    gcoeff operator*() const { return *ptr; }
+    iterator & operator++() { ptr++; return *this; }
+    iterator & operator++(int) { return ++(*this); }
+    bool operator!=(const iterator &that) const { return ptr != that.ptr && ((ptr && ptr->g) || (that.ptr && that.ptr->g)); };
+  private:
+    gcoeff *ptr;
+  };
 
-typedef std::vector<constgpvec> relmatrix;
-  
+  // gpvec() = default;
+  // ~gpvec() = default;
+
+  size_t size() const;
+
+  iterator begin() const { return iterator(this); }
+  iterator end() const { return iterator(NULL); }
+
+  gcoeff *data;
+
+  gcoeff *operator->() const { return data; }
+  gcoeff &operator*() const { return *data; }
+  gpvec &operator++() { data++; return *this; }
+  gpvec &operator++(int) { return ++(*this); }
+  gpvec operator+(ptrdiff_t i) const { return { .data = data+i }; }
+  gpvec operator-(ptrdiff_t i) const { return { .data = data-i }; }
+  ptrdiff_t operator-(const gpvec v) const { return data - v.data; }
+  bool operator==(const gpvec v) const { return data == v.data; }
+  bool operator!=(const gpvec v) const { return data != v.data; }
+};
+typedef const gpvec constgpvec;
+
+typedef std::vector<gpvec> relmatrix;
+
+const gpvec nullgpvec = { .data = NULL };
+
 /*
 ** An element in a lie-algebra is a sum of several multiplications. Hence it
 ** will be represented as a expresson-tree. For simplicity (from the user's
@@ -111,16 +143,16 @@ void InitStack(void);
 void FreeStack(void);
 gpvec FreshVec(void);
 void PopVec(void);
-void PopVec(gpvec &);
+void PopVec(gpvec);
 
-inline void Copy(gpvec vec1, constgpvec vec2) {
-  for (; vec2->g != EOW; vec1++, vec2++)
-    coeff_set(vec1->c, vec2->c), vec1->g = vec2->g;
+inline void Copy(gpvec vec1, const gpvec vec2) {
+  for (auto gc: vec2)
+    coeff_set(vec1->c, gc.c), vec1->g = gc.g, vec1++;
   vec1->g = EOW;
 }
-inline unsigned Length(constgpvec vec) {
+inline unsigned Length(const gpvec vec) {
   unsigned l = 0;
-  while (vec[l].g != EOW) l++;
+  for (auto gc __attribute__((unused)): vec) l++;
   return l;
 }
 gpvec NewVec(unsigned);
@@ -186,32 +218,33 @@ inline void Diff(gpvec vec0, const coeff x1, constgpvec vec1, const coeff x2, co
 }
 inline void Prod(gpvec vec0, const coeff n, constgpvec vec) {
   if (coeff_nz_p(n))
-    for (; vec->g != EOW; vec++) {
-      coeff_mul(vec0->c, vec->c, n);
+    for (auto gc: vec) {
+      coeff_mul(vec0->c, gc.c, n);
       if (coeff_nz_p(vec0->c))
-	vec0->g = vec->g, vec0++;
+	vec0->g = gc.g, vec0++;
     }
   vec0->g = EOW;
 }
 inline void Neg(gpvec vec1, constgpvec vec2) {
-  for (; vec2->g != EOW; vec1++, vec2++)
-    coeff_neg(vec1->c, vec2->c), vec1->g = vec2->g;
+  for (auto gc: vec2)
+    coeff_neg(vec1->c, gc.c), vec1->g = gc.g, vec1++;
   vec1->g = EOW;
 }
 inline void Neg(gpvec vec1) {
-  for (; vec1->g != EOW; vec1++)
-    coeff_neg(vec1->c, vec1->c);
+  for (auto gc: vec1)
+    coeff_neg(gc.c, gc.c);
 }
 inline int Compare(constgpvec vec1, constgpvec vec2) {
+  gpvec p1 = vec1, p2 = vec2;
   for (;;) {
-    if (vec1->g != vec2->g)
-      return vec1->g > vec2->g ? 1 : -1;
-    if (vec1->g == EOW)
+    if (p1->g != p2->g)
+      return p1->g > p2->g ? 1 : -1;
+    if (p1->g == EOW)
       return 0;
-    int c = coeff_cmp(vec1->c, vec2->c);
+    int c = coeff_cmp(p1->c, p2->c);
     if (c)
       return c;
-    vec1++; vec2++;
+    p1++; p2++;
   }
 }
 void LieBracket(const pcpresentation &, gpvec, constgpvec, constgpvec);

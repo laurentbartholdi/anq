@@ -68,20 +68,20 @@ inline gpvec GET(coeffvec &v, coeff &a)
 
 inline void CX(constgpvec x, coeffvec &y)
 {
-  for (; x->g != EOW; x++)
-    coeff_set(y[x->g - FirstCentral], x->c);
+  for (auto gc: x)
+    coeff_set(y[gc.g - FirstCentral], gc.c);
 }
 
 inline void CAX(const coeff &a, constgpvec x, coeffvec &y)
 {
-  for (; x->g != EOW; x++)
-    coeff_mul(y[x->g - FirstCentral], a, x->c);
+  for (auto gc: x)
+    coeff_mul(y[gc.g - FirstCentral], a, gc.c);
 }
 
 inline void CAXPY(const coeff &a, constgpvec x, coeffvec &y)
 {
-  for (; x->g != EOW; x++)
-    coeff_addmul(y[x->g - FirstCentral], a, x->c);
+  for (auto gc: x)
+    coeff_addmul(y[gc.g - FirstCentral], a, gc.c);
 }
 
 inline void CAXPBYZ(const coeff &a, const coeffvec &x, const coeff &b, constgpvec y, coeffvec &z)
@@ -117,9 +117,9 @@ static void InitTorsion(void) {
   if (Torsion) {
     for (unsigned i = 0; i < NrCols; i++) {
       Matrix[i] = NewVec(1);
-      Matrix[i][0].g = FirstCentral + i;
-      coeff_set(Matrix[i][0].c, *TorsionExp);
-      Matrix[i][1].g = EOW;
+      Matrix[i]->g = FirstCentral + i;
+      coeff_set(Matrix[i]->c, *TorsionExp);
+      (Matrix[i]+1)->g = EOW;
     }
   }
 }
@@ -130,7 +130,7 @@ void InitRelMatrix(const pcpresentation &pc, unsigned nrcentralgens) {
   Torsion = pc.PAlgebra;
   TorsionExp = &pc.TorsionExp;
 
-  Matrix.resize(NrCols, NULL);
+  Matrix.resize(NrCols, nullgpvec);
   InitTorsion();
 }
 
@@ -139,7 +139,7 @@ void FreeRelMatrix(void) {
     abortprintf(5, "FreeMatrix: row queue not empty");
   
   for (gpvec v : Matrix)
-    if (v)
+    if (v != nullgpvec)
       FreeVec(v, NrCols);
   Matrix.clear();
 }
@@ -147,7 +147,7 @@ void FreeRelMatrix(void) {
 // for debugging purposes
 void PrintMatrix(void) {
   for (constgpvec v : Matrix)
-    if (v)
+    if (v != nullgpvec)
       PrintVec(stdout, v);
   printf("\n");
 }
@@ -155,7 +155,7 @@ void PrintMatrix(void) {
 /* collect the vectors in Queue and Matrix, and combine them back into Matrix */
 void LU(void) {
   /* remove unbound entries in Matrix */
-  Matrix.erase(std::remove(Matrix.begin(), Matrix.end(), (gpvec) 0), Matrix.end());
+  Matrix.erase(std::remove(Matrix.begin(), Matrix.end(), nullgpvec), Matrix.end());
 
   /* put queue at bottom of matrix */
 #ifdef CUSTOM_ALLOC
@@ -173,15 +173,15 @@ void LU(void) {
     std::vector<int> intmat;
     for (constgpvec v : Matrix) {
       ind.push_back(intmat.size());
-      for (constgpvec w = v; w->g != EOW; w++)
-	intmat.push_back(w->g - FirstCentral);
+      for (auto gc: v)
+	intmat.push_back(gc.g - FirstCentral);
     }
     ind.push_back(intmat.size());
 
     if (Debug >= 2) {
       fprintf(LogFile, "# about to collect %ld relations (%ld nnz)\n", Matrix.size(), intmat.size());
     }
-  
+
     size_t alloc = colamd_recommended(intmat.size(), NrCols, Matrix.size());
     intmat.reserve(alloc);
     int ok = colamd(NrCols, Matrix.size(), alloc, intmat.data(), ind.data(), NULL, stats);
@@ -197,7 +197,7 @@ void LU(void) {
       abortprintf(5, "colamd error %d", ok);
   }
   
-  std::vector<gpvec> oldrels(NrCols, NULL);
+  std::vector<gpvec> oldrels(NrCols, nullgpvec);
   Matrix.swap(oldrels);
   InitTorsion();
 
@@ -218,7 +218,7 @@ void LU(void) {
       if (coeff_z_p(newrow[row]))
 	continue;
       
-      if (Matrix[row] == NULL) { /* Insert v in Matrix at position row */
+      if (Matrix[row] == nullgpvec) { /* Insert v in Matrix at position row */
 	coeff_unit_annihilator(b, a, newrow[row]);
 	Matrix[row] = GET(newrow, b);
 	CAX(a, Matrix[row], newrow);
@@ -272,20 +272,20 @@ relmatrix GetRelMatrix(void) {
 
   relmatrix rels;
   rels.reserve(NrCols);
-  
+
   /* reduce all the head columns, to achieve Hermite normal form. */
   coeffvec newrow = NEW(NrCols);
   coeff q;
   coeff_init(q);
   for (unsigned j = 0; j < NrCols; j++) { // !!! would this be faster looping backwards?
-    if (!Matrix[j])
+    if (Matrix[j] == nullgpvec)
       continue;
     CX(Matrix[j], newrow);
     FreeVec(Matrix[j]);
-    
+
     for (unsigned i = j+1; i < NrCols; i++) {
       gpvec w = Matrix[i];
-      if (!w)
+      if (w == nullgpvec)
 	continue;
 
       if (!coeff_reduced_p(newrow[i], w->c)) {
@@ -302,7 +302,7 @@ relmatrix GetRelMatrix(void) {
    generators; e.g. [2 1;0 2] could become [4 0;0 1] and allow
    elimination of the second vector. this requires a different format,
    and is perhaps best done outside this matrix code. */
-  
+
   coeff_clear(q);
   FREE(newrow);
 

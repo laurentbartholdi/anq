@@ -12,19 +12,20 @@ unsigned NrTotalGens;
 
 /* add generator newgen to vector v, and store its definition */
 static void AddSingleGenerator(pcpresentation &pc, gpvec &v, deftype def) {
-  unsigned l;
+  gpvec p;
 
-  if (v == NULL) {
-    v = NewVec(1);
-    l = 0;
-  } else {
-    l = Length(v);
+  if (v != nullgpvec) {
+    int l = Length(v);
     v = ResizeVec(v, l, l + 1);
+    p = v + l;
+  } else {
+    v = NewVec(1);
+    p = v;
   }
 
-  v[l].g = ++NrTotalGens;
-  coeff_set_si(v[l].c, 1);
-  v[l+1].g = EOW;
+  p->g = ++NrTotalGens;
+  coeff_set_si(p->c, 1);
+  (p+1)->g = EOW;
 
   pc.Generator = (deftype *) realloc(pc.Generator, (NrTotalGens + 1) * sizeof(deftype));
   if (pc.Generator == NULL)
@@ -82,7 +83,7 @@ void InitPcPres(pcpresentation &pc, const presentation &pres, bool Graded, bool 
 
 void FreePcPres(pcpresentation &pc, const presentation &pres) {
   for (unsigned i = 1; i <= pc.NrPcGens; i++) {
-    if (pc.Power[i] != NULL)
+    if (pc.Power[i] != nullgpvec)
       FreeVec(pc.Power[i]);
     coeff_clear(pc.Exponent[i]);
     coeff_clear(pc.Annihilator[i]);
@@ -255,7 +256,7 @@ void AddNewTails(pcpresentation &pc, const presentation &pres) {
   if (pc.Power == NULL)
     abortprintf(2, "AddNewTails: realloc(Power) failed");
   for (unsigned i = pc.NrPcGens + 1; i <= NrTotalGens; i++)
-    pc.Power[i] = NULL;
+    pc.Power[i] = nullgpvec;
 
   /* The Product array is not extended yet, because anyways it won't be used.
      we'll extend it later, in ReducePcPres */
@@ -278,32 +279,32 @@ void AddNewTails(pcpresentation &pc, const presentation &pres) {
 
 static void EliminateTrivialGenerators(pcpresentation &pc, const relmatrix &rels, gpvec &v, int renumber[]) {
   bool copied = false;
-  unsigned pos = 0;
+  gpvec p = v;
 
-  for (; v[pos].g != EOW;) {
-    int newg = renumber[v[pos].g];
+  for (; p->g != EOW;) {
+    int newg = renumber[p->g];
     if (newg >= 1) {
-      v[pos].g = newg;
-      pos++;
+      p->g = newg;
+      p++;
     } else {
       constgpvec rel = rels[-newg];
       gpvec temp = FreshVec();
-      Diff(temp, v+pos+1, v[pos].c, rel+1);
+      Diff(temp, p+1, p->c, rel+1);
       if (!copied) { /* we should make sure we have enough space */
 	gpvec newv = NewVec(NrTotalGens);
-	v[pos].g = EOW; /* cut original p at this position, copy to newv */
+	p->g = EOW; /* cut original p at this position, copy to newv */
 	Copy(newv, v);
-	v[pos].g = rel->g; /* put it back, so we can free correctly v */
+	p->g = rel->g; /* put it back, so we can free correctly v */
 	FreeVec(v);
 	v = newv;
       }
-      Copy(v+pos, temp);
+      Copy(p, temp);
       PopVec();
       copied = true;
     }
   }
   if (copied)
-    v = ResizeVec(v, NrTotalGens, pos);
+    v = ResizeVec(v, NrTotalGens, p-v);
   ShrinkCollect(pc, v);
 }
 
@@ -350,7 +351,7 @@ void ReducePcPres(pcpresentation &pc, const presentation &pres, const relmatrix 
   /* Modify the torsions first, in decreasing order, since they're needed
      for Collect */
   for (unsigned j = NrTotalGens; j >= 1; j--)
-    if (pc.Power[j] != NULL)
+    if (pc.Power[j] != nullgpvec)
       EliminateTrivialGenerators(pc, rels, pc.Power[j], renumber);
   
   /*  Modify the epimorphisms: */

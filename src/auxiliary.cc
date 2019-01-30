@@ -91,14 +91,15 @@ void PopVec(gpvec &p) {
 /****************************************************************/
 
 gpvec NewVec(unsigned size) {
-  gpvec v = (gpvec) malloc ((size+1)*sizeof v[0]);
-  if (v == NULL)
+  gpvec v;
+  v.data = (gcoeff *) malloc ((size+1)*sizeof v.data[0]);
+  if (v == nullgpvec)
     abortprintf(2, "NewVec: malloc(Vector) failed");
 
   for (unsigned i = 0; i < size; i++) /* we don't allocate the coefficient
 					 in the last position, it's only
 					 used for the EOW marker */
-    coeff_init(v[i].c);
+    coeff_init(v.data[i].c);
   v->g = EOW;
   
   return v;
@@ -106,28 +107,28 @@ gpvec NewVec(unsigned size) {
 
 void FreeVec(gpvec v, unsigned size) {
   for (unsigned i = 0; i < size; i++)
-    coeff_clear(v[i].c);
-  free(v);
+    coeff_clear(v.data[i].c);
+  free(v.data);
 }
 
 void FreeVec(gpvec v) {
-  for (gpvec p = v; p->g != EOW; p++)
-    coeff_clear(p->c);
-  free(v);
+  for (auto gc: v)
+    coeff_clear(gc.c);
+  free(v.data);
 }
 
 gpvec ResizeVec(gpvec v, unsigned oldlength, unsigned newlength) {
   if (oldlength > newlength)
     for (unsigned i = newlength; i < oldlength; i++)
-      coeff_clear(v[i].c);
+      coeff_clear(v.data[i].c);
 
-  v = (gpvec) realloc (v, (newlength+1)*sizeof v[0]);
-  if (v == NULL)
+  v.data = (gcoeff *) realloc (v.data, (newlength+1)*sizeof v.data[0]);
+  if (v == nullgpvec)
     abortprintf(2, "ResizeVec: realloc(Vector) failed");
 
   if (oldlength < newlength)
     for (unsigned i = oldlength; i < newlength; i++)
-      coeff_init(v[i].c);
+      coeff_init(v.data[i].c);
 
   return v;
 }

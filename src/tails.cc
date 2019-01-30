@@ -79,14 +79,16 @@ static bool AdjustTail(const pcpresentation &pc, gen j, gen i) {
     fprintf(LogFile, "\n");
   }
 
-  unsigned k;
-  for (k = 0; pc.Product[j][i][k].g != EOW; k++)
-    if (pc.Product[j][i][k].g != tail[k].g || coeff_cmp(pc.Product[j][i][k].c,tail[k].c))
+  gpvec p = tail;
+  for (auto gc: pc.Product[j][i]) {
+    if (gc.g != p->g || coeff_cmp(gc.c,p->c))
       return false;
+    p++;
+  }
 
-  if (tail[k].g != EOW) {
-    pc.Product[j][i] = ResizeVec(pc.Product[j][i], k, Length(tail));
-    Copy(pc.Product[j][i]+k, tail+k);
+  if (p->g != EOW) {
+    pc.Product[j][i] = ResizeVec(pc.Product[j][i], p-tail, Length(tail));
+    Copy(pc.Product[j][i]+(p-tail), p);
   }
 
   PopVec(); /* tail */

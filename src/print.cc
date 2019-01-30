@@ -43,10 +43,11 @@ void TimeStamp(const char *s) {
 }
 
 void PrintVec(FILE *f, constgpvec gv) {
-  for (unsigned i = 0; gv[i].g != EOW; i++) {
-    if (i) fprintf(f, " + ");
-    coeff_out_str(f, gv[i].c);
-    fprintf(f, "*a%d", gv[i].g);
+  bool first = true;
+  for (auto gc: gv) {
+    if (first) first = false; else fprintf(f, " + ");
+    coeff_out_str(f, gc.c);
+    fprintf(f, "*a%d", gc.g);
   }
 }
 
@@ -134,7 +135,7 @@ void PrintPcPres(FILE *f, const pcpresentation &pc, const presentation &pres, bo
       fprintf(f, "%10s", "");
       coeff_out_str(f, pc.Exponent[i]);
       fprintf(f, "*a%d", i);
-      if (pc.Power[i] != NULL && pc.Power[i]->g != EOW) {
+      if (pc.Power[i] != nullgpvec && pc.Power[i]->g != EOW) {
 	if (pc.Generator[pc.Power[i]->g].t == DPOW && pc.Generator[pc.Power[i]->g].g == i)
 	  fprintf(f, " =: a%d", pc.Power[i]->g);
 	else {
@@ -193,12 +194,10 @@ void PrintPcPres(FILE *f, const pcpresentation &pc, const presentation &pres, bo
 }
 
 bool PrintGAPVec(FILE *f, constgpvec v, bool first) {
-  for (; v->g != EOW; v++) {
-    if (first)
-      fprintf(f, " + ");
-    coeff_out_str(f, v->c);
-    fprintf(f, "*bas[%d]", v->g);
-    first = false;
+  for (auto gc: v) {
+    if (first) first = false; else fprintf(f, " + ");
+    coeff_out_str(f, gc.c);
+    fprintf(f, "*bas[%d]", gc.g);
   }
   return first;
 }
@@ -237,7 +236,7 @@ void PrintGAPPres(FILE *f, const pcpresentation &pc, const presentation &pres) {
       fprintf(f, "%s-", first ? "" : ",\n\t\t");
       coeff_out_str(f, pc.Exponent[i]);
       fprintf(f, "*bas[%d]", i);
-      if (pc.Power[i] != NULL)
+      if (pc.Power[i] != nullgpvec)
 	PrintGAPVec(f, pc.Power[i], false);
       first = false;
     }
