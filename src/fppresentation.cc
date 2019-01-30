@@ -285,9 +285,9 @@ static void NextToken(void) {
     coeff_set_si(N, 0);
     int base = (Ch == '0' ? coeff_base : 10);
     
-    while (isdigit(Ch)) {
+    while (isalnum(Ch)) {
       coeff_mul_si(N, N, base);
-      coeff_add_si(N, N, Ch - '0');
+      coeff_add_si(N, N, isdigit(Ch) ? Ch - '0' : Ch + 10 - (isupper(Ch) ? 'A' : 'a'));
       ReadCh();
     }
     break;
@@ -457,15 +457,17 @@ static void ValidateExpression(node *n, gen g) {
     ValidateExpression(n->cont.bin.r, g);
     break;
   case TPOW:
+    if (n->cont.bin.l->type == TNUM || n->cont.bin.r->type == TNUM)
+      break;
 #ifdef LIEALG
-    if (n->cont.bin.l->type != TNUM || n->cont.bin.r->type != TNUM)
-      SyntaxError("Arguments of TPOW should be numbers, not %s,%s", nodename[n->cont.bin.l->type], nodename[n->cont.bin.r->type]);
+    // this actually cannot happen, because of compile-time evaluation
+    SyntaxError("Arguments of TPOW should be numbers, not %s,%s", nodename[n->cont.bin.l->type], nodename[n->cont.bin.r->type]);
 #else
     ValidateExpression(n->cont.bin.l, g);
     if (n->cont.bin.r->type != TNUM)
       ValidateExpression(n->cont.bin.r, g);
-#endif
     break;
+#endif
 #ifdef LIEALG
   case TBRACK:
   case TSUM:
@@ -732,6 +734,9 @@ void EvalRel(const pcpresentation &pc, gpvec v, node *rel) {
     PopVec();
     break;
   case TLQUO:
+#ifdef GROUP
+  case TREL:
+#endif
     vl = FreshVec();
     vr = FreshVec();
     EvalRel(pc, vl, rel->cont.bin.l);
@@ -772,7 +777,9 @@ void EvalRel(const pcpresentation &pc, gpvec v, node *rel) {
     PopVec();
     break;
   case TDIFF:
+#ifdef LIEALG
   case TREL:
+#endif
     vl = FreshVec();
     vr = FreshVec();
     EvalRel(pc, vl, rel->cont.bin.l);
@@ -780,6 +787,22 @@ void EvalRel(const pcpresentation &pc, gpvec v, node *rel) {
     Diff(v, vl, vr);
     PopVec();
     PopVec();
+    break;
+  case TPOW:
+    if (rel->cont.bin.r->type == TNUM) {
+      vl = FreshVec();
+      EvalRel(pc, vl, rel->cont.bin.l);
+      Pow(pc, v, vl, rel->cont.bin.r->cont.n);
+      PopVec();
+    } else {
+      vl = FreshVec();
+      vr = FreshVec();
+      EvalRel(pc, vl, rel->cont.bin.l);
+      EvalRel(pc, vr, rel->cont.bin.r);
+      Conjugate(pc, v, vl, vr);
+      PopVec();
+      PopVec();
+    }
     break;
   default:
     abortprintf(3, "EvalRel: operator of type %s should not occur", nodename[rel->type]);

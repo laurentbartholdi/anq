@@ -202,7 +202,8 @@ bool PrintGAPVec(FILE *f, constgpvec v, bool first) {
   }
   return first;
 }
-  
+
+#ifdef LIEALG
 void PrintGAPPres(FILE *f, const pcpresentation &pc, const presentation &pres) {
   fprintf(f, "LoadPackage(\"liering\");\n"
 	  "F := FreeLieRing(Integers,[");
@@ -293,3 +294,26 @@ void PrintGAPPres(FILE *f, const pcpresentation &pc, const presentation &pres) {
   fprintf(f, "\treturn L;\n"
 	  "end,[]);\n");
 }
+#else
+void PrintGAPPres(FILE *f, const pcpresentation &pc, const presentation &pres) {
+  fprintf(f, "LoadPackage(\"nq\");\n"
+	  "F := FreeGroup(IsSyllableWordsFamily,[");
+  for (unsigned i = 1; i <= pres.NrGens; i++)
+    fprintf(f, "%s\"%s\"", i > 1 ? "," : "", pres.GeneratorName[i].c_str());
+  fprintf(f, "]);\n");
+
+  fprintf(f, "G := CallFuncList(function()\n"
+	  "\tlocal F, c, g;\n"
+	  "\tF := FreeGroup(%d);\n"
+	  "\tg := GeneratorsOfGroup(F);\n"
+	  "\tc := FromTheLeftCollector(%d);\n", pc.NrPcGens, pc.NrPcGens);
+  //!!! SetRelativeOrder(ftl, i, n);
+  //!!! SetPower( ftl, i, rels.powersp[i] );
+  //!!! SetConjugate( ftl, j, i, gens[j] * comm[j,i] );
+  fprintf(f, "\treturn PcpGroupByCollector(c);\n"
+	  "end,[]);\n");
+  fprintf(f, "SetEpimorphismFromFreeGroup(G, GroupHomomorphismByImages(F,G,[");
+  //!!! images of std generators
+  fprintf(f, "]));\n");
+}
+#endif

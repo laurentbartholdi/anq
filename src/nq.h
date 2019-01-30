@@ -217,9 +217,11 @@ inline int Compare(constgpvec vec1, constgpvec vec2) {
 void LieBracket(const pcpresentation &, gpvec, constgpvec, constgpvec);
 void GroupBracket(const pcpresentation &, gpvec, constgpvec, constgpvec);
 void Prod(const pcpresentation &, gpvec, constgpvec, constgpvec);
+void Conjugate(const pcpresentation &, gpvec, constgpvec, constgpvec);
 void Quo(const pcpresentation &, gpvec, constgpvec, constgpvec);
 void LQuo(const pcpresentation &, gpvec, constgpvec, constgpvec);
 void Inv(const pcpresentation &, gpvec, constgpvec);
+void Pow(const pcpresentation &, gpvec, constgpvec, coeff &);
 void Collect(const pcpresentation &pc, gpvec, constgpvec);
 void ShrinkCollect(const pcpresentation &pc, gpvec &);
 

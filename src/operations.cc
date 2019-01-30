@@ -158,7 +158,7 @@ void Diff(gpvec vec0, constgpvec vec1, constgpvec vec2) {
 /****************************************************************
  Lie bracket of vectors
 
- this could be very inefficient the way it's implemented:
+ !!! this could be very inefficient the way it's implemented:
  if vec1 and vec2 are almost full vectors (of length N), and each
  Product[] entry is a short vector (of length n), then we have
  complexity O(N^3) while we could achieve O(N^2n) in theory.
@@ -196,6 +196,7 @@ void LieBracket(const pcpresentation &pc, gpvec vec0, constgpvec vec1, constgpve
   PopVec();
 }
 
+#ifdef LIEALG
 /* the main collection routine. It could be optimized:
    if all Power relations have length n, and gv is full of length N,
    then the complexity is O(N^3) rather than O(N^2 n).
@@ -278,6 +279,157 @@ void ShrinkCollect(const pcpresentation &pc, gpvec &v) {
     v[pos+shift].g = EOW;
     v = ResizeVec(v, pos, pos+shift);
   }
+}
+#else
+void Collect(const pcpresentation &pc, gpvec vec0, constgpvec v) {
+  volative v = 0; v / v;
+  //!!! GROUP
+}
+
+// time-critical: avoid copying if possible
+void ShrinkCollect(const pcpresentation &pc, gpvec &v) {
+  volative v = 0; v / v;
+  //!!! GROUP
+}
+#endif
+
+void Prod(const pcpresentation &pc, gpvec vec0, constgpvec vec1, constgpvec vec2)
+{
+  Copy(vec0, vec1);
+  Collect(pc, vec0, vec2);
+}
+
+// solve vec2*vec0 = vec1*vec2 for vec0
+void Conjugate(const pcpresentation &pc, gpvec vec0, constgpvec vec1, constgpvec vec2)
+{
+  gpvec p1p2 = FreshVec();
+  Copy(p1p2, vec1);
+  Collect(pc, p1p2, vec2);
+  LQuo(pc, vec0, vec2, p1p2);
+  PopVec();
+}
+
+void Quo(const pcpresentation &pc, gpvec vec0, constgpvec vec1, constgpvec vec2)
+{
+  gpvec vec2i = FreshVec();
+  for (unsigned pos = 0; vec2[pos].g != EOW; pos++) {
+    vec2i[pos].g = vec2[pos].g;
+    coeff_neg(vec2i[pos].c, vec2[pos].c);
+  }
+  Copy(vec0, vec1);
+  Collect(pc, vec0, vec2i);
+  PopVec();
+}
+
+// solve vec1*vec0 = vec2 for vec0
+void LQuo(const pcpresentation &pc, gpvec vec0, constgpvec vec1, constgpvec vec2)
+{
+  gpvec p = vec0, p2 = FreshVec();
+  Copy(p2, vec2);
+  constgpvec p1 = vec1;
+  p->g = EOW;
+  
+  while (gen g = std::min(vec1->g, vec2->g) != EOW) {
+    if (p1->g == p2->g)
+      coeff_sub(p->c, (p2++)->c, (p1++)->c);
+    else if (g == p1->g)
+      coeff_neg(p->c, (p1++)->c);
+    else
+      coeff_set(p->c, (p2++)->c);
+    if (!coeff_reduced_p(p->c, pc.Exponent[g]))
+      coeff_fdiv_r(p->c, p->c, pc.Exponent[g]);
+    if (coeff_nz_p(p->c)) {
+      (p++)->g = g;
+      p->g = EOW;
+      Collect(pc, p2, p-1);
+    }
+  }
+  PopVec();
+}
+
+void Inv(const pcpresentation &pc, gpvec vec0, constgpvec vec1)
+{
+  gpower one = { .g = EOW };
+  LQuo(pc, vec0, vec1, &one);
+}
+
+// solve vec2*vec1*vec0 = vec1*vec2 for vec0
+void GroupBracket(const pcpresentation &pc, gpvec vec0, constgpvec vec1, constgpvec vec2)
+{
+  // at each step, we have p2a*p1a*p = p1p2
+  gpvec p1a = FreshVec(), p2a = FreshVec(), p1p2 = FreshVec(), p = vec0;
+  Copy(p1p2, vec1);
+  Collect(pc, p1p2, vec2);
+  Copy(p1a, vec1);
+  Copy(p2a, vec2);
+  p->g = EOW;
+  
+  while (gen g = std::min(p1p2->g,std::min(p1a->g,p2a->g)) != EOW) {
+    if (g == p1a->g)
+      coeff_neg(p->c, p1a->c); // increment later p1a, after more collecting
+    else
+      coeff_set_si(p->c, 0);
+    if (g == p2a->g)
+      coeff_sub(p->c, p->c, (p2a++)->c);
+    if (g == p1p2->g)
+      coeff_add(p->c, p->c, (p1p2++)->c);
+    if (!coeff_reduced_p(p->c, pc.Exponent[g]))
+      coeff_fdiv_r(p->c, p->c, pc.Exponent[g]);
+    if (coeff_nz_p(p->c)) {
+      (p++)->g = g;
+      p->g = EOW;
+      Collect(pc, p1a, p-1);
+    }
+    if (g == p1a->g) {
+      gen oldg = (++p1a)->g;
+      p1a->g = EOW;
+      Collect(pc, p2a, p1a-1);
+      p1a->g = oldg;
+    }
+  }
+  PopVec(), PopVec(), PopVec(), PopVec();
+}
+
+static void Pow(const pcpresentation &pc, gpvec vec0, constgpvec vec1, int c)
+{
+  if (c == -1) {
+    Inv(pc, vec0, vec1);
+    return;
+  }
+  if(c == 0) {
+    vec0->g = EOW;
+    return;
+  }
+  if (c == 1) {
+    Copy(vec0, vec1);
+    return;
+  }
+
+  vec0->g = EOW;
+  gpvec s = FreshVec();
+  if (c > 0)
+    Copy(s, vec1);
+  else {
+    Inv(pc, s, vec1);
+    c = -c;
+  }
+
+  //!!! use prime instead of 2 to improve cancellations
+  for (;;) {
+    if (c % 2)
+      Collect(pc, vec0, s);
+    c /= 2;
+    if (c == 0)
+      break;
+    Collect(pc, s, s);
+  }
+  PopVec();
+}
+
+void Pow(const pcpresentation &pc, gpvec vec0, constgpvec vec1, coeff &c)
+{
+  //!!! what to do with large exponents?
+  Pow(pc, vec0, vec1, coeff_get_si(c));
 }
 
 #if 0

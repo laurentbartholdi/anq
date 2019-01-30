@@ -13,6 +13,8 @@
 **  quotient ring.
 */
 
+// !!!GROUP
+
 /*
 **  CheckJacobi( a, b, c ) checks whether the Jacobi holds for
 **  the triple ( a, b, c ) and returns its value in cv.

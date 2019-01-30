@@ -13,6 +13,8 @@
 **  hence we can compute them inductively.
 */
 
+// !!!GROUP
+
 /* compute the correct tail for [aj,ai]:
  *
  * - if i is defined as [g,h], compute [j,i] = [j,g,h]-[j,h,g]
