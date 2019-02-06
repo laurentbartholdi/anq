@@ -32,70 +32,73 @@ inline void FREE(coeffvec &v)
     coeff_clear(c);
 }
 
-inline gpvec GET(coeffvec &v)
+inline sparsecvec GET(coeffvec &v)
 {
   unsigned len = 0;
   for (coeff &c : v)
     if (coeff_nz_p(c))
       len++;
-  gpvec r = NewVec(len), p = r;
+  sparsecvec r(len);
+  auto p = r.begin();
   for (unsigned i = 0; i < v.size(); i++) {
     if (coeff_z_p(v[i]))
       continue;
-    p->g = i + FirstCentral;
-    coeff_set(p->c, v[i]);
+    p->first = i + FirstCentral;
+    coeff_set(p->second, v[i]);
     coeff_zero(v[i]);
     p++;
   }
-  p->g = EOW;
+  p.markend();
   return r;
 }
 
-inline gpvec GET(coeffvec &v, coeff &a)
+inline sparsecvec GET(coeffvec &v, coeff &a)
 {
   unsigned len = 0;
-  gpvec r = NewVec(v.size()), p = r;
+  sparsecvec r(v.size());
+  auto p = r.begin();
   for (unsigned i = 0; i < v.size(); i++) {
-    p->g = i + FirstCentral;
-    coeff_mul(p->c, v[i], a);
+    p->first = i + FirstCentral;
+    coeff_mul(p->second, v[i], a);
     coeff_zero(v[i]);
-    if (coeff_nz_p(p->c))
+    if (coeff_nz_p(p->second))
       p++, len++;
   }
-  p->g = EOW;
-  return ResizeVec(r, v.size(), len);
+  p.markend();
+  r.resize(len);
+  return r;
 }
 
-inline void CX(constgpvec x, coeffvec &y)
+inline void CX(const sparsecvec x, coeffvec &y)
 {
-  for (auto gc: x)
-    coeff_set(y[gc.g - FirstCentral], gc.c);
+  for (auto kc : x)
+    coeff_set(y[kc.first - FirstCentral], kc.second);
 }
 
-inline void CAX(const coeff &a, constgpvec x, coeffvec &y)
+inline void CAX(const coeff &a, const sparsecvec x, coeffvec &y)
 {
-  for (auto gc: x)
-    coeff_mul(y[gc.g - FirstCentral], a, gc.c);
+  for (auto kc : x)
+    coeff_mul(y[kc.first - FirstCentral], a, kc.second);
 }
 
-inline void CAXPY(const coeff &a, constgpvec x, coeffvec &y)
+inline void CAXPY(const coeff &a, const sparsecvec x, coeffvec &y)
 {
-  for (auto gc: x)
-    coeff_addmul(y[gc.g - FirstCentral], a, gc.c);
+  for (auto kc : x)
+    coeff_addmul(y[kc.first - FirstCentral], a, kc.second);
 }
 
-inline void CAXPBYZ(const coeff &a, const coeffvec &x, const coeff &b, constgpvec y, coeffvec &z)
+inline void CAXPBYZ(const coeff &a, const coeffvec &x, const coeff &b, const sparsecvec y, coeffvec &z)
 {
   for (unsigned i = 0; i < x.size(); i++)
     coeff_mul(z[i], a, x[i]);
   CAXPY(b, y, z);
 }
 
-std::vector<gpvec> Matrix;
+std::vector<sparsecvec> Matrix;
 #ifdef CUSTOM_ALLOC
-template<typename T> struct gpvec_allocator: public std::allocator<T>
+template<typename T> struct sparsecvec_allocator: public std::allocator<T>
 {
-  template<class U> struct rebind { typedef gpvec_allocator<U> other; };
+  template<class U> struct rebind { typedef sparsecvec_allocator<U> other; };
   typedef std::allocator<T> base;
   typename base::pointer allocate(typename base::size_type n) {
     fprintf(stderr,"ALLOC %d",n); // here we want to make a copy
@@ -106,20 +109,20 @@ template<typename T> struct gpvec_allocator: public std::allocator<T>
     return this->base::allocate(n, hint);
   }
 };
-std::set<gpvec,bool(*)(gpvec,gpvec),gpvec_allocator<gpvec>> Queue([](gpvec v1, gpvec v2){ return Compare(v1,v2) < 0; });
+std::set<sparsecvec,bool(*)(sparsecvec,sparsecvec),sparsecvec_allocator<sparsecvec>> Queue([](sparsecvec v1, sparsecvec v2){ return Compare(v1,v2) < 0; });
 #else
 // hack to allow pointer to be changed in set
-struct __gpvec { mutable gpvec v; };
-std::set<__gpvec,bool(*)(__gpvec,__gpvec)> Queue([](__gpvec v1, __gpvec v2){ return Compare(v1.v,v2.v) < 0; });
+struct __sparsecvec { mutable sparsecvec v; };
+std::set<__sparsecvec,bool(*)(__sparsecvec,__sparsecvec)> Queue([](__sparsecvec v1, __sparsecvec v2){ return Compare(v1.v,v2.v) < 0; });
 #endif
 
 static void InitTorsion(void) {  
   if (Torsion) {
     for (unsigned i = 0; i < NrCols; i++) {
-      Matrix[i] = NewVec(1);
-      Matrix[i]->g = FirstCentral + i;
-      coeff_set(Matrix[i]->c, *TorsionExp);
-      (Matrix[i]+1)->g = EOW;
+      Matrix[i].alloc(1);
+      Matrix[i][0].first = FirstCentral + i;
+      coeff_set(Matrix[i][0].second, *TorsionExp);
+      Matrix[i].truncate(1);
     }
   }
 }
@@ -130,7 +133,7 @@ void InitRelMatrix(const pcpresentation &pc, unsigned nrcentralgens) {
   Torsion = pc.PAlgebra;
   TorsionExp = &pc.TorsionExp;
 
-  Matrix.resize(NrCols, nullgpvec);
+  Matrix.resize(NrCols, sparsecvec(nullptr));
   InitTorsion();
 }
 
@@ -138,16 +141,15 @@ void FreeRelMatrix(void) {
   if (!Queue.empty())
     abortprintf(5, "FreeMatrix: row queue not empty");
   
-  for (gpvec v : Matrix)
-    if (v != nullgpvec)
-      FreeVec(v, NrCols);
+  for (sparsecvec v : Matrix)
+    v.free(NrCols);
   Matrix.clear();
 }
 
 // for debugging purposes
 void PrintMatrix(void) {
-  for (constgpvec v : Matrix)
-    if (v != nullgpvec)
+  for (const sparsecvec v : Matrix)
+    if (v.allocated())
       PrintVec(stdout, v);
   printf("\n");
 }
@@ -155,13 +157,13 @@ void PrintMatrix(void) {
 /* collect the vectors in Queue and Matrix, and combine them back into Matrix */
 void LU(void) {
   /* remove unbound entries in Matrix */
-  Matrix.erase(std::remove(Matrix.begin(), Matrix.end(), nullgpvec), Matrix.end());
+  Matrix.erase(std::remove(Matrix.begin(), Matrix.end(), sparsecvec(nullptr)), Matrix.end());
 
   /* put queue at bottom of matrix */
 #ifdef CUSTOM_ALLOC
   Matrix.insert(Matrix.end(), Queue.begin(), Queue.end());
 #else
-  std::transform(Queue.begin(), Queue.end(), std::back_inserter(Matrix), [](__gpvec v) { return v.v; });
+  std::transform(Queue.begin(), Queue.end(), std::back_inserter(Matrix), [](__sparsecvec v) { return v.v; });
 #endif
   
   Queue.clear();
@@ -171,10 +173,10 @@ void LU(void) {
   {
     int stats[COLAMD_STATS];
     std::vector<int> intmat;
-    for (constgpvec v : Matrix) {
+    for (const sparsecvec v : Matrix) {
       ind.push_back(intmat.size());
-      for (auto gc: v)
-	intmat.push_back(gc.g - FirstCentral);
+      for (auto kc : v)
+	intmat.push_back(kc.first - FirstCentral);
     }
     ind.push_back(intmat.size());
 
@@ -197,7 +199,7 @@ void LU(void) {
       abortprintf(5, "colamd error %d", ok);
   }
   
-  std::vector<gpvec> oldrels(NrCols, nullgpvec);
+  std::vector<sparsecvec> oldrels(NrCols, sparsecvec(nullptr));
   Matrix.swap(oldrels);
   InitTorsion();
 
@@ -212,13 +214,13 @@ void LU(void) {
      the order specified by the permutation ind */
   for (unsigned i = 0; i < oldrels.size(); i++) {
     CX(oldrels[ind[i]], newrow);
-    FreeVec(oldrels[ind[i]]);
+    oldrels[ind[i]].free(); // !!! specify size to free?
 
     for (unsigned row = 0; row < NrCols; row++) {
       if (coeff_z_p(newrow[row]))
 	continue;
       
-      if (Matrix[row] == nullgpvec) { /* Insert v in Matrix at position row */
+      if (!Matrix[row].allocated()) { /* Insert v in Matrix at position row */
 	coeff_unit_annihilator(b, a, newrow[row]);
 	Matrix[row] = GET(newrow, b);
 	CAX(a, Matrix[row], newrow);
@@ -227,8 +229,8 @@ void LU(void) {
 	  fprintf(LogFile, "# Adding row %d: ",row); PrintVec(LogFile, Matrix[row]); fprintf(LogFile, "\n");
 	}
       } else { /* two rows with same pivot. Merge them */
-	coeff_gcdext(d, a, b, newrow[row], Matrix[row]->c); /* d = a*v[head]+b*Matrix[row][head] */
-	if (!coeff_cmp(d, Matrix[row]->c)) { /* likely case: Matrix[row][head]=d, b=1, a=0 */
+	coeff_gcdext(d, a, b, newrow[row], Matrix[row][0].second); /* d = a*v[head]+b*Matrix[row][head] */
+	if (!coeff_cmp(d, Matrix[row][0].second)) { /* likely case: Matrix[row][head]=d, b=1, a=0 */
 	  coeff_divexact(d, newrow[row], d);
 	  coeff_neg(d, d);
 	  CAXPY(d, Matrix[row], newrow);
@@ -242,11 +244,11 @@ void LU(void) {
 #endif
 	} else {
 	  coeff_divexact(c, newrow[row], d);
-	  coeff_divexact(d, Matrix[row]->c, d);
+	  coeff_divexact(d, Matrix[row].begin()->second, d);
 	  CAXPBYZ(a, newrow, b, Matrix[row], scratch);
 	  coeff_neg(d, d);
 	  CAXPBYZ(d, newrow, c, Matrix[row], newrow);
-	  FreeVec(Matrix[row]);
+	  Matrix[row].free(); // !!! with size?
 	  Matrix[row] = GET(scratch);
 
 	  if (Debug >= 3) {
@@ -278,18 +280,18 @@ relmatrix GetRelMatrix(void) {
   coeff q;
   coeff_init(q);
   for (unsigned j = 0; j < NrCols; j++) { // !!! would this be faster looping backwards?
-    if (Matrix[j] == nullgpvec)
+    if (!Matrix[j].allocated())
       continue;
     CX(Matrix[j], newrow);
-    FreeVec(Matrix[j]);
+    Matrix[j].free(); // !!! specify size?
 
     for (unsigned i = j+1; i < NrCols; i++) {
-      gpvec w = Matrix[i];
-      if (w == nullgpvec)
+      sparsecvec w = Matrix[i];
+      if (!w.allocated())
 	continue;
 
-      if (!coeff_reduced_p(newrow[i], w->c)) {
-	coeff_fdiv_q(q, newrow[i], w->c);
+      if (!coeff_reduced_p(newrow[i], w[0].second)) {
+	coeff_fdiv_q(q, newrow[i], w[0].second);
 	coeff_neg(q, q);
 	CAXPY(q, w, newrow);
       }
@@ -311,21 +313,23 @@ relmatrix GetRelMatrix(void) {
 }
 
 /* adds a row to the queue, and empty the queue if it got full */
-void AddToRelMatrix(gpvec cv) {
-  if (cv->g == EOW) // easy case: trivial relation, change nothing
+void AddToRelMatrix(sparsecvec cv) {
+  if (cv.empty()) // easy case: trivial relation, change nothing
     return;
   
-  if (cv->g < FirstCentral) // sanity check
-    abortprintf(5, "AddRow: vector has a term a%d not in the centre", cv->g);
+  if (cv[0].first < FirstCentral) // sanity check
+    abortprintf(5, "AddRow: vector has a term a%d not in the centre", cv[0].first);
 
 #ifdef CUSTOM_ALLOC
   auto p = Queue.emplace(cv);
 #else
-  __gpvec xv = {.v = cv};
+  __sparsecvec xv = {.v = cv};
   auto p = Queue.emplace(xv);
 
-  if (p.second) // make the copy permanent
-    Copy(p.first->v = NewVec(Length(cv)), cv);
+  if (p.second) { // make the copy permanent
+    p.first->v.alloc(cv.size());
+    p.first->v.copy(cv);
+  }
 #endif
   
   if (!p.second)

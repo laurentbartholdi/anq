@@ -27,53 +27,25 @@ const unsigned INFINITY = -1;
 /****************************************************************
  * generators
  ****************************************************************/
-typedef unsigned gen;
-const gen EOW = (gen) -1; // larger than all others
+//typedef unsigned gen;
+//!!!const gen EOW = (gen) -1; // larger than all others
 
 /****************************************************************
  * generator-coefficient pairs and vectors.
- * Used for sparse matrix rows.
+ * Used for structure constants and sparse matrix rows.
  ****************************************************************/
-struct gcoeff {
-  gen g;
-  coeff c;
+#include "vectors.hh"
+
+struct coeff_sparseops {
+  static void init(coeff &c) { coeff_init(c); }
+  static void clear(coeff &c) { coeff_clear(c); }
+  static bool nz_p(coeff &c) { return coeff_nz_p(c); }
+  static void set(coeff &c, const coeff &d) { coeff_set(c,d); }
 };
-struct gpvec {
-  struct iterator : public std::iterator<std::output_iterator_tag, int> {
-    explicit iterator(const gpvec *v) { if (v == NULL) ptr = NULL; else ptr = v->data; };
-    gcoeff operator*() const { return *ptr; }
-    iterator & operator++() { ptr++; return *this; }
-    iterator & operator++(int) { return ++(*this); }
-    bool operator!=(const iterator &that) const { return ptr != that.ptr && ((ptr && ptr->g) || (that.ptr && that.ptr->g)); };
-  private:
-    gcoeff *ptr;
-  };
+typedef sparsevec<coeff,coeff_sparseops> sparsecvec;
+typedef sparsecvec::key gen;
 
-  // gpvec() = default;
-  // ~gpvec() = default;
-
-  size_t size() const;
-
-  iterator begin() const { return iterator(this); }
-  iterator end() const { return iterator(NULL); }
-
-  gcoeff *data;
-
-  gcoeff *operator->() const { return data; }
-  gcoeff &operator*() const { return *data; }
-  gpvec &operator++() { data++; return *this; }
-  gpvec &operator++(int) { return ++(*this); }
-  gpvec operator+(ptrdiff_t i) const { return { .data = data+i }; }
-  gpvec operator-(ptrdiff_t i) const { return { .data = data-i }; }
-  ptrdiff_t operator-(const gpvec v) const { return data - v.data; }
-  bool operator==(const gpvec v) const { return data == v.data; }
-  bool operator!=(const gpvec v) const { return data != v.data; }
-};
-typedef const gpvec constgpvec;
-
-typedef std::vector<gpvec> relmatrix;
-
-const gpvec nullgpvec = { .data = NULL };
+typedef std::vector<sparsecvec> relmatrix;
 
 /*
 ** An element in a lie-algebra is a sum of several multiplications. Hence it
@@ -141,30 +113,33 @@ extern FILE *LogFile;
 /* auxiliary functions */
 void InitStack(void);
 void FreeStack(void);
-gpvec FreshVec(void);
+sparsecvec FreshVec(void);
 void PopVec(void);
-void PopVec(gpvec);
+void PopVec(sparsecvec);
 
-inline void Copy(gpvec vec1, const gpvec vec2) {
-  for (auto gc: vec2)
-    coeff_set(vec1->c, gc.c), vec1->g = gc.g, vec1++;
-  vec1->g = EOW;
+#if 0 //!!!
+inline void Copy(sparsecvec vec1, const sparsecvec vec2) {
+  auto p1 = vec1.begin();
+  for (auto kc: vec2)
+    coeff_set(p1->second, kc.second), p1->first = kc.first, p1++;
+  p1.markend();
 }
-inline unsigned Length(const gpvec vec) {
+inline unsigned Length(const sparsecvec vec) {
   unsigned l = 0;
   for (auto gc __attribute__((unused)): vec) l++;
   return l;
 }
-gpvec NewVec(unsigned);
-void FreeVec(gpvec, unsigned);
-void FreeVec(gpvec);
-gpvec ResizeVec(gpvec, unsigned, unsigned);
+sparsecvec NewVec(unsigned);
+void FreeVec(sparsecvec, unsigned);
+void FreeVec(sparsecvec);
+sparsecvec ResizeVec(sparsecvec, unsigned, unsigned);
+#endif
 
 /* pcpresentation functions */
 extern unsigned  NrTotalGens; // during extension of pc presentation, NrTotalGens = new NrPcGens
 
 struct pcpresentation {
-  gpvec **Product, // the Lie bracket: [aj,ai] = ...
+  sparsecvec **Product, // the Lie bracket: [aj,ai] = ...
     *Power, // powers: Exponent[i]*ai = ...
     *Epimorphism; // epimorphism from fppresentation: Epimorphism[xi] = ...
   coeff *Exponent, // the Exponent[i]*ai in next class
@@ -187,86 +162,88 @@ void ReducePcPres(pcpresentation &, const presentation &, const relmatrix &);
 void ComputeTails(const pcpresentation &);
 
 /* consistency functions */
-void TripleProduct(const pcpresentation &, gpvec &, gen, gen, gen);
+void TripleProduct(const pcpresentation &, sparsecvec &, gen, gen, gen);
 void Consistency(const pcpresentation &);
 
 /* print functions */
 void abortprintf(int, const char *, ...) __attribute__((format(printf, 2, 3),noreturn));
-void PrintVec(FILE *f, constgpvec);
+void PrintVec(FILE *f, const sparsecvec);
 void PrintPcPres(FILE *f, const pcpresentation &, const presentation &, bool, bool, bool);
 void PrintGAPPres(FILE *f, const pcpresentation &, const presentation &);
 void TimeStamp(const char *);
   
 /* operation functions */
-void Sum(gpvec, constgpvec, constgpvec);
-void Sum(gpvec, constgpvec, const coeff, constgpvec);
-void Sum(gpvec, const coeff, constgpvec, const coeff, constgpvec);
-void Diff(gpvec, constgpvec, constgpvec);
-inline void Diff(gpvec vec0, constgpvec vec1, const coeff x2, constgpvec vec2) {
+void Sum(sparsecvec, const sparsecvec, const sparsecvec);
+void Sum(sparsecvec, const sparsecvec, const coeff, const sparsecvec);
+void Sum(sparsecvec, const coeff, const sparsecvec, const coeff, const sparsecvec);
+void Diff(sparsecvec, const sparsecvec, const sparsecvec);
+inline void Diff(sparsecvec vec0, const sparsecvec vec1, const coeff x2, const sparsecvec vec2) {
   coeff y2;
   coeff_init(y2);
   coeff_neg(y2, x2);
   Sum(vec0, vec1, y2, vec2);
   coeff_clear(y2);
 }
-inline void Diff(gpvec vec0, const coeff x1, constgpvec vec1, const coeff x2, constgpvec vec2) {
+inline void Diff(sparsecvec vec0, const coeff x1, const sparsecvec vec1, const coeff x2, const sparsecvec vec2) {
   coeff y2;
   coeff_init(y2);
   coeff_neg(y2, x2);
   Sum(vec0, x1, vec1, y2, vec2);
   coeff_clear(y2);
 }
-inline void Prod(gpvec vec0, const coeff n, constgpvec vec) {
+inline void Prod(sparsecvec vec0, const coeff n, const sparsecvec vec) {
+  auto p0 = vec0.begin();
   if (coeff_nz_p(n))
-    for (auto gc: vec) {
-      coeff_mul(vec0->c, gc.c, n);
-      if (coeff_nz_p(vec0->c))
-	vec0->g = gc.g, vec0++;
+    for (auto kc: vec) {
+      coeff_mul(p0->second, kc.second, n);
+      if (coeff_nz_p(p0->second))
+	p0->first = kc.first, p0++;
     }
-  vec0->g = EOW;
+  p0.markend();
 }
-inline void Neg(gpvec vec1, constgpvec vec2) {
-  for (auto gc: vec2)
-    coeff_neg(vec1->c, gc.c), vec1->g = gc.g, vec1++;
-  vec1->g = EOW;
+inline void Neg(sparsecvec vec1, const sparsecvec vec2) {
+  auto p1 = vec1.begin();
+  for (auto kc: vec2)
+    coeff_neg(p1->second, kc.second), p1->first = kc.first, p1++;
+  p1.markend();
 }
-inline void Neg(gpvec vec1) {
-  for (auto gc: vec1)
-    coeff_neg(gc.c, gc.c);
+inline void Neg(sparsecvec vec1) {
+  for (auto kc: vec1)
+    coeff_neg(kc.second, kc.second);
 }
-inline int Compare(constgpvec vec1, constgpvec vec2) {
-  gpvec p1 = vec1, p2 = vec2;
+inline int Compare(const sparsecvec vec1, const sparsecvec vec2) {
+  auto p1 = vec1.begin(), p2 = vec2.begin();
   for (;;) {
-    if (p1->g != p2->g)
-      return p1->g > p2->g ? 1 : -1;
-    if (p1->g == EOW)
+    if (p1->first != p2->first)
+      return p1->first > p2->first ? 1 : -1;
+    if (p1.atend())
       return 0;
-    int c = coeff_cmp(p1->c, p2->c);
+    int c = coeff_cmp(p1->second, p2->second);
     if (c)
       return c;
     p1++; p2++;
   }
 }
-void LieBracket(const pcpresentation &, gpvec, constgpvec, constgpvec);
-void GroupBracket(const pcpresentation &, gpvec, constgpvec, constgpvec);
-void Prod(const pcpresentation &, gpvec, constgpvec, constgpvec);
-void Conjugate(const pcpresentation &, gpvec, constgpvec, constgpvec);
-void Quo(const pcpresentation &, gpvec, constgpvec, constgpvec);
-void LQuo(const pcpresentation &, gpvec, constgpvec, constgpvec);
-void Inv(const pcpresentation &, gpvec, constgpvec);
-void Pow(const pcpresentation &, gpvec, constgpvec, coeff &);
-void Collect(const pcpresentation &pc, gpvec, constgpvec);
-void ShrinkCollect(const pcpresentation &pc, gpvec &);
+void LieBracket(const pcpresentation &, sparsecvec, const sparsecvec, const sparsecvec);
+void GroupBracket(const pcpresentation &, sparsecvec, const sparsecvec, const sparsecvec);
+void Prod(const pcpresentation &, sparsecvec, const sparsecvec, const sparsecvec);
+void Conjugate(const pcpresentation &, sparsecvec, const sparsecvec, const sparsecvec);
+void Quo(const pcpresentation &, sparsecvec, const sparsecvec, const sparsecvec);
+void LQuo(const pcpresentation &, sparsecvec, const sparsecvec, const sparsecvec);
+void Inv(const pcpresentation &, sparsecvec, const sparsecvec);
+void Pow(const pcpresentation &, sparsecvec, const sparsecvec, coeff &);
+void Collect(const pcpresentation &pc, sparsecvec, const sparsecvec);
+void ShrinkCollect(const pcpresentation &pc, sparsecvec &);
 
 /* fppresentation functions */
 void ReadPresentation(presentation &, const char *);
 void FreePresentation(presentation &);
-void EvalRel(const pcpresentation &, gpvec, node *);
+void EvalRel(const pcpresentation &, sparsecvec, node *);
 void EvalAllRel(const pcpresentation &, const presentation &);
 void PrintNode(FILE *f, const presentation &, node *);
 
 /* matrix functions */
 relmatrix GetRelMatrix(void);
-void AddToRelMatrix(gpvec);
+void AddToRelMatrix(const sparsecvec);
 void InitRelMatrix(const pcpresentation &, unsigned);
 void FreeRelMatrix(void);

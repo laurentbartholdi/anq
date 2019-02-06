@@ -42,14 +42,25 @@ void TimeStamp(const char *s) {
   }
 }
 
-void PrintVec(FILE *f, constgpvec gv) {
+#ifdef LIEALG
+void PrintVec(FILE *f, const sparsecvec v) {
   bool first = true;
-  for (auto gc: gv) {
+  for (auto kc : v) {
     if (first) first = false; else fprintf(f, " + ");
-    coeff_out_str(f, gc.c);
-    fprintf(f, "*a%d", gc.g);
+    coeff_out_str(f, kc.second);
+    fprintf(f, "*a%d", kc.first);
   }
 }
+#else
+void PrintVec(FILE *f, const sparsecvec v) {
+  bool first = true;
+  for (auto kc : v) {
+    if (first) first = false; else fprintf(f, " * ");
+    fprintf(f, "a%d^", kc.first);
+    coeff_out_str(f, kc.second);
+  }
+}
+#endif
 
 void PrintPcPres(FILE *f, const pcpresentation &pc, const presentation &pres, bool PrintCompact, bool PrintDefs, bool PrintZeros) {
   fprintf(f, "<\n");
@@ -72,9 +83,9 @@ void PrintPcPres(FILE *f, const pcpresentation &pc, const presentation &pres, bo
   
   fprintf(f, "# The epimorphism:\n");
   for (unsigned i = 1; i <= pres.NrGens; i++) {
-    gen g = pc.Epimorphism[i]->g;
     fprintf(f, "# %10s |-->", pres.GeneratorName[i].c_str());
-    if (g != EOW && pc.Generator[g].t == DGEN && pc.Generator[g].g == i)
+    gen g = pc.Epimorphism[i][0].first;
+    if (!pc.Epimorphism[i].empty() && pc.Generator[g].t == DGEN && pc.Generator[g].g == i)
       fprintf(f, ": a%d\n", g);
     else {
       fprintf(f, " ");
@@ -93,8 +104,14 @@ void PrintPcPres(FILE *f, const pcpresentation &pc, const presentation &pres, bo
 	fprintf(f, "[a%d,a%d] = ", pc.Generator[i].g, pc.Generator[i].h);
 	break;
       case DPOW:
+#ifdef LIEALG
 	coeff_out_str(f, pc.Exponent[i]);
 	fprintf(f, "*a%d = ", pc.Generator[i].g);
+#else
+	fprintf(f, "a%d^", pc.Generator[i].g);
+	coeff_out_str(f, pc.Exponent[i]);
+	fprintf(f, " = ");
+#endif
 	break;
       case DGEN:;
       }
@@ -135,12 +152,15 @@ void PrintPcPres(FILE *f, const pcpresentation &pc, const presentation &pres, bo
       fprintf(f, "%10s", "");
       coeff_out_str(f, pc.Exponent[i]);
       fprintf(f, "*a%d", i);
-      if (pc.Power[i] != nullgpvec && pc.Power[i]->g != EOW) {
-	if (pc.Generator[pc.Power[i]->g].t == DPOW && pc.Generator[pc.Power[i]->g].g == i)
-	  fprintf(f, " =: a%d", pc.Power[i]->g);
-	else {
-	  fprintf(f, " = ");
-	  PrintVec(f, pc.Power[i]);
+      if (pc.Power[i].allocated()) {
+	gen g = pc.Power[i][0].first;
+	if (!pc.Power[i].empty()) {
+	  if (pc.Generator[g].t == DPOW && pc.Generator[g].g == i)
+	    fprintf(f, " =: a%d", g);
+	  else {
+	    fprintf(f, " = ");
+	    PrintVec(f, pc.Power[i]);
+	  }
 	}
       }
       first = false;
@@ -151,20 +171,20 @@ void PrintPcPres(FILE *f, const pcpresentation &pc, const presentation &pres, bo
   first = true;
   for (unsigned j = 1; j <= pc.NrPcGens; j++)
     for (unsigned i = 1; i < j; i++) {
-      gen g = pc.Product[j][i]->g;
+      gen g = pc.Product[j][i][0].first;
       if (PrintCompact) {
 	if (pc.Generator[i].t != DGEN || pc.Generator[j].t == DPOW)
 	  continue;
       } else {
-	if (!PrintZeros && g == EOW)
+	if (!PrintZeros && pc.Product[j][i].empty())
 	continue;
       }  
       if (!first)
 	fprintf(f, ",\n");
       fprintf(f, "%10s[a%d,a%d]", "", j, i);
-      if (g != EOW) {
+      if (!pc.Product[j][i].empty()) {
 	if (pc.Generator[g].g == j && pc.Generator[g].h == i)
-	  fprintf(f, " =: a%d", pc.Product[j][i]->g);
+	  fprintf(f, " =: a%d", g);
 	else {
 	  fprintf(f, " = ");
 	  PrintVec(f, pc.Product[j][i]);
@@ -176,16 +196,16 @@ void PrintPcPres(FILE *f, const pcpresentation &pc, const presentation &pres, bo
   if (!pres.Extra.empty()) {
     fprintf(f, " |\n# The extra elements:\n");
     first = true;
-    gpvec v = FreshVec();
+    sparsecvec v = FreshVec();
     for (node *n : pres.Extra) {
-      gpvec temp = FreshVec();
+      sparsecvec temp = FreshVec();
       EvalRel(pc, temp, n);
       Collect(pc, v, temp);
       PopVec();
       if (!first)
 	fprintf(f, ",\n");
       fprintf(f, "%10s", ""); PrintVec(f, v);
-      if (v->g == EOW) fprintf(f, "0*a1");
+      if (v.empty()) fprintf(f, "0*a1");
       first = false;
     }
     PopVec();
@@ -193,11 +213,11 @@ void PrintPcPres(FILE *f, const pcpresentation &pc, const presentation &pres, bo
   fprintf(f, " >\n");
 }
 
-bool PrintGAPVec(FILE *f, constgpvec v, bool first) {
-  for (auto gc: v) {
+bool PrintGAPVec(FILE *f, const sparsecvec v, bool first) {
+  for (auto kc : v) {
     if (first) first = false; else fprintf(f, " + ");
-    coeff_out_str(f, gc.c);
-    fprintf(f, "*bas[%d]", gc.g);
+    coeff_out_str(f, kc.second);
+    fprintf(f, "*bas[%d]", kc.first);
   }
   return first;
 }
@@ -214,14 +234,13 @@ void PrintGAPPres(FILE *f, const pcpresentation &pc, const presentation &pres) {
 	  "\tT := EmptySCTable(%d,0,\"antisymmetric\");\n", pc.NrPcGens);
   for (unsigned j = 1; j <= pc.NrPcGens; j++)
     for (unsigned i = 1; i < j; i++) {
-      gen g = pc.Product[j][i]->g;
-      if (g != EOW) {
+      if (!pc.Product[j][i].empty()) {
         fprintf(f, "\tSetEntrySCTable(T,%d,%d,[", j, i);
 	bool first = true;
-	for (gpvec v = pc.Product[j][i]; v->g != EOW; v++) {
+	for (auto kc : pc.Product[j][i]) {
 	  if (!first) fprintf(f, ",");
-	  coeff_out_str(f, v->c);
-	  fprintf(f, ",%d", v->g);
+	  coeff_out_str(f, kc.second);
+	  fprintf(f, ",%d", kc.first);
 	  first = false;
 	}
 	fprintf(f, "]);\n");
@@ -236,7 +255,7 @@ void PrintGAPPres(FILE *f, const pcpresentation &pc, const presentation &pres) {
       fprintf(f, "%s-", first ? "" : ",\n\t\t");
       coeff_out_str(f, pc.Exponent[i]);
       fprintf(f, "*bas[%d]", i);
-      if (pc.Power[i] != nullgpvec)
+      if (pc.Power[i].allocated())
 	PrintGAPVec(f, pc.Power[i], false);
       first = false;
     }
@@ -254,10 +273,10 @@ void PrintGAPPres(FILE *f, const pcpresentation &pc, const presentation &pres) {
 
   if (!pres.Extra.empty()) {
     fprintf(f, "\tRange(epi)!.extra := [");
-    gpvec v = FreshVec();
+    sparsecvec v = FreshVec();
     bool first = true;
     for (node *n : pres.Extra) {
-      gpvec temp = FreshVec();
+      sparsecvec temp = FreshVec();
       EvalRel(pc, temp, n);
       Collect(pc, v, temp);
       PopVec();

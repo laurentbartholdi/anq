@@ -21,24 +21,30 @@
 */
 
 /* v += [[a,b],c] */
-void TripleProduct(const pcpresentation &pc, gpvec &v, gen a, gen b, gen c) {
-  gpvec temp[2];
+void TripleProduct(const pcpresentation &pc, sparsecvec &v, gen a, gen b, gen c) {
+  sparsecvec temp[2];
   temp[0] = FreshVec();
   temp[1] = FreshVec();
   bool parity = false;
   
   if (a < b) {
-    for (gpvec p = pc.Product[b][a]; p->g != EOW && p->g <= pc.NrPcGens; p++)
-      if (p->g > c)
-	Diff(temp[!parity], temp[parity], p->c, pc.Product[p->g][c]), parity ^= 1;
-      else if (p->g < c)
-	Sum(temp[!parity], temp[parity], p->c, pc.Product[c][p->g]), parity ^= 1;
+    for (auto kc : pc.Product[b][a]) {
+      if (kc.first > pc.NrPcGens)
+	break;
+      if (kc.first > c)
+	Diff(temp[!parity], temp[parity], kc.second, pc.Product[kc.first][c]), parity ^= 1;
+      else if (kc.first < c)
+	Sum(temp[!parity], temp[parity], kc.second, pc.Product[c][kc.first]), parity ^= 1;
+    }
   } else {
-    for (gpvec p = pc.Product[a][b]; p->g != EOW && p->g <= pc.NrPcGens; p++)
-      if (p->g > c)
-	Sum(temp[!parity], temp[parity], p->c, pc.Product[p->g][c]), parity ^= 1;
-      else if (p->g < c)
-	Diff(temp[!parity], temp[parity], p->c, pc.Product[c][p->g]), parity ^= 1;
+    for (auto kc : pc.Product[a][b]) {
+      if (kc.first > pc.NrPcGens)
+	break;
+      if (kc.first > c)
+	Sum(temp[!parity], temp[parity], kc.second, pc.Product[kc.first][c]), parity ^= 1;
+      else if (kc.first < c)
+	Diff(temp[!parity], temp[parity], kc.second, pc.Product[c][kc.first]), parity ^= 1;
+    }
   }
 #if 0
   if (parity)
@@ -46,7 +52,7 @@ void TripleProduct(const pcpresentation &pc, gpvec &v, gen a, gen b, gen c) {
   else
     PopVec(), PopVec(v);
 #else
-  Copy(v, temp[parity]);
+  v.copy(temp[parity]);
   PopVec();
   PopVec();
 #endif
@@ -59,9 +65,9 @@ void TripleProduct(const pcpresentation &pc, gpvec &v, gen a, gen b, gen c) {
 **  generators.
 */
 static void CheckJacobi(const pcpresentation &pc, gen a, gen b, gen c) {
-  gpvec temp1 = FreshVec();
-  gpvec temp2 = FreshVec();
-  gpvec temp3 = FreshVec();
+  sparsecvec temp1 = FreshVec();
+  sparsecvec temp2 = FreshVec();
+  sparsecvec temp3 = FreshVec();
   TripleProduct(pc, temp1, a, b, c); // temp1 = [a,b,c]
   TripleProduct(pc, temp2, b, c, a); // temp2 = [b,c,a]
   Sum(temp3, temp1, temp2); // temp3 = [a,b,c] + [b,c,a]
@@ -89,17 +95,19 @@ static void CheckJacobi(const pcpresentation &pc, gen a, gen b, gen c) {
 **
 */
 static void CheckPower(const pcpresentation &pc, gen a, gen b) {
-  gpvec temp[2];
+  sparsecvec temp[2];
   temp[0] = FreshVec();
   temp[1] = FreshVec();
   bool parity = false;
   
-  for (gpvec p = pc.Power[a]; p->g <= pc.NrPcGens && p->g != EOW; p++) {
-    gen g = p->g;
+  for (auto kc : pc.Power[a]) {
+    gen g = kc.first;
+    if (g > pc.NrPcGens)
+      break;
     if (g > b)
-      Diff(temp[!parity], temp[parity], p->c, pc.Product[g][b]), parity ^= 1;
+      Diff(temp[!parity], temp[parity], kc.second, pc.Product[g][b]), parity ^= 1;
     else if (g < b)
-      Sum(temp[!parity], temp[parity], p->c, pc.Product[b][g]), parity ^= 1;
+      Sum(temp[!parity], temp[parity], kc.second, pc.Product[b][g]), parity ^= 1;
   }
 
   if (a > b)
@@ -128,7 +136,7 @@ static void CheckPower(const pcpresentation &pc, gen a, gen b) {
  * enforce (N/A)*w = 0
  */
 static void CheckTorsion(const pcpresentation &pc, unsigned i) {
-  gpvec temp1 = FreshVec(), temp2 = FreshVec();
+  sparsecvec temp1 = FreshVec(), temp2 = FreshVec();
   coeff annihilator, unit;
   coeff_init(annihilator);
   coeff_init(unit); // unused

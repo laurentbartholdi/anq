@@ -11,24 +11,15 @@
 unsigned NrTotalGens;
 
 /* add generator newgen to vector v, and store its definition */
-static void AddSingleGenerator(pcpresentation &pc, gpvec &v, deftype def) {
-  gpvec p;
-
-  if (v != nullgpvec) {
-    int l = Length(v);
-    v = ResizeVec(v, l, l + 1);
-    p = v + l;
-  } else {
-    v = NewVec(1);
-    p = v;
-  }
-
-  p->g = ++NrTotalGens;
-  coeff_set_si(p->c, 1);
-  (p+1)->g = EOW;
+static void AddSingleGenerator(pcpresentation &pc, sparsecvec &v, deftype def) {
+  unsigned len = v.size();
+  v.resize(len+1);
+  v[len].first = ++NrTotalGens;
+  coeff_set_si(v[len].second, 1);
+  v.truncate(len+1);
 
   pc.Generator = (deftype *) realloc(pc.Generator, (NrTotalGens + 1) * sizeof(deftype));
-  if (pc.Generator == NULL)
+  if (pc.Generator == nullptr)
     abortprintf(2, "AddSingleGenerator: realloc(Generator) failed");
   
   pc.Generator[NrTotalGens] = def;
@@ -53,12 +44,12 @@ void InitPcPres(pcpresentation &pc, const presentation &pres, bool Graded, bool 
   pc.NilpotencyClass = NilpotencyClass;
   coeff_init_set(pc.TorsionExp, TorsionExp);
   
-  pc.Epimorphism = (gpvec *) malloc((pres.NrGens + 1) * sizeof(gpvec));
+  pc.Epimorphism = (sparsecvec *) malloc((pres.NrGens + 1) * sizeof(sparsecvec));
   if (pc.Epimorphism == NULL)
     abortprintf(2, "InitPcPres: malloc(Epimorphism) failed");
   for (unsigned i = 1; i <= pres.NrGens; i++)
-    pc.Epimorphism[i] = NewVec(0);
-
+    pc.Epimorphism[i].alloc(0);
+  
   pc.Generator = (deftype *) malloc(sizeof(deftype));
   if (pc.Generator == NULL)
     abortprintf(2, "InitPcPres: malloc(Generator) failed");
@@ -72,27 +63,27 @@ void InitPcPres(pcpresentation &pc, const presentation &pres, bool Graded, bool 
   if (pc.Annihilator == NULL)
     abortprintf(2, "InitPcPres: malloc(Annihilator) failed");
 
-  pc.Power = (gpvec *) malloc(sizeof(gpvec));
+  pc.Power = (sparsecvec *) malloc(sizeof(sparsecvec));
   if (pc.Power == NULL)
     abortprintf(2, "InitPcPres: malloc(Power) failed");
 
-  pc.Product = (gpvec **) malloc((pc.NrPcGens + 1) * sizeof(gpvec *));
+  pc.Product = (sparsecvec **) malloc((pc.NrPcGens + 1) * sizeof(sparsecvec *));
   if (pc.Product == NULL)
     abortprintf(2, "InitPcPres: malloc(Product) failed");
 }
 
 void FreePcPres(pcpresentation &pc, const presentation &pres) {
   for (unsigned i = 1; i <= pc.NrPcGens; i++) {
-    if (pc.Power[i] != nullgpvec)
-      FreeVec(pc.Power[i]);
+    if (pc.Power[i].allocated())
+      pc.Power[i].free();
     coeff_clear(pc.Exponent[i]);
     coeff_clear(pc.Annihilator[i]);
     for (unsigned j = 1; j < i; j++)
-      FreeVec(pc.Product[i][j]);
+      pc.Product[i][j].free();
     free(pc.Product[i]);
   }
   for (unsigned i = 1; i <= pres.NrGens; i++)
-    FreeVec(pc.Epimorphism[i]);
+    pc.Epimorphism[i].free();
   free(pc.Epimorphism);
   free(pc.Power);
   free(pc.Exponent);
@@ -150,7 +141,7 @@ void AddNewTails(pcpresentation &pc, const presentation &pres) {
   for (unsigned i = 1; i <= pres.NrGens; i++) {
     if (is_dgen[i] || pres.Weight[i] >= pc.Class || pc.Graded)
       continue;
-    AddSingleGenerator(pc, pc.Epimorphism[i], {.t = DINVALID, .g = i, .h = EOW});
+    AddSingleGenerator(pc, pc.Epimorphism[i], {.t = DINVALID, .g = i});
     if (Debug >= 2)
       fprintf(LogFile, "# added tail a%d to epimorphic image of %s\n", NrTotalGens, pres.GeneratorName[i].c_str());
   }
@@ -177,7 +168,7 @@ void AddNewTails(pcpresentation &pc, const presentation &pres) {
 	  continue;
 	if (pc.Graded && (!pc.PAlgebra || pc.Generator[i].w+1 != pc.Class))
 	  continue;
-	AddSingleGenerator(pc, pc.Power[i], {.t = (pc.PAlgebra ? DPOW : DINVALID), .g = i, .h = EOW, .w = pc.Class, .cw = pc.Generator[i].cw});
+	AddSingleGenerator(pc, pc.Power[i], {.t = (pc.PAlgebra ? DPOW : DINVALID), .g = i, .w = pc.Class, .cw = pc.Generator[i].cw});
 	if (Debug >= 2)
 	  fprintf(LogFile, "# added tail a%d to non-defining torsion generator a%d\n", NrTotalGens, i);
       }
@@ -228,7 +219,7 @@ void AddNewTails(pcpresentation &pc, const presentation &pres) {
   for (unsigned i = 1; i <= pres.NrGens; i++) {
     if (pres.Weight[i] != pc.Class)
       continue;
-    AddSingleGenerator(pc, pc.Epimorphism[i], {.t = DGEN, .g = i, .h = EOW, .w = pc.Class, .cw = 1});
+    AddSingleGenerator(pc, pc.Epimorphism[i], {.t = DGEN, .g = i, .w = pc.Class, .cw = 1});
     if (Debug >= 2)
       fprintf(LogFile, "# added tail a%d as epimorphic image of %s\n", NrTotalGens, pres.GeneratorName[i].c_str());
   }
@@ -252,11 +243,11 @@ void AddNewTails(pcpresentation &pc, const presentation &pres) {
   for (unsigned i = pc.NrPcGens + 1; i <= NrTotalGens; i++)
     coeff_init_set_si(pc.Annihilator[i], 0);
 
-  pc.Power = (gpvec *) realloc(pc.Power, (NrTotalGens + 1) * sizeof(gpvec));
+  pc.Power = (sparsecvec *) realloc(pc.Power, (NrTotalGens + 1) * sizeof(sparsecvec));
   if (pc.Power == NULL)
     abortprintf(2, "AddNewTails: realloc(Power) failed");
   for (unsigned i = pc.NrPcGens + 1; i <= NrTotalGens; i++)
-    pc.Power[i] = nullgpvec;
+    pc.Power[i].noalloc();
 
   /* The Product array is not extended yet, because anyways it won't be used.
      we'll extend it later, in ReducePcPres */
@@ -277,34 +268,36 @@ void AddNewTails(pcpresentation &pc, const presentation &pres) {
       operation can be done in-place
 */
 
-static void EliminateTrivialGenerators(pcpresentation &pc, const relmatrix &rels, gpvec &v, int renumber[]) {
+static void EliminateTrivialGenerators(pcpresentation &pc, const relmatrix &rels, sparsecvec &v, int renumber[]) {
   bool copied = false;
-  gpvec p = v;
+  unsigned pos = 0;
+  //!!! avoid this pos thing!!!
+  if (v.empty())
+    return;
 
-  for (; p->g != EOW;) {
-    int newg = renumber[p->g];
+  for (; !v.issize(pos);) {
+    int newg = renumber[v[pos].first];
     if (newg >= 1) {
-      p->g = newg;
-      p++;
+      v[pos].first = newg;
+      pos++;
     } else {
-      constgpvec rel = rels[-newg];
-      gpvec temp = FreshVec();
-      Diff(temp, p+1, p->c, rel+1);
+      sparsecvec temp = FreshVec();
+      Diff(temp, v.window(pos+1), v[pos].second, rels[-newg].window(1));
       if (!copied) { /* we should make sure we have enough space */
-	gpvec newv = NewVec(NrTotalGens);
-	p->g = EOW; /* cut original p at this position, copy to newv */
-	Copy(newv, v);
-	p->g = rel->g; /* put it back, so we can free correctly v */
-	FreeVec(v);
-	v = newv;
+	sparsecvec oldv = v;
+	v.alloc(NrTotalGens);
+	oldv.truncate(pos); /* cut original v at position p, copy to newv */
+	v.copy(oldv);
+	oldv[pos].first = rels[-newg][0].first; /* put it back, so we can free correctly v */
+	oldv.free();
+	copied = true;
       }
-      Copy(p, temp);
+      v.window(pos).copy(temp);
       PopVec();
-      copied = true;
     }
   }
   if (copied)
-    v = ResizeVec(v, NrTotalGens, p-v);
+    v.resize(NrTotalGens, pos);
   ShrinkCollect(pc, v);
 }
 
@@ -314,7 +307,7 @@ void ReducePcPres(pcpresentation &pc, const presentation &pres, const relmatrix 
 
   if (Debug >= 2) {
     fprintf(LogFile, "# relations matrix:\n");
-    for (constgpvec r : rels) {
+    for (const sparsecvec r : rels) {
       fprintf(LogFile, "# "); PrintVec(LogFile, r); fprintf(LogFile, "\n");
     }
   }
@@ -325,13 +318,14 @@ void ReducePcPres(pcpresentation &pc, const presentation &pres, const relmatrix 
 
   for (unsigned k = 1, i = 0; k <= NrTotalGens; k++) {
     unsigned newk = renumber[k] = k - trivialgens;
-    if (i == rels.size() || k != rels[i]->g) /* no relation for k, remains */
+    if (i == rels.size() || k != rels[i][0].first) /* no relation for k, remains */
       continue;
 
-    if (coeff_cmp_si(rels[i]->c, 1)) { /* k is torsion, nontrivial */
-      coeff_set(pc.Exponent[newk], rels[i]->c);
-      pc.Power[newk] = NewVec(Length(rels[i]+1));
-      Neg(pc.Power[newk], rels[i]+1);
+    if (coeff_cmp_si(rels[i][0].second, 1)) { /* k is torsion, nontrivial */
+      coeff_set(pc.Exponent[newk], rels[i][0].second);
+      const sparsecvec tail = rels[i].window(1);
+      pc.Power[newk].alloc(tail.size());
+      Neg(pc.Power[newk], tail);
     } else { /* k is trivial, and will be eliminated */
       trivialgens++;
       renumber[k] = -i; /* mark as trivial */
@@ -351,7 +345,7 @@ void ReducePcPres(pcpresentation &pc, const presentation &pres, const relmatrix 
   /* Modify the torsions first, in decreasing order, since they're needed
      for Collect */
   for (unsigned j = NrTotalGens; j >= 1; j--)
-    if (pc.Power[j] != nullgpvec)
+    if (pc.Power[j].allocated())
       EliminateTrivialGenerators(pc, rels, pc.Power[j], renumber);
   
   /*  Modify the epimorphisms: */
@@ -384,17 +378,17 @@ void ReducePcPres(pcpresentation &pc, const presentation &pres, const relmatrix 
      Weight, but it's not worth it */
 
   /* finally extend the Product array, by trivial elements */
-  pc.Product = (gpvec **) realloc(pc.Product, (newnrpcgens + 1) * sizeof(gpvec *));
-  if (pc.Product == NULL)
+  pc.Product = (sparsecvec **) realloc(pc.Product, (newnrpcgens + 1) * sizeof(sparsecvec *));
+  if (pc.Product == nullptr)
     abortprintf(2, "ReducePcPres: realloc(Product) failed");
 
   for (unsigned i = pc.NrPcGens + 1; i <= newnrpcgens; i++) {
-    pc.Product[i] = (gpvec *) malloc(i * sizeof(gpvec));
-    if (pc.Product[i] == NULL)
+    pc.Product[i] = (sparsecvec *) malloc(i * sizeof(sparsecvec));
+    if (pc.Product[i] == nullptr)
       abortprintf(2, "ReducePcPres: realloc(Product[%d]) failed", i);
 
     for (unsigned j = 1; j < i; j++)
-      pc.Product[i][j] = NewVec(0);
+      pc.Product[i][j].noalloc();
   }
   
   TimeStamp("ReducePcPres()");

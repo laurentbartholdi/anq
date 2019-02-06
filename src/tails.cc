@@ -25,16 +25,16 @@ static bool AdjustTail(const pcpresentation &pc, gen j, gen i) {
   if (pc.Generator[i].t == DGEN && pc.Generator[j].t != DPOW) /* nothing to do, [aj,ai] is a defining generator */
     return true;
 
-  gpvec tail = FreshVec();
+  sparsecvec tail = FreshVec();
 
   if (pc.Generator[i].t == DCOMM) { /* ai = [g,h] */
     gen g = pc.Generator[i].g, h = pc.Generator[i].h;
 
-    gpvec agh = FreshVec();
+    sparsecvec agh = FreshVec();
     TripleProduct(pc, agh, j, g, h);
-    gpvec ahg = FreshVec();
+    sparsecvec ahg = FreshVec();
     TripleProduct(pc, ahg, j, h, g);
-    gpvec v = FreshVec();
+    sparsecvec v = FreshVec();
     Diff(v, agh, ahg);
     Collect(pc, tail, v);
     PopVec();
@@ -45,7 +45,7 @@ static bool AdjustTail(const pcpresentation &pc, gen j, gen i) {
       fprintf(LogFile, "# tail: [a%d,a%d] = [a%d,[a%d,a%d]] = ", j, i, j, g, h);
   } else if (pc.Generator[i].t == DPOW) { /* ai=N*g */
     gen g = pc.Generator[i].g;
-    gpvec v = FreshVec();
+    sparsecvec v = FreshVec();
     Prod(v, pc.Exponent[g], pc.Product[j][g]);
     Collect(pc, tail, v);
     PopVec();
@@ -57,7 +57,7 @@ static bool AdjustTail(const pcpresentation &pc, gen j, gen i) {
     }
   } else { /* aj = N*g */
     gen g = pc.Generator[j].g;
-    gpvec v = FreshVec();
+    sparsecvec v = FreshVec();
     if (g > i)
       Prod(v, pc.Exponent[g], pc.Product[g][i]);
     else if (g < i) {
@@ -79,16 +79,16 @@ static bool AdjustTail(const pcpresentation &pc, gen j, gen i) {
     fprintf(LogFile, "\n");
   }
 
-  gpvec p = tail;
-  for (auto gc: pc.Product[j][i]) {
-    if (gc.g != p->g || coeff_cmp(gc.c,p->c))
+  unsigned len = 0;
+  for (auto kc : pc.Product[j][i]) {
+    if (kc.first != tail[len].first || coeff_cmp(kc.second,tail[len].second))
       return false;
-    p++;
+    len++;
   }
 
-  if (p->g != EOW) {
-    pc.Product[j][i] = ResizeVec(pc.Product[j][i], p-tail, Length(tail));
-    Copy(pc.Product[j][i]+(p-tail), p);
+  if (!tail.issize(len)) {
+    pc.Product[j][i].resize(len, tail.size());
+    pc.Product[j][i].window(len).copy(tail.window(len));
   }
 
   PopVec(); /* tail */

@@ -21,29 +21,29 @@
  vector addition and scalar multiplication
 ****************************************************************/
 /* vec0 = vec1 + vec2 */
-void Sum(gpvec vec0, constgpvec vec1, constgpvec vec2) {
-  gpvec p1 = vec1, p2 = vec2;
+void Sum(sparsecvec vec0, const sparsecvec vec1, const sparsecvec vec2) {
+  auto p0 = vec0.begin(), p1 = vec1.begin(), p2 = vec2.begin();
   for (;;) {
-    if (p1->g == EOW) {
-      Copy(vec0, p2);
+    if (p1.atend()) {
+      p0.tail().copy(p2.tail());
       return;
     }
-    if (p2->g == EOW) {
-      Copy(vec0, p1);
+    if (p2.atend()) {
+      p0.tail().copy(p1.tail());
       return;
     }
-    if (p1->g < p2->g) {
-      coeff_set(vec0->c, p1->c), vec0->g = p1->g;
-      vec0++;
+    if (p1->first < p2->first) {
+      coeff_set(p0->second, p1->second), p0->first = p1->first;
+      p0++;
       p1++;
-    } else if (p1->g > p2->g) {
-      coeff_set(vec0->c, p2->c), vec0->g = p2->g;
-      vec0++;
+    } else if (p1->first > p2->first) {
+      coeff_set(p0->second, p2->second), p0->first = p2->first;
+      p0++;
       p2++;
     } else {
-      coeff_add(vec0->c, p1->c, p2->c);
-      if (coeff_nz_p(vec0->c))
-	vec0->g = p1->g, vec0++;
+      coeff_add(p0->second, p1->second, p2->second);
+      if (coeff_nz_p(p0->second))
+	p0->first = p1->first, p0++;
       p1++;
       p2++;
     }
@@ -51,36 +51,36 @@ void Sum(gpvec vec0, constgpvec vec1, constgpvec vec2) {
 }
 
 /* vec0 = vec1 + x2*vec2 */
-void Sum(gpvec vec0, constgpvec vec1, const coeff x2, constgpvec vec2) {
+void Sum(sparsecvec vec0, const sparsecvec vec1, const coeff x2, const sparsecvec vec2) {
   if (coeff_z_p(x2)) {
-    Copy(vec0, vec1);
+    vec0.copy(vec1);
     return;
   }
 
-  gpvec p1 = vec1, p2 = vec2;
+  auto p0 = vec0.begin(), p1 = vec1.begin(), p2 = vec2.begin();
   for (;;) {
-    if (p1->g == EOW) {
-      Prod(vec0, x2, p2);
+    if (p1.atend()) {
+      Prod(p0.tail(), x2, p2.tail());
       return;
     }
-    if (p2->g == EOW) {
-      Copy(vec0, p1);
+    if (p2.atend()) {
+      p0.tail().copy(p1.tail());
       return;
     }
-    if (p1->g < p2->g) {
-      coeff_set(vec0->c, p1->c), vec0->g = p1->g;
-      vec0++;
+    if (p1->first < p2->first) {
+      coeff_set(p0->second, p1->second), p0->first = p1->first;
+      p0++;
       p1++;
-    } else if (p1->g > p2->g) {
-      coeff_mul(vec0->c, x2, p2->c);
-      if (coeff_nz_p(vec0->c))
-	vec0->g = p2->g, vec0++;
+    } else if (p1->first > p2->first) {
+      coeff_mul(p0->second, x2, p2->second);
+      if (coeff_nz_p(p0->second))
+	p0->first = p2->first, p0++;
       p2++;
     } else {
-      coeff_set(vec0->c, p1->c);
-      coeff_addmul(vec0->c, x2, p2->c);
-      if (coeff_nz_p(vec0->c))
-	vec0->g = p1->g, vec0++;
+      coeff_set(p0->second, p1->second);
+      coeff_addmul(p0->second, x2, p2->second);
+      if (coeff_nz_p(p0->second))
+	p0->first = p1->first, p0++;
       p1++;
       p2++;
     }
@@ -88,7 +88,7 @@ void Sum(gpvec vec0, constgpvec vec1, const coeff x2, constgpvec vec2) {
 }
 
 /* vec0 = x1*vec1 + x2*vec2 */
-void Sum(gpvec vec0, const coeff x1, constgpvec vec1, const coeff x2, constgpvec vec2) {
+void Sum(sparsecvec vec0, const coeff x1, const sparsecvec vec1, const coeff x2, const sparsecvec vec2) {
   if (coeff_z_p(x1)) {
     Prod(vec0, x2, vec2);
     return;
@@ -98,31 +98,31 @@ void Sum(gpvec vec0, const coeff x1, constgpvec vec1, const coeff x2, constgpvec
     return;
   }
 
-  gpvec p1 = vec1, p2 = vec2;
+  auto p0 = vec0.begin(), p1 = vec1.begin(), p2 = vec2.begin();
   for (;;) {
-    if (p1->g == EOW) {
-      Prod(vec0, x2, p2);
+    if (p1.atend()) {
+      Prod(p0.tail(), x2, p2.tail());
       return;
     }
-    if (p2->g == EOW) {
-      Prod(vec0, x1, p1);
+    if (p2.atend()) {
+      Prod(p0.tail(), x1, p1.tail());
       return;
     }
-    if (p1->g < p2->g) {
-      coeff_mul(vec0->c, x1, p1->c);
-      if (coeff_nz_p(vec0->c))
-	vec0->g = p1->g, vec0++;
+    if (p1->first < p2->first) {
+      coeff_mul(p0->second, x1, p1->second);
+      if (coeff_nz_p(p0->second))
+	p0->first = p1->first, p0++;
       p1++;
-    } else if (p1->g > p2->g) {
-      coeff_mul(vec0->c, x2, p2->c);
-      if (coeff_nz_p(vec0->c))
-	vec0->g = p2->g, vec0++;
+    } else if (p1->first > p2->first) {
+      coeff_mul(p0->second, x2, p2->second);
+      if (coeff_nz_p(p0->second))
+	p0->first = p2->first, p0++;
       p2++;
     } else {
-      coeff_mul(vec0->c, x1, p1->c);
-      coeff_addmul(vec0->c, x2, p2->c);
-      if (coeff_nz_p(vec0->c))
-	vec0->g = p1->g, vec0++;
+      coeff_mul(p0->second, x1, p1->second);
+      coeff_addmul(p0->second, x2, p2->second);
+      if (coeff_nz_p(p0->second))
+	p0->first = p1->first, p0++;
       p1++;
       p2++;
     }
@@ -130,29 +130,29 @@ void Sum(gpvec vec0, const coeff x1, constgpvec vec1, const coeff x2, constgpvec
 }
 
 /* vec0 = vec1 - vec2 */
-void Diff(gpvec vec0, constgpvec vec1, constgpvec vec2) {
-  gpvec p1 = vec1, p2 = vec2;
+void Diff(sparsecvec vec0, const sparsecvec vec1, const sparsecvec vec2) {
+  auto p0 = vec0.begin(), p1 = vec1.begin(), p2 = vec2.begin();
   for (;;) {
-    if (p1->g == EOW) {
-      Neg(vec0, p2);
+    if (p1.atend()) {
+      Neg(p0.tail(), p2.tail());
       return;
     }
-    if (p2->g == EOW) {
-      Copy(vec0, p1);
+    if (p2.atend()) {
+      p0.tail().copy(p1.tail());
       return;
     }
-    if (p1->g < p2->g) {
-      coeff_set(vec0->c, p1->c), vec0->g = p1->g;
-      vec0++;
+    if (p1->first < p2->first) {
+      coeff_set(p0->second, p1->second), p0->first = p1->first;
+      p0++;
       p1++;
-    } else if (p1->g > p2->g) {
-      coeff_neg(vec0->c, p2->c), vec0->g = p2->g;
-      vec0++;
+    } else if (p1->first > p2->first) {
+      coeff_neg(p0->second, p2->second), p0->first = p2->first;
+      p0++;
       p2++;
     } else {
-      coeff_sub(vec0->c, p1->c, p2->c);
-      if (coeff_nz_p(vec0->c))
-	vec0->g = p1->g, vec0++;
+      coeff_sub(p0->second, p1->second, p2->second);
+      if (coeff_nz_p(p0->second))
+	p0->first = p1->first, p0++;
       p1++;
       p2++;
     }
@@ -172,30 +172,30 @@ void Diff(gpvec vec0, constgpvec vec1, constgpvec vec2) {
  there into vec0.
 ****************************************************************/
 /* vec0 = [ vec1, vec2 ] */
-void LieBracket(const pcpresentation &pc, gpvec vec0, constgpvec vec1, constgpvec vec2) {
-  gpvec temp[2];
+void LieBracket(const pcpresentation &pc, sparsecvec vec0, const sparsecvec vec1, const sparsecvec vec2) {
+  sparsecvec temp[2];
   bool parity = false;
   temp[0] = FreshVec();
   temp[1] = FreshVec();
   coeff c;
   coeff_init(c);
   
-  for (auto gc1: vec1)
-    for (auto gc2: vec2)
-      if (gc1.g <= pc.NrPcGens && gc2.g <= pc.NrPcGens && pc.Generator[gc1.g].w + pc.Generator[gc2.g].w <= pc.Class) {
-        if (gc1.g > gc2.g) {
-	  coeff_mul(c, gc1.c, gc2.c);
-	  Sum(temp[!parity], temp[parity], c, pc.Product[gc1.g][gc2.g]);
+  for (auto gc1 : vec1)
+    for (auto gc2 : vec2)
+      if (gc1.first <= pc.NrPcGens && gc2.first <= pc.NrPcGens && pc.Generator[gc1.first].w + pc.Generator[gc2.first].w <= pc.Class) {
+        if (gc1.first > gc2.first) {
+	  coeff_mul(c, gc1.second, gc2.second);
+	  Sum(temp[!parity], temp[parity], c, pc.Product[gc1.first][gc2.first]);
 	  parity ^= 1;
-	} else if (gc2.g > gc1.g) {
-	  coeff_mul(c, gc1.c, gc2.c);
+	} else if (gc2.first > gc1.first) {
+	  coeff_mul(c, gc1.second, gc2.second);
 	  coeff_neg(c, c);
-	  Sum(temp[!parity], temp[parity], c, pc.Product[gc2.g][gc1.g]);
+	  Sum(temp[!parity], temp[parity], c, pc.Product[gc2.first][gc1.first]);
 	  parity ^= 1;
 	}
       }
   coeff_clear(c);
-  Copy(vec0, temp[parity]);
+  vec0.copy(temp[parity]);
   PopVec();
   PopVec();
 }
@@ -207,35 +207,37 @@ void LieBracket(const pcpresentation &pc, gpvec vec0, constgpvec vec1, constgpve
 
    We should do it with a container such as <map>
 */
-void Collect(const pcpresentation &pc, gpvec vec0, constgpvec v) {
-  gpvec temp[2], p;
+// !!!
+void Collect(const pcpresentation &pc, sparsecvec vec0, const sparsecvec v) {
+  sparsecvec temp[2];
   temp[0] = FreshVec();
   temp[1] = FreshVec();
   bool parity = false;
   coeff mp;
   coeff_init(mp);
+  auto p = v.begin(), p0 = vec0.begin();
   
-  for (p = (gpvec) v; p->g != EOW;) {
-    gen i = p->g;
-    if(coeff_reduced_p(p->c, pc.Exponent[i])) {
-      coeff_set(vec0->c, p->c), vec0->g = i;
-      vec0++;
+  for (; !p.atend();) {
+    gen i = p->first;
+    if(coeff_reduced_p(p->second, pc.Exponent[i])) {
+      coeff_set(p0->second, p->second), p0->first = i;
+      p0++;
       p++;
     } else {
-      coeff_fdiv_q(mp, p->c, pc.Exponent[i]);
-      coeff_set(vec0->c, p->c);
-      coeff_submul(vec0->c, mp, pc.Exponent[i]);
-      if (coeff_nz_p(vec0->c))
-	vec0->g = i, vec0++;
+      coeff_fdiv_q(mp, p->second, pc.Exponent[i]);
+      coeff_set(p0->second, p->second);
+      coeff_submul(p0->second, mp, pc.Exponent[i]);
+      if (coeff_nz_p(p0->second))
+	p0->first = i, p0++;
       p++;
-      if (pc.Power[i] != nullgpvec && pc.Power[i]->g != EOW) {
-	Sum(temp[!parity], p, mp, pc.Power[i]);
+      if (!pc.Power[i].empty()) {
+	Sum(temp[!parity], p.tail(), mp, pc.Power[i]);
 	parity ^= 1;
-	p = temp[parity];
+	p = temp[parity].begin();
       }
     }
   }
-  vec0->g = EOW;
+  p0.markend();
   PopVec();
   PopVec();
   coeff_clear(mp);
@@ -247,179 +249,188 @@ void Collect(const pcpresentation &pc, gpvec vec0, constgpvec v) {
   -- if shift<0, or reduced coeff=0, we may have space to accomodate Power[g]
   -- we should use a std::map in the full collect, see above
 */
-void ShrinkCollect(const pcpresentation &pc, gpvec &v) {
+void ShrinkCollect(const pcpresentation &pc, sparsecvec &v) {
   int shift = 0;
-  gpvec p;
-  for (p = v; p->g != EOW; p++) {
-    gen g = p->g;
-    if(!coeff_reduced_p(p->c, pc.Exponent[g])) {
-      if (pc.Power[g] != nullgpvec && pc.Power[g]->g != EOW) { // bad news, collection can become longer
-	gpvec newp = FreshVec();
-	Collect(pc, newp, p);
-	unsigned lenv = Length(v), lennewv = (p-v)+shift+Length(newp); //!!!
+  unsigned pos;
+  for (pos = 0; !v.issize(pos); pos++) {
+    gen g = v[pos].first;
+    if(!coeff_reduced_p(v[pos].second, pc.Exponent[g])) {
+      if (!pc.Power[g].empty()) { // bad news, collection can become longer
+	sparsecvec newp = FreshVec();
+	Collect(pc, newp, v.window(pos));
+	unsigned lenv = v.size(), lennewv = pos+shift+newp.size();
 	if (lenv >= lennewv) {
-	  Copy(p+shift, newp);
-	  if (lenv > lennewv) {
-	    int len = p-v; // !!!
-	    v = ResizeVec(v, lenv, lennewv);
-	    p = v + len;
-	  }
+	  v.window(pos+shift).copy(newp);
+	  if (lenv > lennewv)
+	    v.resize(lenv, lennewv);
 	} else {
-	  gpvec newv = NewVec(lennewv);
-	  (p+shift)->g = EOW; // cut the vector for copy
-	  Copy(newv, v);
-	  (p+shift)->g = g; // put it back for deallocation
-	  Copy(newv+(p-v)+shift, newp);
-	  FreeVec(v);
+	  sparsecvec newv(lennewv);
+	  v.truncate(pos+shift); // cut the vector for copy
+	  newv.copy(v);
+	  v[pos+shift].first = g; // put it back for deallocation
+	  newv.window(pos+shift).copy(newp);
+	  v.free();
 	  v = newv;
 	}
 	PopVec();
 	return;
       }
-      coeff_fdiv_r(p->c, p->c, pc.Exponent[g]);
-      if (coeff_z_p(p->c)) { shift--; continue; }
+      coeff_fdiv_r(v[pos].second, v[pos].second, pc.Exponent[g]);
+      if (coeff_z_p(v[pos].second)) { shift--; continue; }
     }
     if (shift < 0)
-      coeff_set((p+shift)->c, p->c), (p+shift)->g = g;
+      coeff_set(v[pos+shift].second, v[pos].second), v[pos+shift].first = g;
   }
   if (shift < 0) {
-    (p+shift)->g = EOW;
-    v = ResizeVec(v, v-p, (v-p)+shift);
+    v.truncate(pos+shift);
+    v.resize(pos,pos+shift);
   }
 }
 #else
-void Collect(const pcpresentation &pc, gpvec vec0, constgpvec v) {
+/* in groups, collection is done during calculation of the operations.
+ * the last collection step consists just in removing 0s.
+ */
+void Collect(const pcpresentation &pc, sparsecvec vec0, const sparsecvec v) {
   volatile int x = 0; printf("%d", x / x);
   //!!! GROUP
 }
 
 // time-critical: avoid copying if possible
-void ShrinkCollect(const pcpresentation &pc, gpvec &v) {
+void ShrinkCollect(const pcpresentation &pc, sparsecvec &v) {
   volatile int x = 0; printf("%d", x / x);
   //!!! GROUP
 }
 #endif
 
-void Prod(const pcpresentation &pc, gpvec vec0, constgpvec vec1, constgpvec vec2)
+/* the main collection function, for groups */
+void GroupCollect(const pcpresentation &pc, sparsecvec vec0, const sparsecvec v) {
+}
+
+void Prod(const pcpresentation &pc, sparsecvec vec0, const sparsecvec vec1, const sparsecvec vec2)
 {
-  Copy(vec0, vec1);
-  Collect(pc, vec0, vec2);
+  vec0.copy(vec1);
+  GroupCollect(pc, vec0, vec2);
 }
 
 // solve vec2*vec0 = vec1*vec2 for vec0
-void Conjugate(const pcpresentation &pc, gpvec vec0, constgpvec vec1, constgpvec vec2)
+void Conjugate(const pcpresentation &pc, sparsecvec vec0, const sparsecvec vec1, const sparsecvec vec2)
 {
-  gpvec p1p2 = FreshVec();
-  Copy(p1p2, vec1);
-  Collect(pc, p1p2, vec2);
+  sparsecvec p1p2 = FreshVec();
+  p1p2.copy(vec1);
+  GroupCollect(pc, p1p2, vec2);
   LQuo(pc, vec0, vec2, p1p2);
   PopVec();
 }
 
-void Quo(const pcpresentation &pc, gpvec vec0, constgpvec vec1, constgpvec vec2)
+void Quo(const pcpresentation &pc, sparsecvec vec0, const sparsecvec vec1, const sparsecvec vec2)
 {
-  gpvec vec2i = FreshVec();
+  sparsecvec vec2i = FreshVec();
 #if 0
   //!!! check order in which we push inverse!
   for (autounsigned pos = 0; vec2[pos].g != EOW; pos++) {
     vec2i[pos].g = vec2[pos].g;
-    coeff_neg(vec2i[pos].c, vec2[pos].c);
+    coeff_neg(vec2i[pos].second, vec2[pos].second);
   }
 #endif
-  Copy(vec0, vec1);
-  Collect(pc, vec0, vec2i);
+  vec0.copy(vec1);
+  GroupCollect(pc, vec0, vec2i);
   PopVec();
 }
 
 // solve vec1*vec0 = vec2 for vec0
-void LQuo(const pcpresentation &pc, gpvec vec0, constgpvec vec1, constgpvec vec2)
+void LQuo(const pcpresentation &pc, sparsecvec vec0, const sparsecvec vec1, const sparsecvec vec2)
 {
-  gpvec p = vec0, p1 = vec1, p2 = FreshVec();
-  Copy(p2, vec2);
-  p->g = EOW;
+#if 0
+  sparsecvec p = vec0, p1 = vec1, p2 = FreshVec();
+  p2.Copy(p2, vec2);
+  p->first = EOW;
   
-  while (gen g = std::min(vec1->g, vec2->g) != EOW) {
-    if (p1->g == p2->g)
-      coeff_sub(p->c, (p2++)->c, (p1++)->c);
-    else if (g == p1->g)
-      coeff_neg(p->c, (p1++)->c);
+  while (gen g = std::min(vec1->first, vec2->first) != EOW) {
+    if (p1->first == p2->first)
+      coeff_sub(p->second, (p2++)->second, (p1++)->second);
+    else if (g == p1->first)
+      coeff_neg(p->second, (p1++)->second);
     else
-      coeff_set(p->c, (p2++)->c);
-    if (!coeff_reduced_p(p->c, pc.Exponent[g]))
-      coeff_fdiv_r(p->c, p->c, pc.Exponent[g]);
-    if (coeff_nz_p(p->c)) {
-      (p++)->g = g;
-      p->g = EOW;
-      Collect(pc, p2, p-1);
+      coeff_set(p->second, (p2++)->second);
+    if (!coeff_reduced_p(p->second, pc.Exponent[g]))
+      coeff_fdiv_r(p->second, p->second, pc.Exponent[g]);
+    if (coeff_nz_p(p->second)) {
+      p->first = g;
+      (p+1)->first = EOW;
+      GroupCollect(pc, p2, p);
+      p++;
     }
   }
   PopVec();
+#endif
 }
 
-gcoeff __one = { .g = EOW };
-const gpvec one = { .data = &__one };
+const sparsecvec one((size_t) 0);
 
-void Inv(const pcpresentation &pc, gpvec vec0, constgpvec vec1)
+void Inv(const pcpresentation &pc, sparsecvec vec0, const sparsecvec vec1)
 {
   LQuo(pc, vec0, vec1, one);
 }
 
 // solve vec2*vec1*vec0 = vec1*vec2 for vec0
-void GroupBracket(const pcpresentation &pc, gpvec vec0, constgpvec vec1, constgpvec vec2)
+void GroupBracket(const pcpresentation &pc, sparsecvec vec0, const sparsecvec vec1, const sparsecvec vec2)
 {
+#if 0 // !!!
   // at each step, we have p2a*p1a*p = p1p2
-  gpvec p1a = FreshVec(), p2a = FreshVec(), p1p2 = FreshVec(), p = vec0;
+  sparsecvec p1a = FreshVec(), p2a = FreshVec(), p1p2 = FreshVec(), p = vec0;
   Copy(p1p2, vec1);
-  Collect(pc, p1p2, vec2);
+  GroupCollect(pc, p1p2, vec2);
   Copy(p1a, vec1);
   Copy(p2a, vec2);
-  p->g = EOW;
+  p->first = EOW;
   
-  while (gen g = std::min(p1p2->g,std::min(p1a->g,p2a->g)) != EOW) {
-    if (g == p1a->g)
-      coeff_neg(p->c, p1a->c); // increment later p1a, after more collecting
+  while (gen g = std::min(p1p2->first,std::min(p1a->first,p2a->first)) != EOW) {
+    if (g == p1a->first)
+      coeff_neg(p->second, p1a->second); // increment later p1a, after more collecting
     else
-      coeff_set_si(p->c, 0);
-    if (g == p2a->g)
-      coeff_sub(p->c, p->c, (p2a++)->c);
-    if (g == p1p2->g)
-      coeff_add(p->c, p->c, (p1p2++)->c);
-    if (!coeff_reduced_p(p->c, pc.Exponent[g]))
-      coeff_fdiv_r(p->c, p->c, pc.Exponent[g]);
-    if (coeff_nz_p(p->c)) {
-      (p++)->g = g;
-      p->g = EOW;
-      Collect(pc, p1a, p-1);
+      coeff_set_si(p->second, 0);
+    if (g == p2a->first)
+      coeff_sub(p->second, p->second, (p2a++)->second);
+    if (g == p1p2->first)
+      coeff_add(p->second, p->second, (p1p2++)->second);
+    if (!coeff_reduced_p(p->second, pc.Exponent[g]))
+      coeff_fdiv_r(p->second, p->second, pc.Exponent[g]);
+    if (coeff_nz_p(p->second)) {
+      p->first = g;
+      (p+1)->first = EOW;
+      GroupCollect(pc, p1a, p);
+      p++;
     }
-    if (g == p1a->g) {
-      gen oldg = (++p1a)->g;
-      p1a->g = EOW;
-      Collect(pc, p2a, p1a-1);
-      p1a->g = oldg;
+    if (g == p1a->first) {
+      gen oldg = (++p1a)->first;
+      p1a->first = EOW;
+      GroupCollect(pc, p2a, p1a+(-1));
+      p1a->first = oldg;
     }
   }
   PopVec(), PopVec(), PopVec(), PopVec();
+#endif
 }
 
-static void Pow(const pcpresentation &pc, gpvec vec0, constgpvec vec1, int c)
+static void Pow(const pcpresentation &pc, sparsecvec vec0, const sparsecvec vec1, int c)
 {
   if (c == -1) {
     Inv(pc, vec0, vec1);
     return;
   }
   if(c == 0) {
-    vec0->g = EOW;
+    vec0.clear();
     return;
   }
   if (c == 1) {
-    Copy(vec0, vec1);
+    vec0.copy(vec1);
     return;
   }
 
-  vec0->g = EOW;
-  gpvec s = FreshVec();
+  vec0.clear();
+  sparsecvec s = FreshVec();
   if (c > 0)
-    Copy(s, vec1);
+    s.copy(vec1);
   else {
     Inv(pc, s, vec1);
     c = -c;
@@ -428,16 +439,16 @@ static void Pow(const pcpresentation &pc, gpvec vec0, constgpvec vec1, int c)
   //!!! use prime instead of 2 to improve cancellations
   for (;;) {
     if (c % 2)
-      Collect(pc, vec0, s);
+      GroupCollect(pc, vec0, s);
     c /= 2;
     if (c == 0)
       break;
-    Collect(pc, s, s);
+    GroupCollect(pc, s, s);
   }
   PopVec();
 }
 
-void Pow(const pcpresentation &pc, gpvec vec0, constgpvec vec1, coeff &c)
+void Pow(const pcpresentation &pc, sparsecvec vec0, const sparsecvec vec1, coeff &c)
 {
   //!!! what to do with large exponents?
   Pow(pc, vec0, vec1, coeff_get_si(c));
@@ -447,19 +458,19 @@ void Pow(const pcpresentation &pc, gpvec vec0, constgpvec vec1, coeff &c)
 // work-in-progress attempt
 typedef std::map<gen,coeff> sparsevec;
 
-void Collect(gpvec &vec, bool resize) {
+void Collect(sparsecvec vec, bool resize) {
   sparsevec todo;
   int pos, shift;
   coeff mp;
   coeff_init(mp);
   for (pos = shift = 0; vec[pos].g != EOW; pos++) {
     gen g = vec[pos].g;
-    if(!coeff_reduced_p(vec[pos].c, Exponent[g])) {
-      coeff_fdiv_q(mp, vec[pos].c, Exponent[g]);
-      coeff_submul(vec[pos].c, mp, Exponent[g]);
-      if (coeff_nz_p(vec[pos].c) && (Power[g] == NULL || Power[g]->g == EOW))
+    if(!coeff_reduced_p(vec[pos].second, Exponent[g])) {
+      coeff_fdiv_q(mp, vec[pos].second, Exponent[g]);
+      coeff_submul(vec[pos].second, mp, Exponent[g]);
+      if (coeff_nz_p(vec[pos].second) && Power[g].empty())
 	goto next;  // just reduce the coeff, trivial power
-      if (Power[g] == NULL || Power[g]->g == EOW) {
+      if (Power[g].empty()) {
 	shift++; // we're about to shrink the vector, a coefficient vanished
 	continue;
       }
@@ -469,17 +480,17 @@ void Collect(gpvec &vec, bool resize) {
     }
   next:
     if (shift)
-      coeff_set(vec[pos-shift].c, vec[pos].c), vec[pos-shift].g = g;
+      coeff_set(vec[pos-shift].second, vec[pos].second), vec[pos-shift].g = g;
   }
   coeff_clear(mp);
 }
 
-void Collect(gpvec v0, constgpvec v1) {
-  Collect((gpvec) v1, false);
+void Collect(sparsecvec v0, const sparsecvec v1) {
+  Collect((sparsecvec) v1, false);
   Copy(v0, v1);
 }
 
-void ShrinkCollect(gpvec &v) {
+void ShrinkCollect(sparsecvec &v) {
   Collect(v, true);
 }
 #endif

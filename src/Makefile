@@ -6,23 +6,23 @@
 ##
 
 NQVERSION = -DVERSION='"4.0.0 2019-01-26"'
-OPT = -O0 #-Ofast
-DEBUG = -g -ggdb
-CXXFLAGS = -std=gnu++11 -Wall -Werror $(DEBUG) $(OPT)
+OPT = -march=native -O0 #-Ofast
+DEBUG = -g -fsanitize=address -ggdb # -fprofile-instr-generate -fcoverage-mapping
 CFLAGS = -Wall -Werror $(DEBUG) $(OPT)
+CXXFLAGS = -std=gnu++11 $(CFLAGS)
 LDFLAGS = $(DEBUG) -lcolamd -lgmp
 
 ## LieNQ prefers GNU C compiler, for debugging.
 
 ifeq ($(shell uname -s),Darwin)
-    CC = g++-8
-    CXX = g++-8
+    CXX = g++
 else
-    CC = g++
     CXX = g++
 endif
+CC = $(CXX)
 
 NQ_OBJ = fppresentation.o pcpresentation.o print.o operations.o matrix.o consistency.o tails.o auxiliary.o nq.o
+NQ_INCL = nq.h coeff.h vectors.hh
 
 all: nql_long nqg_long
 #all: nql_2_64 nql_2_320 nql_3_39 nql_5_27 nql_5_100 nql_long nql_mpz nqg_2_64 nqg_2_320 nqg_3_39 nqg_5_27 nqg_5_100 nqg_long nqg_mpz
@@ -32,132 +32,132 @@ clean:
 
 nql_mpz: $(subst .o,l_mpz.o,$(NQ_OBJ))
 
-%l_mpz.o: %.cc nq.h coeff.h coeff_mpz.h
+%l_mpz.o: %.cc $(NQ_INCL) coeff_mpz.h
 	$(CXX) -c -DCOEFF_IS_MPZ -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
 
 nql_z: $(subst .o,l_z.o,$(NQ_OBJ))
 
-%l_z.o: %.cc nq.h coeff.h coeff_z.h
+%l_z.o: %.cc $(NQ_INCL) coeff_z.h
 	$(CXX) -c -DCOEFF_IS_Z -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
 
 nql_long: $(subst .o,l_long.o,$(NQ_OBJ))
 
-%l_long.o: %.cc nq.h coeff.h coeff_long.h
+%l_long.o: %.cc $(NQ_INCL) coeff_long.h
 	$(CXX) -c -DCOEFF_IS_LONG -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
 
 nql_2_3: $(subst .o,l_2_3.o,$(NQ_OBJ))
 
-%l_2_3.o: %.cc nq.h coeff.h coeff_2_k.h
+%l_2_3.o: %.cc $(NQ_INCL) coeff_2_k.h
 	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=2 -DMODULUS_EXPONENT=3 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
 
 nql_2_63: $(subst .o,l_2_63.o,$(NQ_OBJ))
 
-%l_2_63.o: %.cc nq.h coeff.h coeff_2_k.h
+%l_2_63.o: %.cc $(NQ_INCL) coeff_2_k.h
 	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=2 -DMODULUS_EXPONENT=63 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
 
 nql_2_64: $(subst .o,l_2_64.o,$(NQ_OBJ))
 
-%l_2_64.o: %.cc nq.h coeff.h coeff_2_k.h
+%l_2_64.o: %.cc $(NQ_INCL) coeff_2_k.h
 	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=2 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
 
 nql_2_257: $(subst .o,l_2_257.o,$(NQ_OBJ))
 
-%l_2_257.o: %.cc nq.h coeff.h coeff_2_mp.h
+%l_2_257.o: %.cc $(NQ_INCL) coeff_2_mp.h
 	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=2 -DMODULUS_EXPONENT=257 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
 
 nql_2_320: $(subst .o,l_2_320.o,$(NQ_OBJ))
 
-%l_2_320.o: %.cc nq.h coeff.h coeff_2_mp.h
+%l_2_320.o: %.cc $(NQ_INCL) coeff_2_mp.h
 	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=2 -DMODULUS_EXPONENT=320 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
 
 nql_3_38: $(subst .o,l_3_38.o,$(NQ_OBJ))
 
-%l_3_38.o: %.cc nq.h coeff.h coeff_p_k.h
+%l_3_38.o: %.cc $(NQ_INCL) coeff_p_k.h
 	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=3 -DMODULUS_EXPONENT=38 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
 
 nql_3_39: $(subst .o,l_3_39.o,$(NQ_OBJ))
 
-%l_3_39.o: %.cc nq.h coeff.h coeff_p_k.h
+%l_3_39.o: %.cc $(NQ_INCL) coeff_p_k.h
 	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=3 -DMODULUS_EXPONENT=39 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
 
 nql_5_26: $(subst .o,l_5_26.o,$(NQ_OBJ))
 
-%l_5_26.o: %.cc nq.h coeff.h coeff_p_k.h
+%l_5_26.o: %.cc $(NQ_INCL) coeff_p_k.h
 	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=5 -DMODULUS_EXPONENT=26 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
 
 nql_5_27: $(subst .o,l_5_27.o,$(NQ_OBJ))
 
-%l_5_27.o: %.cc nq.h coeff.h coeff_p_k.h
+%l_5_27.o: %.cc $(NQ_INCL) coeff_p_k.h
 	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=5 -DMODULUS_EXPONENT=27 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
 
 nql_5_100: $(subst .o,l_5_100.o,$(NQ_OBJ))
 
-%l_5_100.o: %.cc nq.h coeff.h coeff_p_mp.h
+%l_5_100.o: %.cc $(NQ_INCL) coeff_p_mp.h
 	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=5 -DMODULUS_EXPONENT=100 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
 
 nqg_mpz: $(subst .o,g_mpz.o,$(NQ_OBJ))
 
-%g_mpz.o: %.cc nq.h coeff.h coeff_mpz.h
+%g_mpz.o: %.cc $(NQ_INCL) coeff_mpz.h
 	$(CXX) -c -DCOEFF_IS_MPZ -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
 
 nqg_z: $(subst .o,g_z.o,$(NQ_OBJ))
 
-%g_z.o: %.cc nq.h coeff.h coeff_z.h
+%g_z.o: %.cc $(NQ_INCL) coeff_z.h
 	$(CXX) -c -DCOEFF_IS_Z -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
 
 nqg_long: $(subst .o,g_long.o,$(NQ_OBJ))
 
-%g_long.o: %.cc nq.h coeff.h coeff_long.h
+%g_long.o: %.cc $(NQ_INCL) coeff_long.h
 	$(CXX) -c -DCOEFF_IS_LONG -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
 
 nqg_2_3: $(subst .o,g_2_3.o,$(NQ_OBJ))
 
-%g_2_3.o: %.cc nq.h coeff.h coeff_2_k.h
+%g_2_3.o: %.cc $(NQ_INCL) coeff_2_k.h
 	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=2 -DMODULUS_EXPONENT=3 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
 
 nqg_2_63: $(subst .o,g_2_63.o,$(NQ_OBJ))
 
-%g_2_63.o: %.cc nq.h coeff.h coeff_2_k.h
+%g_2_63.o: %.cc $(NQ_INCL) coeff_2_k.h
 	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=2 -DMODULUS_EXPONENT=63 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
 
 nqg_2_64: $(subst .o,g_2_64.o,$(NQ_OBJ))
 
-%g_2_64.o: %.cc nq.h coeff.h coeff_2_k.h
+%g_2_64.o: %.cc $(NQ_INCL) coeff_2_k.h
 	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=2 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
 
 nqg_2_257: $(subst .o,g_2_257.o,$(NQ_OBJ))
 
-%g_2_257.o: %.cc nq.h coeff.h coeff_2_mp.h
+%g_2_257.o: %.cc $(NQ_INCL) coeff_2_mp.h
 	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=2 -DMODULUS_EXPONENT=257 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
 
 nqg_2_320: $(subst .o,g_2_320.o,$(NQ_OBJ))
 
-%g_2_320.o: %.cc nq.h coeff.h coeff_2_mp.h
+%g_2_320.o: %.cc $(NQ_INCL) coeff_2_mp.h
 	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=2 -DMODULUS_EXPONENT=320 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
 
 nqg_3_38: $(subst .o,g_3_38.o,$(NQ_OBJ))
 
-%g_3_38.o: %.cc nq.h coeff.h coeff_p_k.h
+%g_3_38.o: %.cc $(NQ_INCL) coeff_p_k.h
 	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=3 -DMODULUS_EXPONENT=38 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
 
 nqg_3_39: $(subst .o,g_3_39.o,$(NQ_OBJ))
 
-%g_3_39.o: %.cc nq.h coeff.h coeff_p_k.h
+%g_3_39.o: %.cc $(NQ_INCL) coeff_p_k.h
 	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=3 -DMODULUS_EXPONENT=39 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
 
 nqg_5_26: $(subst .o,g_5_26.o,$(NQ_OBJ))
 
-%g_5_26.o: %.cc nq.h coeff.h coeff_p_k.h
+%g_5_26.o: %.cc $(NQ_INCL) coeff_p_k.h
 	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=5 -DMODULUS_EXPONENT=26 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
 
 nqg_5_27: $(subst .o,g_5_27.o,$(NQ_OBJ))
 
-%g_5_27.o: %.cc nq.h coeff.h coeff_p_k.h
+%g_5_27.o: %.cc $(NQ_INCL) coeff_p_k.h
 	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=5 -DMODULUS_EXPONENT=27 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
 
 nqg_5_100: $(subst .o,g_5_100.o,$(NQ_OBJ))
 
-%g_5_100.o: %.cc nq.h coeff.h coeff_p_mp.h
+%g_5_100.o: %.cc $(NQ_INCL) coeff_p_mp.h
 	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=5 -DMODULUS_EXPONENT=100 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
 
 coeff_test: coeff_test.cc coeff.h coeff_2_k.h coeff_p_k.h coeff_2_mp.h coeff_p_mp.h

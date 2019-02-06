@@ -555,14 +555,14 @@ void ReadPresentation(presentation &pres, const char *InputFileName) {
       n->cont.bin = {.l = n->cont.bin.r, .r = n->cont.bin.l};
     }
     if (n->type == TREL) {
-      ValidateExpression(n->cont.bin.l, EOW);
-      ValidateExpression(n->cont.bin.r, EOW);
+      ValidateExpression(n->cont.bin.l, INFINITY);
+      ValidateExpression(n->cont.bin.r, INFINITY);
     } else if (n->type == TDREL) {
       if (n->cont.bin.l->type != TGEN)
 	SyntaxError("LHS should be generator, not %s", nodename[n->cont.bin.l->type]);
       ValidateExpression(n->cont.bin.r, n->cont.bin.l->cont.g);
     } else
-      ValidateExpression(n, EOW);
+      ValidateExpression(n, INFINITY);
 
     if (n->type == TDREL)
       pres.Aliases.push_back(n);
@@ -581,7 +581,7 @@ void ReadPresentation(presentation &pres, const char *InputFileName) {
 
     while (is_relation(Token)) {
       node *n = Expression(pres, 0);
-      ValidateExpression(n, EOW);
+      ValidateExpression(n, INFINITY);
       pres.Extra.push_back(n);
       if (Token == COMMA)
 	NextToken();
@@ -697,8 +697,8 @@ void PrintNode(FILE *f, const presentation &pres, node *n) {
 ** generators.
 */
 
-void EvalRel(const pcpresentation &pc, gpvec v, node *rel) {
-  gpvec vl, vr;
+void EvalRel(const pcpresentation &pc, sparsecvec v, node *rel) {
+  sparsecvec vl, vr;
   switch (rel->type) {
   case TSUM:
     vl = FreshVec();
@@ -764,7 +764,7 @@ void EvalRel(const pcpresentation &pc, gpvec v, node *rel) {
     PopVec();
     break;
   case TGEN:
-    Copy(v, pc.Epimorphism[rel->cont.g]);
+    v.copy(pc.Epimorphism[rel->cont.g]);
     break;
   case TNEG:
     EvalRel(pc, v, rel->cont.u);
@@ -811,10 +811,10 @@ void EvalRel(const pcpresentation &pc, gpvec v, node *rel) {
 
 /* evaluate all relations, and add them to the relation matrix */
 void EvalAllRel(const pcpresentation &pc, const presentation &pres) {
-  gpvec v = FreshVec();
+  sparsecvec v = FreshVec();
 
   for (auto n : pres.Aliases) {
-    gpvec temp = FreshVec();
+    sparsecvec temp = FreshVec();
     EvalRel(pc, temp, n->cont.bin.r);
     Collect(pc, v, temp);
     PopVec();
@@ -824,12 +824,12 @@ void EvalAllRel(const pcpresentation &pc, const presentation &pres) {
       fprintf(LogFile, " ("); PrintVec(LogFile, v); fprintf(LogFile, ")\n");
     }
     gen g = n->cont.bin.l->cont.g;
-    pc.Epimorphism[g] = ResizeVec(pc.Epimorphism[g], Length(pc.Epimorphism[g]), Length(v));
-    Copy(pc.Epimorphism[g], v);
+    pc.Epimorphism[g].resize(v.size());
+    pc.Epimorphism[g].copy(v);
   }
   
   for (auto n : pres.Relators) {
-    gpvec temp = FreshVec();
+    sparsecvec temp = FreshVec();
     EvalRel(pc, temp, n);
     Collect(pc, v, temp);
     PopVec();
