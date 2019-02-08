@@ -8,300 +8,79 @@
 #include "nq.h"
 #include <map>
 
-/*
-** The purpose of this couple of functions is to handle the Lie-algebra
-** operations in the PC-presentation. There are 3 main operations i.e.
-** a summation:        with respect to this the elements form an Abelian-group;
-** a Lie product:      equipped with the usual Jacoby, anti-commutativity, and
-**                     distributivity. It is stored in the Power[][] matrix.
-** an integer-product: A module-operation of course. Makes no problem(?).
-*/
+stack<hollowcvec> vecstack;
 
-/****************************************************************
- vector addition and scalar multiplication
-****************************************************************/
-/* vec0 = vec1 + vec2 */
-void Sum(sparsecvec vec0, const sparsecvec vec1, const sparsecvec vec2) {
-  auto p0 = vec0.begin(), p1 = vec1.begin(), p2 = vec2.begin();
-  for (;;) {
-    if (p1.atend()) {
-      p0.tail().copy(p2.tail());
-      return;
-    }
-    if (p2.atend()) {
-      p0.tail().copy(p1.tail());
-      return;
-    }
-    if (p1->first < p2->first) {
-      coeff_set(p0->second, p1->second), p0->first = p1->first;
-      p0++;
-      p1++;
-    } else if (p1->first > p2->first) {
-      coeff_set(p0->second, p2->second), p0->first = p2->first;
-      p0++;
-      p2++;
-    } else {
-      coeff_add(p0->second, p1->second, p2->second);
-      if (coeff_nz_p(p0->second))
-	p0->first = p1->first, p0++;
-      p1++;
-      p2++;
-    }
-  }
-}
-
-/* vec0 = vec1 + x2*vec2 */
-void Sum(sparsecvec vec0, const sparsecvec vec1, const coeff x2, const sparsecvec vec2) {
-  if (coeff_z_p(x2)) {
-    vec0.copy(vec1);
-    return;
-  }
-
-  auto p0 = vec0.begin(), p1 = vec1.begin(), p2 = vec2.begin();
-  for (;;) {
-    if (p1.atend()) {
-      Prod(p0.tail(), x2, p2.tail());
-      return;
-    }
-    if (p2.atend()) {
-      p0.tail().copy(p1.tail());
-      return;
-    }
-    if (p1->first < p2->first) {
-      coeff_set(p0->second, p1->second), p0->first = p1->first;
-      p0++;
-      p1++;
-    } else if (p1->first > p2->first) {
-      coeff_mul(p0->second, x2, p2->second);
-      if (coeff_nz_p(p0->second))
-	p0->first = p2->first, p0++;
-      p2++;
-    } else {
-      coeff_set(p0->second, p1->second);
-      coeff_addmul(p0->second, x2, p2->second);
-      if (coeff_nz_p(p0->second))
-	p0->first = p1->first, p0++;
-      p1++;
-      p2++;
-    }
-  }
-}
-
-/* vec0 = x1*vec1 + x2*vec2 */
-void Sum(sparsecvec vec0, const coeff x1, const sparsecvec vec1, const coeff x2, const sparsecvec vec2) {
-  if (coeff_z_p(x1)) {
-    Prod(vec0, x2, vec2);
-    return;
-  }
-  if (coeff_z_p(x2)) {
-    Prod(vec0, x1, vec1);
-    return;
-  }
-
-  auto p0 = vec0.begin(), p1 = vec1.begin(), p2 = vec2.begin();
-  for (;;) {
-    if (p1.atend()) {
-      Prod(p0.tail(), x2, p2.tail());
-      return;
-    }
-    if (p2.atend()) {
-      Prod(p0.tail(), x1, p1.tail());
-      return;
-    }
-    if (p1->first < p2->first) {
-      coeff_mul(p0->second, x1, p1->second);
-      if (coeff_nz_p(p0->second))
-	p0->first = p1->first, p0++;
-      p1++;
-    } else if (p1->first > p2->first) {
-      coeff_mul(p0->second, x2, p2->second);
-      if (coeff_nz_p(p0->second))
-	p0->first = p2->first, p0++;
-      p2++;
-    } else {
-      coeff_mul(p0->second, x1, p1->second);
-      coeff_addmul(p0->second, x2, p2->second);
-      if (coeff_nz_p(p0->second))
-	p0->first = p1->first, p0++;
-      p1++;
-      p2++;
-    }
-  }
-}
-
-/* vec0 = vec1 - vec2 */
-void Diff(sparsecvec vec0, const sparsecvec vec1, const sparsecvec vec2) {
-  auto p0 = vec0.begin(), p1 = vec1.begin(), p2 = vec2.begin();
-  for (;;) {
-    if (p1.atend()) {
-      Neg(p0.tail(), p2.tail());
-      return;
-    }
-    if (p2.atend()) {
-      p0.tail().copy(p1.tail());
-      return;
-    }
-    if (p1->first < p2->first) {
-      coeff_set(p0->second, p1->second), p0->first = p1->first;
-      p0++;
-      p1++;
-    } else if (p1->first > p2->first) {
-      coeff_neg(p0->second, p2->second), p0->first = p2->first;
-      p0++;
-      p2++;
-    } else {
-      coeff_sub(p0->second, p1->second, p2->second);
-      if (coeff_nz_p(p0->second))
-	p0->first = p1->first, p0++;
-      p1++;
-      p2++;
-    }
-  }
-}
-
-/****************************************************************
- Lie bracket of vectors
-
- !!! this could be very inefficient the way it's implemented:
- if vec1 and vec2 are almost full vectors (of length N), and each
- Product[] entry is a short vector (of length n), then we have
- complexity O(N^3) while we could achieve O(N^2n) in theory.
-
- it would be better to do this with a container storing all
- coefficients of all sums of Product[]s, and reading the results from
- there into vec0.
-****************************************************************/
-/* vec0 = [ vec1, vec2 ] */
-void LieBracket(const pcpresentation &pc, sparsecvec vec0, const sparsecvec vec1, const sparsecvec vec2) {
-  sparsecvec temp[2];
-  bool parity = false;
-  temp[0] = FreshVec();
-  temp[1] = FreshVec();
+/* Lie algebra operations */
+void hollowcvec::liebracket(const pcpresentation &pc, const hollowcvec v, const hollowcvec w) {
   coeff c;
   coeff_init(c);
-  
-  for (auto gc1 : vec1)
-    for (auto gc2 : vec2)
-      if (gc1.first <= pc.NrPcGens && gc2.first <= pc.NrPcGens && pc.Generator[gc1.first].w + pc.Generator[gc2.first].w <= pc.Class) {
-        if (gc1.first > gc2.first) {
-	  coeff_mul(c, gc1.second, gc2.second);
-	  Sum(temp[!parity], temp[parity], c, pc.Product[gc1.first][gc2.first]);
-	  parity ^= 1;
-	} else if (gc2.first > gc1.first) {
-	  coeff_mul(c, gc1.second, gc2.second);
-	  coeff_neg(c, c);
-	  Sum(temp[!parity], temp[parity], c, pc.Product[gc2.first][gc1.first]);
-	  parity ^= 1;
-	}
+
+  for (auto kcv : v)
+    for (auto kcw : w)
+      if (kcv.first <= pc.NrPcGens && kcw.first <= pc.NrPcGens && pc.Generator[kcv.first].w + pc.Generator[kcw.first].w <= pc.Class) {
+	coeff_mul(c, kcv.second, kcw.second);
+        if (kcv.first > kcw.first)
+	  addmul(c, pc.Comm[kcv.first][kcw.first]);
+	else if (kcw.first > kcv.first)
+	  submul(c, pc.Comm[kcw.first][kcv.first]);
       }
   coeff_clear(c);
-  vec0.copy(temp[parity]);
-  PopVec();
-  PopVec();
 }
 
-#ifdef LIEALG
-/* the main collection routine. It could be optimized:
-   if all Power relations have length n, and gv is full of length N,
-   then the complexity is O(N^3) rather than O(N^2 n).
-
-   We should do it with a container such as <map>
-*/
-// !!!
-void Collect(const pcpresentation &pc, sparsecvec vec0, const sparsecvec v) {
-  sparsecvec temp[2];
-  temp[0] = FreshVec();
-  temp[1] = FreshVec();
-  bool parity = false;
-  coeff mp;
-  coeff_init(mp);
-  auto p = v.begin(), p0 = vec0.begin();
+// add/subtract [[a,b],c]. sign == add, ~sign == subtract.
+void hollowcvec::lie3bracket(const pcpresentation &pc, gen a, gen b, gen c, bool sign) {
+  const bool sab = (a < b);
+  const sparsecvec v = sab ? pc.Comm[b][a] : pc.Comm[a][b];
   
-  for (; !p.atend();) {
-    gen i = p->first;
-    if(coeff_reduced_p(p->second, pc.Exponent[i])) {
-      coeff_set(p0->second, p->second), p0->first = i;
-      p0++;
-      p++;
-    } else {
-      coeff_fdiv_q(mp, p->second, pc.Exponent[i]);
-      coeff_set(p0->second, p->second);
-      coeff_submul(p0->second, mp, pc.Exponent[i]);
-      if (coeff_nz_p(p0->second))
-	p0->first = i, p0++;
-      p++;
-      if (!pc.Power[i].empty()) {
-	Sum(temp[!parity], p.tail(), mp, pc.Power[i]);
-	parity ^= 1;
-	p = temp[parity].begin();
-      }
+  for (auto kc : v) {
+    if (kc.first > pc.NrPcGens)
+      break;
+    if (kc.first == c)
+      continue;
+    const bool skc = kc.first < c;
+    const sparsecvec w = skc ? pc.Comm[c][kc.first] : pc.Comm[kc.first][c];
+    if (sign ^ sab ^ skc)
+      addmul(kc.second, w);
+    else
+      submul(kc.second, w);
+  }
+}
+
+void hollowcvec::liecollect(const pcpresentation &pc) {
+  coeff q;
+  coeff_init(q);
+  
+  for (auto kc : *this)
+    if(!coeff_reduced_p(kc.second, pc.Exponent[kc.first])) {
+      coeff_fdiv_qr(q, (*this)[kc.first], kc.second, pc.Exponent[kc.first]);
+      addmul(q, pc.Power[kc.first]);
     }
-  }
-  p0.markend();
-  PopVec();
-  PopVec();
-  coeff_clear(mp);
+  coeff_clear(q);
 }
 
-/* It seems the following routine is time-critical.
-   It can be improved in many manners:
-  -- if Power[g]->g != EOW but we're at the end (likely case), can just append
-  -- if shift<0, or reduced coeff=0, we may have space to accomodate Power[g]
-  -- we should use a std::map in the full collect, see above
-*/
-void ShrinkCollect(const pcpresentation &pc, sparsecvec &v) {
-  int shift = 0;
-  unsigned pos;
-  for (pos = 0; !v.issize(pos); pos++) {
-    gen g = v[pos].first;
-    if(!coeff_reduced_p(v[pos].second, pc.Exponent[g])) {
-      if (!pc.Power[g].empty()) { // bad news, collection can become longer
-	sparsecvec newp = FreshVec();
-	Collect(pc, newp, v.window(pos));
-	unsigned lenv = v.size(), lennewv = pos+shift+newp.size();
-	if (lenv >= lennewv) {
-	  v.window(pos+shift).copy(newp);
-	  if (lenv > lennewv)
-	    v.resize(lenv, lennewv);
-	} else {
-	  sparsecvec newv(lennewv);
-	  v.truncate(pos+shift); // cut the vector for copy
-	  newv.copy(v);
-	  v[pos+shift].first = g; // put it back for deallocation
-	  newv.window(pos+shift).copy(newp);
-	  v.free();
-	  v = newv;
-	}
-	PopVec();
-	return;
-      }
-      coeff_fdiv_r(v[pos].second, v[pos].second, pc.Exponent[g]);
-      if (coeff_z_p(v[pos].second)) { shift--; continue; }
-    }
-    if (shift < 0)
-      coeff_set(v[pos+shift].second, v[pos].second), v[pos+shift].first = g;
-  }
-  if (shift < 0) {
-    v.truncate(pos+shift);
-    v.resize(pos,pos+shift);
-  }
-}
-#else
-/* in groups, collection is done during calculation of the operations.
- * the last collection step consists just in removing 0s.
- */
-void Collect(const pcpresentation &pc, sparsecvec vec0, const sparsecvec v) {
-  volatile int x = 0; printf("%d", x / x);
-  //!!! GROUP
+/* group operations */
+void hollowcvec::mul(const pcpresentation &pc, const hollowcvec) {
 }
 
-// time-critical: avoid copying if possible
-void ShrinkCollect(const pcpresentation &pc, sparsecvec &v) {
-  volatile int x = 0; printf("%d", x / x);
-  //!!! GROUP
+void hollowcvec::pow(const pcpresentation &pc, const hollowcvec, const coeff &) {
 }
-#endif
 
+void hollowcvec::quo(const pcpresentation &pc, const hollowcvec) {
+}
+
+void hollowcvec::lquo(const pcpresentation &pc, const hollowcvec, const hollowcvec) {
+}
+
+void hollowcvec::conjugate(const pcpresentation &pc, const hollowcvec, const hollowcvec) {
+}
+
+void hollowcvec::groupbracket(const pcpresentation &pc, const hollowcvec, const hollowcvec) {
+}
+
+void hollowcvec::groupcollect(const pcpresentation &pc) {
+}
+
+#if 0
 /* the main collection function, for groups */
 void GroupCollect(const pcpresentation &pc, sparsecvec vec0, const sparsecvec v) {
 }
@@ -453,44 +232,288 @@ void Pow(const pcpresentation &pc, sparsecvec vec0, const sparsecvec vec1, coeff
   //!!! what to do with large exponents?
   Pow(pc, vec0, vec1, coeff_get_si(c));
 }
-
-#if 0
-// work-in-progress attempt
-typedef std::map<gen,coeff> sparsevec;
-
-void Collect(sparsecvec vec, bool resize) {
-  sparsevec todo;
-  int pos, shift;
-  coeff mp;
-  coeff_init(mp);
-  for (pos = shift = 0; vec[pos].g != EOW; pos++) {
-    gen g = vec[pos].g;
-    if(!coeff_reduced_p(vec[pos].second, Exponent[g])) {
-      coeff_fdiv_q(mp, vec[pos].second, Exponent[g]);
-      coeff_submul(vec[pos].second, mp, Exponent[g]);
-      if (coeff_nz_p(vec[pos].second) && Power[g].empty())
-	goto next;  // just reduce the coeff, trivial power
-      if (Power[g].empty()) {
-	shift++; // we're about to shrink the vector, a coefficient vanished
-	continue;
-      }
-      // insert Power[g] into todo. When looping, compare elements and head of todo; pop whichever comes first, maybe add, reduce, maybe push more on todo.
-
-      // simpler, probably equivalent in performance: push Power and all of remainder of word on todo (combining). Then repeatedly remove head of todo, reduce, maybe push back a Power, and write into vec. If reached EOW, either realloc or keep writing.
-    }
-  next:
-    if (shift)
-      coeff_set(vec[pos-shift].second, vec[pos].second), vec[pos-shift].g = g;
-  }
-  coeff_clear(mp);
-}
-
-void Collect(sparsecvec v0, const sparsecvec v1) {
-  Collect((sparsecvec) v1, false);
-  Copy(v0, v1);
-}
-
-void ShrinkCollect(sparsecvec &v) {
-  Collect(v, true);
-}
 #endif
+
+/* evaluate relator, given as tree */
+void hollowcvec::eval(const pcpresentation &pc, node *rel) {
+  switch (rel->type) {
+  case TSUM:
+    {
+      eval(pc, rel->cont.bin.l);
+      hollowcvec t = vecstack.fresh();
+      t.eval(pc, rel->cont.bin.r);
+      add(t);
+      vecstack.pop(t);
+    }
+    break;
+  case TPROD:
+    if (rel->cont.bin.l->type == TNUM) {
+      eval(pc, rel->cont.bin.r);
+      mul(rel->cont.bin.l->cont.n);
+    } else {
+      eval(pc, rel->cont.bin.l);
+      hollowcvec t = vecstack.fresh();
+      t.eval(pc, rel->cont.bin.r);
+      mul(pc, t);
+      vecstack.pop(t);
+    }
+    break;
+  case TQUO:
+    {
+      eval(pc, rel->cont.bin.l);
+      hollowcvec t = vecstack.fresh();
+      t.eval(pc, rel->cont.bin.r);
+      quo(pc, t);
+      vecstack.pop(t);
+    }
+    break;
+  case TLQUO:
+#ifdef GROUP
+  case TREL:
+#endif
+    {
+      hollowcvec t = vecstack.fresh();
+      hollowcvec u = vecstack.fresh();
+      t.eval(pc, rel->cont.bin.l);
+      u.eval(pc, rel->cont.bin.r);
+      lquo(pc, t, u);
+      vecstack.pop(u);
+      vecstack.pop(t);
+    }
+    break;
+  case TBRACK:
+    {
+      hollowcvec t = vecstack.fresh();
+      hollowcvec u = vecstack.fresh();
+      t.eval(pc, rel->cont.bin.l);
+      u.eval(pc, rel->cont.bin.r);
+      liebracket(pc, t, u);
+      vecstack.pop(u);
+      vecstack.pop(t);
+    }
+    break;
+  case TBRACE:
+    {
+      hollowcvec t = vecstack.fresh();
+      hollowcvec u = vecstack.fresh();      
+      t.eval(pc, rel->cont.bin.l);
+      u.eval(pc, rel->cont.bin.r);
+      groupbracket(pc, t, u);
+      vecstack.pop(u);
+      vecstack.pop(t);
+    }
+    break;
+  case TGEN:
+    copysorted(pc.Epimorphism[rel->cont.g]);
+    break;
+  case TNEG:
+    eval(pc, rel->cont.u);
+    neg();
+    break;
+  case TINV:
+    {
+      hollowcvec t = vecstack.fresh();
+      t.eval(pc, rel->cont.u);
+      quo(pc, t);
+      vecstack.pop(t);
+    }
+    break;
+  case TDIFF:
+#ifdef LIEALG
+  case TREL:
+#endif
+    {
+      eval(pc, rel->cont.bin.l);
+      hollowcvec t = vecstack.fresh();
+      t.eval(pc, rel->cont.bin.r);
+      sub(t);
+      vecstack.pop(t);
+    }
+    break;
+  case TPOW:
+    if (rel->cont.bin.r->type == TNUM) {
+      hollowcvec t = vecstack.fresh();
+      t.eval(pc, rel->cont.bin.l);
+      pow(pc, t, rel->cont.bin.r->cont.n);
+      vecstack.pop(t);
+    } else {
+      hollowcvec t = vecstack.fresh();
+      hollowcvec u = vecstack.fresh();
+      t.eval(pc, rel->cont.bin.l);
+      u.eval(pc, rel->cont.bin.r);
+      conjugate(pc, t, u);
+      vecstack.pop(u);
+      vecstack.pop(t);
+      break;
+    }
+    break;
+  default:
+    abortprintf(3, "EvalRel: operator of type %s should not occur", nodename[rel->type]);
+  }
+}
+
+/* evaluate all relations, and add them to the relation matrix */
+void EvalAllRel(const pcpresentation &pc, const fppresentation &pres) {
+  for (auto n : pres.Aliases) {
+    hollowcvec v = vecstack.fresh();
+    v.eval(pc, n->cont.bin.r);
+    v.liecollect(pc);
+
+    if (Debug >= 2) {
+      fprintf(LogFile, "# aliasing relation: ");
+      PrintNode(LogFile, pres, n);
+      fprintf(LogFile, " ("); PrintVec(LogFile, v); fprintf(LogFile, ")\n");
+    }
+    gen g = n->cont.bin.l->cont.g;
+    pc.Epimorphism[g].resize(v.size());
+    pc.Epimorphism[g].copy(v);
+  }
+  
+  for (auto n : pres.Relators) {
+    hollowcvec v = vecstack.fresh();
+    v.eval(pc, n);
+    v.liecollect(pc);
+
+    if (Debug >= 2) {
+      fprintf(LogFile, "# relation: ");
+      PrintNode(LogFile, pres, n);
+      fprintf(LogFile, " ("); PrintVec(LogFile, v); fprintf(LogFile, ")\n");
+    }
+
+    AddToRelMatrix(v);
+    
+    vecstack.pop(v);
+  }
+  
+  TimeStamp("EvalAllRel()");
+}
+
+/* check consistency of pc presentation, and deduce relations to
+ * impose on centre
+ */
+
+// !!!GROUP
+
+/*
+**  The relations to be enforced are of form
+**  [ a, b, c ] + [ b, c, a ] + [ c, a, b ]    where <a> is of weight 1
+**  and  <a> < <b> < <c>  with respect to the linear ordering of the
+**  generators.
+*/
+static void CheckJacobi(const pcpresentation &pc, gen a, gen b, gen c) {
+  hollowcvec t = vecstack.fresh();
+  t.lie3bracket(pc, a, b, c, true);
+  t.lie3bracket(pc, b, c, a, true);
+  t.lie3bracket(pc, c, a, b, true);
+  t.liecollect(pc);
+
+  if (Debug >= 2) {
+    fprintf(LogFile, "# consistency: jacobi(a%d,a%d,a%d) = ", a, b, c);
+    PrintVec(LogFile, t);
+    fprintf(LogFile, "\n");
+  }
+
+  AddToRelMatrix(t);
+
+  vecstack.pop(t);
+}
+
+/*
+**  The following function checks the consistency relation for
+**  o_i[ a, b ] = [ (( o_ia )), b ] where (()) means the substitution
+**  of the argument with its relation.
+**
+*/
+static void CheckPower(const pcpresentation &pc, gen a, gen b) {
+  hollowcvec t = vecstack.fresh();
+  
+  for (auto kc : pc.Power[a]) {
+    gen g = kc.first;
+    if (g > pc.NrPcGens)
+      break;
+    if (g > b)
+      t.submul(kc.second, pc.Comm[g][b]);
+    else if (g < b)
+      t.addmul(kc.second, pc.Comm[b][g]);
+  }
+
+  if (a > b)
+    t.addmul(pc.Exponent[a], pc.Comm[a][b]);
+  else if (a < b)
+    t.submul(pc.Exponent[a], pc.Comm[b][a]);
+  t.liecollect(pc);
+
+  if (Debug >= 2) {
+    fprintf(LogFile, "# consistency: ");
+    coeff_out_str(LogFile, pc.Exponent[a]);
+    fprintf(LogFile, "*[a%d,a%d]-[", a, b);
+    coeff_out_str(LogFile, pc.Exponent[a]);
+    fprintf(LogFile, "*a%d,a%d] = ", a, b);
+    PrintVec(LogFile, t);
+    fprintf(LogFile, "\n");
+  }
+
+  AddToRelMatrix(t);
+  
+  vecstack.pop(t);
+}
+
+/* if N*v = 0 in our ring, and we have a power relation A*g = w,
+ * enforce (N/A)*w = 0
+ */
+static void CheckTorsion(const pcpresentation &pc, unsigned i) {
+  hollowcvec t = vecstack.fresh();
+  coeff annihilator, unit;
+  coeff_init(annihilator);
+  coeff_init(unit); // unused
+  
+  coeff_unit_annihilator(unit, annihilator, pc.Exponent[i]);
+  t.addmul(annihilator, pc.Power[i]);
+  t.liecollect(pc);
+  
+  if (Debug >= 2) {
+    fprintf(LogFile, "# consistency: ");
+    coeff_out_str(LogFile, annihilator);
+    fprintf(LogFile, "*");
+    coeff_out_str(LogFile, pc.Exponent[i]);
+    fprintf(LogFile, "*a%d = ", i);
+    PrintVec(LogFile, t);
+    fprintf(LogFile, "\n");
+  }
+
+  AddToRelMatrix(t);
+
+  coeff_clear(unit);
+  coeff_clear(annihilator);
+  vecstack.pop(t);
+}
+
+void Consistency(const pcpresentation &pc) {
+  for (unsigned i = 1; i <= pc.NrPcGens; i++) {
+    if (pc.Generator[i].t != DGEN)
+      continue;
+    for (unsigned j = i + 1; j <= pc.NrPcGens; j++)
+      for (unsigned k = j + 1; k <= pc.NrPcGens; k++) {
+	unsigned totalweight = pc.Generator[i].w + pc.Generator[j].w + pc.Generator[k].w;
+	if (totalweight > pc.Class || (pc.Graded && totalweight != pc.Class))
+	  continue;
+	
+        CheckJacobi(pc, i, j, k);
+      }
+  }
+  
+  for (unsigned i = 1; i <= pc.NrPcGens; i++)
+    if (coeff_nz_p(pc.Exponent[i])) {
+      CheckTorsion(pc, i);
+
+      for (unsigned j = 1; j <= pc.NrPcGens; j++) {
+	unsigned totalweight = pc.Generator[i].w + pc.Generator[j].w;
+	if (totalweight > pc.Class || (pc.Graded && totalweight != pc.Class))
+	  continue;
+  	
+	CheckPower(pc, i, j);
+      }
+    }
+  
+  TimeStamp("Consistency()");
+}

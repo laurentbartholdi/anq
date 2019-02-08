@@ -16,105 +16,23 @@ unsigned NrCols, FirstCentral;
 bool Torsion;
 const coeff *TorsionExp;
 
-typedef std::vector<coeff> coeffvec;
-
-inline coeffvec NEW(unsigned length)
-{
-  coeffvec v(length);
-  for (unsigned i = 0; i < length; i++)
-    coeff_init_set_si(v[i], 0);
-  return v;
-}
-
-inline void FREE(coeffvec &v)
-{
-  for (coeff &c : v)
-    coeff_clear(c);
-}
-
-inline sparsecvec GET(coeffvec &v)
-{
-  unsigned len = 0;
-  for (coeff &c : v)
-    if (coeff_nz_p(c))
-      len++;
-  sparsecvec r(len);
-  auto p = r.begin();
-  for (unsigned i = 0; i < v.size(); i++) {
-    if (coeff_z_p(v[i]))
-      continue;
-    p->first = i + FirstCentral;
-    coeff_set(p->second, v[i]);
-    coeff_zero(v[i]);
-    p++;
-  }
-  p.markend();
-  return r;
-}
-
-inline sparsecvec GET(coeffvec &v, coeff &a)
-{
-  unsigned len = 0;
-  sparsecvec r(v.size());
-  auto p = r.begin();
-  for (unsigned i = 0; i < v.size(); i++) {
-    p->first = i + FirstCentral;
-    coeff_mul(p->second, v[i], a);
-    coeff_zero(v[i]);
-    if (coeff_nz_p(p->second))
-      p++, len++;
-  }
-  p.markend();
-  r.resize(len);
-  return r;
-}
-
-inline void CX(const sparsecvec x, coeffvec &y)
-{
-  for (auto kc : x)
-    coeff_set(y[kc.first - FirstCentral], kc.second);
-}
-
-inline void CAX(const coeff &a, const sparsecvec x, coeffvec &y)
-{
-  for (auto kc : x)
-    coeff_mul(y[kc.first - FirstCentral], a, kc.second);
-}
-
-inline void CAXPY(const coeff &a, const sparsecvec x, coeffvec &y)
-{
-  for (auto kc : x)
-    coeff_addmul(y[kc.first - FirstCentral], a, kc.second);
-}
-
-inline void CAXPBYZ(const coeff &a, const coeffvec &x, const coeff &b, const sparsecvec y, coeffvec &z)
-{
-  for (unsigned i = 0; i < x.size(); i++)
-    coeff_mul(z[i], a, x[i]);
-  CAXPY(b, y, z);
-}
-
 std::vector<sparsecvec> Matrix;
-#ifdef CUSTOM_ALLOC
-template<typename T> struct sparsecvec_allocator: public std::allocator<T>
-{
-  template<class U> struct rebind { typedef sparsecvec_allocator<U> other; };
-  typedef std::allocator<T> base;
-  typename base::pointer allocate(typename base::size_type n) {
-    fprintf(stderr,"ALLOC %d",n); // here we want to make a copy
-    return this->base::allocate(n);
-  }
-  typename base::pointer allocate(typename base::size_type n, void const* hint) {
-    fprintf(stderr,"ALLOC %d",n);
-    return this->base::allocate(n, hint);
-  }
-};
-std::set<sparsecvec,bool(*)(sparsecvec,sparsecvec),sparsecvec_allocator<sparsecvec>> Queue([](sparsecvec v1, sparsecvec v2){ return Compare(v1,v2) < 0; });
-#else
-// hack to allow pointer to be changed in set
+
+#ifdef HACK_to_allow_pointer_to_be_changed_in_set
 struct __sparsecvec { mutable sparsecvec v; };
 std::set<__sparsecvec,bool(*)(__sparsecvec,__sparsecvec)> Queue([](__sparsecvec v1, __sparsecvec v2){ return Compare(v1.v,v2.v) < 0; });
+
+then "Matrix.insert(Matrix.end(), Queue.begin(), Queue.end());" should become
+std::transform(Queue.begin(), Queue.end(), std::back_inserter(Matrix), [](__sparsecvec v) { return v.v; });
+
+and "Queue.insert(cv);" should become
+{
+  __sparsecvec xv = {.v = cv};
+  auto p = Queue.emplace(xv);
+}
 #endif
+
+std::set<sparsecvec,bool(*)(sparsecvec,sparsecvec)> Queue([](sparsecvec v1, sparsecvec v2){ return Compare(v1,v2) < 0; });
 
 static void InitTorsion(void) {  
   if (Torsion) {
@@ -153,57 +71,56 @@ void PrintMatrix(void) {
       PrintVec(stdout, v);
   printf("\n");
 }
-    
+
+std::vector<int> colamd(relmatrix &m) {
+  std::vector<int> ind;
+  int stats[COLAMD_STATS];
+  std::vector<int> intmat;
+
+  for (const sparsecvec v : m) {
+    ind.push_back(intmat.size());
+    for (auto kc : v)
+      intmat.push_back(kc.first - FirstCentral);
+  }
+  ind.push_back(intmat.size());
+
+  if (Debug >= 2) {
+    fprintf(LogFile, "# about to collect %ld relations (%ld nnz)\n", m.size(), intmat.size());
+  }
+
+  size_t alloc = colamd_recommended(intmat.size(), NrCols, m.size());
+  intmat.reserve(alloc);
+  int ok = colamd(NrCols, m.size(), alloc, intmat.data(), ind.data(), NULL, stats);
+  if (Debug >= 3) {
+    colamd_report(stats);
+    fprintf(LogFile, "# row permutation:");
+    for (unsigned i = 0; i < m.size(); i++)
+      fprintf(LogFile, " %u", ind[i]);
+    fprintf(LogFile,"\n");
+  }
+      
+  if (!ok)
+    abortprintf(5, "colamd error %d", ok);
+
+  return ind;
+}
+
 /* collect the vectors in Queue and Matrix, and combine them back into Matrix */
 void LU(void) {
   /* remove unbound entries in Matrix */
   Matrix.erase(std::remove(Matrix.begin(), Matrix.end(), sparsecvec(nullptr)), Matrix.end());
 
   /* put queue at bottom of matrix */
-#ifdef CUSTOM_ALLOC
-  Matrix.insert(Matrix.end(), Queue.begin(), Queue.end());
-#else
-  std::transform(Queue.begin(), Queue.end(), std::back_inserter(Matrix), [](__sparsecvec v) { return v.v; });
-#endif
-  
+  Matrix.insert(Matrix.end(), Queue.begin(), Queue.end());  
   Queue.clear();
 
   /* call colamd to determine optimal insertion ordering */
-  std::vector<int> ind;
-  {
-    int stats[COLAMD_STATS];
-    std::vector<int> intmat;
-    for (const sparsecvec v : Matrix) {
-      ind.push_back(intmat.size());
-      for (auto kc : v)
-	intmat.push_back(kc.first - FirstCentral);
-    }
-    ind.push_back(intmat.size());
-
-    if (Debug >= 2) {
-      fprintf(LogFile, "# about to collect %ld relations (%ld nnz)\n", Matrix.size(), intmat.size());
-    }
-
-    size_t alloc = colamd_recommended(intmat.size(), NrCols, Matrix.size());
-    intmat.reserve(alloc);
-    int ok = colamd(NrCols, Matrix.size(), alloc, intmat.data(), ind.data(), NULL, stats);
-    if (Debug >= 3) {
-      colamd_report(stats);
-      fprintf(LogFile, "# row permutation:");
-      for (unsigned i = 0; i < Matrix.size(); i++)
-	fprintf(LogFile, " %u", ind[i]);
-      fprintf(LogFile,"\n");
-    }
-      
-    if (!ok)
-      abortprintf(5, "colamd error %d", ok);
-  }
+  std::vector<int> ind = colamd(Matrix);
   
   std::vector<sparsecvec> oldrels(NrCols, sparsecvec(nullptr));
   Matrix.swap(oldrels);
   InitTorsion();
 
-  coeffvec newrow = NEW(NrCols), scratch = NEW(NrCols);
   coeff a, b, c, d;
   coeff_init(a);
   coeff_init(b);
@@ -213,58 +130,62 @@ void LU(void) {
   /* add rows of oldrels into Matrix, reducing them along the way, and in
      the order specified by the permutation ind */
   for (unsigned i = 0; i < oldrels.size(); i++) {
-    CX(oldrels[ind[i]], newrow);
-    oldrels[ind[i]].free(); // !!! specify size to free?
+    hollowcvec currow = vecstack.fresh();
+    currow.copysorted(oldrels[ind[i]]);
+    oldrels[ind[i]].free();
 
-    for (unsigned row = 0; row < NrCols; row++) {
-      if (coeff_z_p(newrow[row]))
-	continue;
+    for (auto kc : currow) {
+      unsigned row = kc.first - FirstCentral;
       
       if (!Matrix[row].allocated()) { /* Insert v in Matrix at position row */
-	coeff_unit_annihilator(b, a, newrow[row]);
-	Matrix[row] = GET(newrow, b);
-	CAX(a, Matrix[row], newrow);
+	coeff_unit_annihilator(b, a, kc.second);
+	currow.mul(b);
+	Matrix[row] = currow.getsparse();
+	currow.clear();
+	currow.addmul(a, Matrix[row]);
       
 	if (Debug >= 3) {
 	  fprintf(LogFile, "# Adding row %d: ",row); PrintVec(LogFile, Matrix[row]); fprintf(LogFile, "\n");
 	}
       } else { /* two rows with same pivot. Merge them */
-	coeff_gcdext(d, a, b, newrow[row], Matrix[row][0].second); /* d = a*v[head]+b*Matrix[row][head] */
+	coeff_gcdext(d, a, b, kc.second, Matrix[row][0].second); /* d = a*v[head]+b*Matrix[row][head] */
 	if (!coeff_cmp(d, Matrix[row][0].second)) { /* likely case: Matrix[row][head]=d, b=1, a=0 */
-	  coeff_divexact(d, newrow[row], d);
-	  coeff_neg(d, d);
-	  CAXPY(d, Matrix[row], newrow);
+	  coeff_divexact(d, kc.second, d);
+	  currow.submul(d, Matrix[row]);
 #ifdef COEFF_IS_MPZ // check coefficient explosion
 	  if (Debug >= 1) {
 	    long maxsize = 0;
-	    for (coeff &c : newrow)
+	    for (coeff &c : currow)
 	      maxsize = std::max(maxsize, labs(c->_mp_size));
 	    fprintf(LogFile, "# Changed v: max coeff size %ld\n", maxsize);
 	  }
 #endif
 	} else {
-	  coeff_divexact(c, newrow[row], d);
-	  coeff_divexact(d, Matrix[row].begin()->second, d);
-	  CAXPBYZ(a, newrow, b, Matrix[row], scratch);
+	  coeff_divexact(c, kc.second, d);
+	  coeff_divexact(d, Matrix[row][0].second, d);
+	  hollowcvec vab = vecstack.fresh();
+	  vab.addmul(a, currow);
+	  vab.addmul(b, Matrix[row]);
 	  coeff_neg(d, d);
-	  CAXPBYZ(d, newrow, c, Matrix[row], newrow);
-	  Matrix[row].free(); // !!! with size?
-	  Matrix[row] = GET(scratch);
-
+	  currow.mul(d);
+	  currow.addmul(c, Matrix[row]);
+	  Matrix[row].free();
+	  Matrix[row] = vab.getsparse();
+	  vecstack.pop(vab);
+	  
 	  if (Debug >= 3) {
 	    fprintf(LogFile, "# Change row %d: ",row); PrintVec(LogFile, Matrix[row]); fprintf(LogFile, "\n");
 	  }
 	}
       }
     }
+    vecstack.pop(currow);
   }
 
   coeff_clear(a);
   coeff_clear(b);
   coeff_clear(c);
   coeff_clear(d);
-  FREE(newrow);
-  FREE(scratch);
 
   TimeStamp("LU");
 }
@@ -276,28 +197,29 @@ relmatrix GetRelMatrix(void) {
   rels.reserve(NrCols);
 
   /* reduce all the head columns, to achieve Hermite normal form. */
-  coeffvec newrow = NEW(NrCols);
   coeff q;
   coeff_init(q);
   for (unsigned j = 0; j < NrCols; j++) { // !!! would this be faster looping backwards?
     if (!Matrix[j].allocated())
       continue;
-    CX(Matrix[j], newrow);
-    Matrix[j].free(); // !!! specify size?
 
-    for (unsigned i = j+1; i < NrCols; i++) {
-      sparsecvec w = Matrix[i];
-      if (!w.allocated())
+    hollowcvec currow = vecstack.fresh();
+    currow.copysorted(Matrix[j]);
+    Matrix[j].free();
+
+    for (auto kc : currow) {
+      unsigned row = kc.first - FirstCentral;
+      if (row == j || !Matrix[row].allocated())
 	continue;
 
-      if (!coeff_reduced_p(newrow[i], w[0].second)) {
-	coeff_fdiv_q(q, newrow[i], w[0].second);
-	coeff_neg(q, q);
-	CAXPY(q, w, newrow);
+      if (!coeff_reduced_p(kc.second, Matrix[row][0].second)) {
+	coeff_fdiv_q(q, kc.second, Matrix[row][0].second);
+	currow.submul(q, Matrix[row]);
       }
     }
-    Matrix[j] = GET(newrow);
+    Matrix[j] = currow.getsparse();
     rels.push_back(Matrix[j]);
+    vecstack.pop(currow);
   }
 
   /* !!! we could also improve this code by eliminating redundant
@@ -306,34 +228,26 @@ relmatrix GetRelMatrix(void) {
    and is perhaps best done outside this matrix code. */
 
   coeff_clear(q);
-  FREE(newrow);
 
   TimeStamp("Hermite");
   return rels;
 }
 
 /* adds a row to the queue, and empty the queue if it got full */
-void AddToRelMatrix(sparsecvec cv) {
-  if (cv.empty()) // easy case: trivial relation, change nothing
+void AddToRelMatrix(hollowcvec hv) {
+  if (hv.empty()) // easy case: trivial relation, change nothing
     return;
+  
+  sparsecvec cv = hv.getsparse();
   
   if (cv[0].first < FirstCentral) // sanity check
     abortprintf(5, "AddRow: vector has a term a%d not in the centre", cv[0].first);
 
-#ifdef CUSTOM_ALLOC
-  auto p = Queue.emplace(cv);
-#else
-  __sparsecvec xv = {.v = cv};
-  auto p = Queue.emplace(xv);
-
-  if (p.second) { // make the copy permanent
-    p.first->v.alloc(cv.size());
-    p.first->v.copy(cv);
-  }
-#endif
-  
-  if (!p.second)
+  auto p = Queue.insert(cv);
+  if (!p.second) { // we were already there, insert failed
+    cv.free();
     return;
+  }
 
   if (Queue.size() >= 10*NrCols) // !!! adjust extra factor
     LU();

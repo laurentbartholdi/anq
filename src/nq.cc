@@ -125,7 +125,7 @@ int main(int argc, char **argv) {
   else
     abortprintf(1, "I need precisely at most one argument as input filename\n%s", USAGE);
 
-  presentation fppres;
+  fppresentation fppres;
   ReadPresentation(fppres, InputFileName);
   
   char hostname[128];
@@ -155,7 +155,7 @@ int main(int argc, char **argv) {
 
     AddNewTails(pc, fppres); // add fresh tails
 
-    InitStack();
+    vecstack.setsize(NrTotalGens);
 
     ComputeTails(pc); // compute other tails
     
@@ -170,7 +170,6 @@ int main(int argc, char **argv) {
     ReducePcPres(pc, fppres, rels); // enforce relations
 
     FreeRelMatrix();
-    FreeStack();
 
     int newgens = pc.NrPcGens-oldnrpcgens;
     fprintf(LogFile, "# The %d%s factor has %d generator%s", pc.Class, ordinal(pc.Class), newgens, plural(newgens));
@@ -188,12 +187,11 @@ int main(int argc, char **argv) {
       break;
   }
 
-  InitStack();
+  vecstack.setsize(NrTotalGens);
   if (Gap)
     PrintGAPPres(OutputFile, pc, fppres);  
   else
     PrintPcPres(OutputFile, pc, fppres, PrintCompact, PrintDefs, PrintZeros);
-  FreeStack();
 
   TimeStamp("main()");
 

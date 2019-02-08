@@ -17,11 +17,6 @@ enum token {
   LANGLE, RANGLE, PIPE, COMMA, SEMICOLON,
   BADTOKEN };
 
-const char *nodename[] = {"TNUM",
-			  "TGEN",
-			  "TBRACK", "TBRACE", "TPROD", "TQUO",  "TLQUO", "TPOW", "TSUM", "TDIFF", "TREL", "TDREL", "TDRELR",
-			  "TNEG", "TINV"};
-
 enum associativity {
   LEFTASSOC, RIGHTASSOC };
 
@@ -87,7 +82,7 @@ static node *NewNode(nodetype type) {
 
 enum genstatus { NOCREATE, CREATE };
 
-static gen GenNumber(presentation &pres, genstatus status, unsigned weight) {
+static gen GenNumber(fppresentation &pres, genstatus status, unsigned weight) {
   if (status == CREATE && pres.NrGens == 0) {
     pres.Weight.resize(1); // we start indexing at 1
     pres.GeneratorName.resize(1);
@@ -310,8 +305,8 @@ static void NextToken(void) {
   }
 }
 
-node *Term(presentation &pres) {
-  node *Expression(presentation&, int);
+node *Term(fppresentation &pres) {
+  node *Expression(fppresentation&, int);
   
   if (is_unary(Token)) {
     node *n = NewNode(unary_node(Token));
@@ -378,7 +373,7 @@ node *Term(presentation &pres) {
   SyntaxError("Term expected");
 }
 
-node *Expression(presentation &pres, int precedence) {
+node *Expression(fppresentation &pres, int precedence) {
   node *t = Term(pres);
   int new_precedence;
   
@@ -492,7 +487,7 @@ static void ValidateExpression(node *n, gen g) {
   }
 }
 
-void ReadPresentation(presentation &pres, const char *InputFileName) {
+void ReadPresentation(fppresentation &pres, const char *InputFileName) {
   bool readstdin = (InputFileName[0] == 0);
   
   if (readstdin)
@@ -599,7 +594,7 @@ void ReadPresentation(presentation &pres, const char *InputFileName) {
   coeff_clear(N);
 }
 
-void FreePresentation(presentation &Pres) {
+void FreePresentation(fppresentation &Pres) {
   for (auto n : Pres.Relators)
     FreeNode(n);
   for (auto n : Pres.Aliases)
@@ -608,7 +603,7 @@ void FreePresentation(presentation &Pres) {
     FreeNode(n);
 }
 
-void PrintNode(FILE *f, const presentation &pres, node *n) {
+void PrintNode(FILE *f, const fppresentation &pres, node *n) {
   switch (n->type) {
   case TNUM:
     coeff_out_str(f, n->cont.n);
@@ -686,161 +681,4 @@ void PrintNode(FILE *f, const presentation &pres, node *n) {
   default:
     abortprintf(3, "PrintNode: Illegal node of type %s", nodename[n->type]);
   }
-}
-
-/*
-** We have to enforce the relations of the finite presentation in the PC
-** presentation. It means, the relations among the generators of the finite
-** presentation will hold among their epimorphic images as well.
-** The result of this task will be a linear equation system over the integers
-** which can be considered as power relations between the polycyclic
-** generators.
-*/
-
-void EvalRel(const pcpresentation &pc, sparsecvec v, node *rel) {
-  sparsecvec vl, vr;
-  switch (rel->type) {
-  case TSUM:
-    vl = FreshVec();
-    vr = FreshVec();
-    EvalRel(pc, vl, rel->cont.bin.l);
-    EvalRel(pc, vr, rel->cont.bin.r);
-    Sum(v, vl, vr);
-    PopVec();
-    PopVec();
-    break;
-  case TPROD:
-    if (rel->cont.bin.l->type == TNUM) {
-      EvalRel(pc, v, rel->cont.bin.r);
-      Prod(v, rel->cont.bin.l->cont.n, v);
-    } else {
-      vl = FreshVec();
-      vr = FreshVec();
-      EvalRel(pc, vl, rel->cont.bin.l);
-      EvalRel(pc, vr, rel->cont.bin.r);
-      Prod(pc, v, vl, vr);
-      PopVec();
-      PopVec();
-      break;
-    }
-    break;
-  case TQUO:
-    vl = FreshVec();
-    vr = FreshVec();
-    EvalRel(pc, vl, rel->cont.bin.l);
-    EvalRel(pc, vr, rel->cont.bin.r);
-    Quo(pc, v, vl, vr);
-    PopVec();
-    PopVec();
-    break;
-  case TLQUO:
-#ifdef GROUP
-  case TREL:
-#endif
-    vl = FreshVec();
-    vr = FreshVec();
-    EvalRel(pc, vl, rel->cont.bin.l);
-    EvalRel(pc, vr, rel->cont.bin.r);
-    LQuo(pc, v, vl, vr);
-    PopVec();
-    PopVec();
-    break;
-  case TBRACK:
-    vl = FreshVec();
-    vr = FreshVec();
-    EvalRel(pc, vl, rel->cont.bin.l);
-    EvalRel(pc, vr, rel->cont.bin.r);
-    LieBracket(pc, v, vl, vr);
-    PopVec();
-    PopVec();
-    break;
-  case TBRACE:
-    vl = FreshVec();
-    vr = FreshVec();
-    EvalRel(pc, vl, rel->cont.bin.l);
-    EvalRel(pc, vr, rel->cont.bin.r);
-    GroupBracket(pc, v, vl, vr);
-    PopVec();
-    PopVec();
-    break;
-  case TGEN:
-    v.copy(pc.Epimorphism[rel->cont.g]);
-    break;
-  case TNEG:
-    EvalRel(pc, v, rel->cont.u);
-    Neg(v);
-    break;
-  case TINV:
-    vl = FreshVec();
-    EvalRel(pc, vl, rel->cont.u);
-    Inv(pc, v, vl);
-    PopVec();
-    break;
-  case TDIFF:
-#ifdef LIEALG
-  case TREL:
-#endif
-    vl = FreshVec();
-    vr = FreshVec();
-    EvalRel(pc, vl, rel->cont.bin.l);
-    EvalRel(pc, vr, rel->cont.bin.r);
-    Diff(v, vl, vr);
-    PopVec();
-    PopVec();
-    break;
-  case TPOW:
-    if (rel->cont.bin.r->type == TNUM) {
-      vl = FreshVec();
-      EvalRel(pc, vl, rel->cont.bin.l);
-      Pow(pc, v, vl, rel->cont.bin.r->cont.n);
-      PopVec();
-    } else {
-      vl = FreshVec();
-      vr = FreshVec();
-      EvalRel(pc, vl, rel->cont.bin.l);
-      EvalRel(pc, vr, rel->cont.bin.r);
-      Conjugate(pc, v, vl, vr);
-      PopVec();
-      PopVec();
-    }
-    break;
-  default:
-    abortprintf(3, "EvalRel: operator of type %s should not occur", nodename[rel->type]);
-  }
-}
-
-/* evaluate all relations, and add them to the relation matrix */
-void EvalAllRel(const pcpresentation &pc, const presentation &pres) {
-  sparsecvec v = FreshVec();
-
-  for (auto n : pres.Aliases) {
-    sparsecvec temp = FreshVec();
-    EvalRel(pc, temp, n->cont.bin.r);
-    Collect(pc, v, temp);
-    PopVec();
-    if (Debug >= 2) {
-      fprintf(LogFile, "# aliasing relation: ");
-      PrintNode(LogFile, pres, n);
-      fprintf(LogFile, " ("); PrintVec(LogFile, v); fprintf(LogFile, ")\n");
-    }
-    gen g = n->cont.bin.l->cont.g;
-    pc.Epimorphism[g].resize(v.size());
-    pc.Epimorphism[g].copy(v);
-  }
-  
-  for (auto n : pres.Relators) {
-    sparsecvec temp = FreshVec();
-    EvalRel(pc, temp, n);
-    Collect(pc, v, temp);
-    PopVec();
-    if (Debug >= 2) {
-      fprintf(LogFile, "# relation: ");
-      PrintNode(LogFile, pres, n);
-      fprintf(LogFile, " ("); PrintVec(LogFile, v); fprintf(LogFile, ")\n");
-    }
-    AddToRelMatrix(v);
-  }
-  PopVec();
-  
-  TimeStamp("EvalAllRel()");
 }

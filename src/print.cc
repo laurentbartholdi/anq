@@ -42,27 +42,22 @@ void TimeStamp(const char *s) {
   }
 }
 
-#ifdef LIEALG
-void PrintVec(FILE *f, const sparsecvec v) {
+template<typename V> void PrintVec(FILE *f, const V v) {
   bool first = true;
   for (auto kc : v) {
+#ifdef LIEALG
     if (first) first = false; else fprintf(f, " + ");
     coeff_out_str(f, kc.second);
     fprintf(f, "*a%d", kc.first);
-  }
-}
 #else
-void PrintVec(FILE *f, const sparsecvec v) {
-  bool first = true;
-  for (auto kc : v) {
     if (first) first = false; else fprintf(f, " * ");
     fprintf(f, "a%d^", kc.first);
     coeff_out_str(f, kc.second);
+#endif
   }
 }
-#endif
 
-void PrintPcPres(FILE *f, const pcpresentation &pc, const presentation &pres, bool PrintCompact, bool PrintDefs, bool PrintZeros) {
+void PrintPcPres(FILE *f, const pcpresentation &pc, const fppresentation &pres, bool PrintCompact, bool PrintDefs, bool PrintZeros) {
   fprintf(f, "<\n");
 
   unsigned curclass = 0;
@@ -171,23 +166,23 @@ void PrintPcPres(FILE *f, const pcpresentation &pc, const presentation &pres, bo
   first = true;
   for (unsigned j = 1; j <= pc.NrPcGens; j++)
     for (unsigned i = 1; i < j; i++) {
-      gen g = pc.Product[j][i][0].first;
       if (PrintCompact) {
 	if (pc.Generator[i].t != DGEN || pc.Generator[j].t == DPOW)
 	  continue;
       } else {
-	if (!PrintZeros && pc.Product[j][i].empty())
+	if (!PrintZeros && pc.Comm[j][i].empty())
 	continue;
       }  
       if (!first)
 	fprintf(f, ",\n");
       fprintf(f, "%10s[a%d,a%d]", "", j, i);
-      if (!pc.Product[j][i].empty()) {
+      if (!pc.Comm[j][i].empty()) {
+	gen g = pc.Comm[j][i][0].first;
 	if (pc.Generator[g].g == j && pc.Generator[g].h == i)
 	  fprintf(f, " =: a%d", g);
 	else {
 	  fprintf(f, " = ");
-	  PrintVec(f, pc.Product[j][i]);
+	  PrintVec(f, pc.Comm[j][i]);
 	}
       }
       first = false;
@@ -196,24 +191,22 @@ void PrintPcPres(FILE *f, const pcpresentation &pc, const presentation &pres, bo
   if (!pres.Extra.empty()) {
     fprintf(f, " |\n# The extra elements:\n");
     first = true;
-    sparsecvec v = FreshVec();
     for (node *n : pres.Extra) {
-      sparsecvec temp = FreshVec();
-      EvalRel(pc, temp, n);
-      Collect(pc, v, temp);
-      PopVec();
+      hollowcvec v = vecstack.fresh();
+      v.eval(pc, n);
+      v.liecollect(pc);
       if (!first)
 	fprintf(f, ",\n");
       fprintf(f, "%10s", ""); PrintVec(f, v);
       if (v.empty()) fprintf(f, "0*a1");
+      vecstack.pop(v);
       first = false;
     }
-    PopVec();
   }
   fprintf(f, " >\n");
 }
 
-bool PrintGAPVec(FILE *f, const sparsecvec v, bool first) {
+template<typename V> bool PrintGAPVec(FILE *f, const V v, bool first) {
   for (auto kc : v) {
     if (first) first = false; else fprintf(f, " + ");
     coeff_out_str(f, kc.second);
@@ -223,7 +216,7 @@ bool PrintGAPVec(FILE *f, const sparsecvec v, bool first) {
 }
 
 #ifdef LIEALG
-void PrintGAPPres(FILE *f, const pcpresentation &pc, const presentation &pres) {
+void PrintGAPPres(FILE *f, const pcpresentation &pc, const fppresentation &pres) {
   fprintf(f, "LoadPackage(\"liering\");\n"
 	  "F := FreeLieRing(Integers,[");
   for (unsigned i = 1; i <= pres.NrGens; i++)
@@ -234,10 +227,10 @@ void PrintGAPPres(FILE *f, const pcpresentation &pc, const presentation &pres) {
 	  "\tT := EmptySCTable(%d,0,\"antisymmetric\");\n", pc.NrPcGens);
   for (unsigned j = 1; j <= pc.NrPcGens; j++)
     for (unsigned i = 1; i < j; i++) {
-      if (!pc.Product[j][i].empty()) {
+      if (!pc.Comm[j][i].empty()) {
         fprintf(f, "\tSetEntrySCTable(T,%d,%d,[", j, i);
 	bool first = true;
-	for (auto kc : pc.Product[j][i]) {
+	for (auto kc : pc.Comm[j][i]) {
 	  if (!first) fprintf(f, ",");
 	  coeff_out_str(f, kc.second);
 	  fprintf(f, ",%d", kc.first);
@@ -273,20 +266,18 @@ void PrintGAPPres(FILE *f, const pcpresentation &pc, const presentation &pres) {
 
   if (!pres.Extra.empty()) {
     fprintf(f, "\tRange(epi)!.extra := [");
-    sparsecvec v = FreshVec();
     bool first = true;
     for (node *n : pres.Extra) {
-      sparsecvec temp = FreshVec();
-      EvalRel(pc, temp, n);
-      Collect(pc, v, temp);
-      PopVec();
+      hollowcvec v = vecstack.fresh();
+      v.eval(pc, n);
+      v.liecollect(pc);
       fprintf(f, "%s(", first ? "" : ",");
       if (PrintGAPVec(f, v, true))
 	fprintf(f,"Zero(L)");
       fprintf(f, ")^epi");
       first = false;
+      vecstack.pop(v);
     }
-    PopVec();
     fprintf(f, "];\n");
   }
   
@@ -313,7 +304,7 @@ void PrintGAPPres(FILE *f, const pcpresentation &pc, const presentation &pres) {
 	  "end,[]);\n");
 }
 #else
-void PrintGAPPres(FILE *f, const pcpresentation &pc, const presentation &pres) {
+void PrintGAPPres(FILE *f, const pcpresentation &pc, const fppresentation &pres) {
   fprintf(f, "LoadPackage(\"nq\");\n"
 	  "F := FreeGroup(IsSyllableWordsFamily,[");
   for (unsigned i = 1; i <= pres.NrGens; i++)

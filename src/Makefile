@@ -7,7 +7,7 @@
 
 NQVERSION = -DVERSION='"4.0.0 2019-01-26"'
 OPT = -march=native -O0 #-Ofast
-DEBUG = -g -fsanitize=address -ggdb # -fprofile-instr-generate -fcoverage-mapping
+DEBUG = -g -ggdb # -fsanitize=address -fprofile-arcs -ftest-coverage
 CFLAGS = -Wall -Werror $(DEBUG) $(OPT)
 CXXFLAGS = -std=gnu++11 $(CFLAGS)
 LDFLAGS = $(DEBUG) -lcolamd -lgmp
@@ -15,20 +15,27 @@ LDFLAGS = $(DEBUG) -lcolamd -lgmp
 ## LieNQ prefers GNU C compiler, for debugging.
 
 ifeq ($(shell uname -s),Darwin)
-    CXX = g++
+    CXX = g++-8
 else
     CXX = g++
 endif
 CC = $(CXX)
 
-NQ_OBJ = fppresentation.o pcpresentation.o print.o operations.o matrix.o consistency.o tails.o auxiliary.o nq.o
+NQ_OBJ = fppresentation.o pcpresentation.o print.o operations.o matrix.o nq.o
 NQ_INCL = nq.h coeff.h vectors.hh
 
-all: nql_long nqg_long
+all: nql_long
 #all: nql_2_64 nql_2_320 nql_3_39 nql_5_27 nql_5_100 nql_long nql_mpz nqg_2_64 nqg_2_320 nqg_3_39 nqg_5_27 nqg_5_100 nqg_long nqg_mpz
 
+profile: clean
+	$(MAKE) CXX=g++ DEBUG="-g -fprofile-instr-generate -fcoverage-mapping"
+
+viewprofile:
+	llvm-profdata merge -o default.profdata default.profraw
+	llvm-cov show ./nql_long -instr-profile=default.profdata $(NAME)
+
 clean:
-	rm -fr *.o nql_[0-9]*_[0-9]* nql_mpz nql_long nql_z *.dSYM
+	rm -fr *.o *.gc?? nql_[0-9]*_[0-9]* nql_mpz nql_long nql_z *.dSYM
 
 nql_mpz: $(subst .o,l_mpz.o,$(NQ_OBJ))
 

@@ -42,6 +42,7 @@ inline void coeff_add_si(coeff &result, coeff &a, long l) {
 #define coeff_divexact mpz_divexact
 #define coeff_fdiv_q mpz_fdiv_q
 #define coeff_fdiv_r mpz_fdiv_r
+#define coeff_fdiv_qr mpz_fdiv_qr
 #define coeff_gcdext mpz_gcdext
 #define coeff_mul mpz_mul
 #define coeff_mul_si mpz_mul_si

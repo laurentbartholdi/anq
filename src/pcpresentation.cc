@@ -26,17 +26,7 @@ static void AddSingleGenerator(pcpresentation &pc, sparsecvec &v, deftype def) {
 }
 
 /* initialize Pc presentation, at class 0. No products or powers are set yet. */
-void InitPcPres(pcpresentation &pc, const presentation &pres, bool Graded, bool PAlgebra, coeff &TorsionExp, unsigned NilpotencyClass) {
-  /*
-  ** The epimorphism maps from the Lie-algebra given by finite presentation to
-  ** the nilpotent factor-algebra computed by the LieNQ algorithm.
-  */
-
-  /*
-  ** We initialize the epimorphism from the finite presentation to the first
-  ** (abelian) factor. It is rather trivial at the beginning, actually a
-  ** one-to-one map between the two generator set.
-*/
+void InitPcPres(pcpresentation &pc, const fppresentation &pres, bool Graded, bool PAlgebra, coeff &TorsionExp, unsigned NilpotencyClass) {
   pc.NrPcGens = 0;
   pc.Class = 0;
   pc.Graded = Graded;
@@ -67,20 +57,20 @@ void InitPcPres(pcpresentation &pc, const presentation &pres, bool Graded, bool 
   if (pc.Power == NULL)
     abortprintf(2, "InitPcPres: malloc(Power) failed");
 
-  pc.Product = (sparsecvec **) malloc((pc.NrPcGens + 1) * sizeof(sparsecvec *));
-  if (pc.Product == NULL)
-    abortprintf(2, "InitPcPres: malloc(Product) failed");
+  pc.Comm = (sparsecvec **) malloc((pc.NrPcGens + 1) * sizeof(sparsecvec *));
+  if (pc.Comm == NULL)
+    abortprintf(2, "InitPcPres: malloc(Comm) failed");
 }
 
-void FreePcPres(pcpresentation &pc, const presentation &pres) {
+void FreePcPres(pcpresentation &pc, const fppresentation &pres) {
   for (unsigned i = 1; i <= pc.NrPcGens; i++) {
     if (pc.Power[i].allocated())
       pc.Power[i].free();
     coeff_clear(pc.Exponent[i]);
     coeff_clear(pc.Annihilator[i]);
     for (unsigned j = 1; j < i; j++)
-      pc.Product[i][j].free();
-    free(pc.Product[i]);
+      pc.Comm[i][j].free();
+    free(pc.Comm[i]);
   }
   for (unsigned i = 1; i <= pres.NrGens; i++)
     pc.Epimorphism[i].free();
@@ -88,17 +78,16 @@ void FreePcPres(pcpresentation &pc, const presentation &pres) {
   free(pc.Power);
   free(pc.Exponent);
   free(pc.Annihilator);
-  free(pc.Product);
+  free(pc.Comm);
   free(pc.Generator);
   coeff_clear(pc.TorsionExp);
 }
 
-/*
-**  The first step is to extend the epimorphism to the next factor.
-**  In order to do that we define new generators for the images
-**  of the generators of the finite presentation which are not definitions.
-*/
-void AddNewTails(pcpresentation &pc, const presentation &pres) {
+/* The first step is to extend the epimorphism to the next factor.  In
+ * order to do that we define new generators for the images of the
+ * generators of the finite presentation which are not definitions.
+ */
+void AddNewTails(pcpresentation &pc, const fppresentation &pres) {
   NrTotalGens = pc.NrPcGens;
 
   /* inverse lookup tables:
@@ -177,7 +166,7 @@ void AddNewTails(pcpresentation &pc, const presentation &pres) {
     if (pass == !pc.PAlgebra) {
       /* for all non-power pc generators g of weight <=Class-k and all
 	 defining pc generators h of weight k, with g > h, and such
-	 that [g,h] is not defining, add a tail to Product[g][h].
+	 that [g,h] is not defining, add a tail to Comm[g][h].
 
 	 all other tails will be computed in Tails() out of these:
 	 - if h is not defining, using Jacobi or Z-linearity;
@@ -205,7 +194,7 @@ void AddNewTails(pcpresentation &pc, const presentation &pres) {
 	    if (totalcweight > pc.NilpotencyClass)
 	      continue;
 	  
-	    AddSingleGenerator(pc, pc.Product[j][i], {.t = (weight == pc.Class ? DCOMM : DINVALID), .g = j, .h = i, .w = pc.Class, .cw = totalcweight});
+	    AddSingleGenerator(pc, pc.Comm[j][i], {.t = (weight == pc.Class ? DCOMM : DINVALID), .g = j, .h = i, .w = pc.Class, .cw = totalcweight});
 	    if (Debug >= 2)
 	      fprintf(LogFile, "# added tail a%d to non-defining commutator [a%d,a%d]\n", NrTotalGens, j, i);
 	  }
@@ -215,7 +204,7 @@ void AddNewTails(pcpresentation &pc, const presentation &pres) {
   }
 
   /* finally, add new pc generators for the new fp generators.
-  */
+   */
   for (unsigned i = 1; i <= pres.NrGens; i++) {
     if (pres.Weight[i] != pc.Class)
       continue;
@@ -224,13 +213,11 @@ void AddNewTails(pcpresentation &pc, const presentation &pres) {
       fprintf(LogFile, "# added tail a%d as epimorphic image of %s\n", NrTotalGens, pres.GeneratorName[i].c_str());
   }
 
-  /*
-  **  Extend the arrays of exponents, commutators etc. to the
-  **  necessary size.  Let's define the newly introduced generators to
-  **  be central i.e.  All of their product relations will be trivial
-  **  and also they have coefficients 0.
-  */
-
+  /* Extend the arrays of exponents, commutators etc. to the necessary
+   *  size.  Let's define the newly introduced generators to be
+   *  central i.e.  All of their product relations will be trivial and
+   *  also they have coefficients 0.
+   */
   pc.Exponent = (coeff *) realloc(pc.Exponent, (NrTotalGens + 1) * sizeof(coeff));
   if (pc.Exponent == NULL)
     abortprintf(2, "AddNewTails: realloc(Exponent) failed");
@@ -249,8 +236,8 @@ void AddNewTails(pcpresentation &pc, const presentation &pres) {
   for (unsigned i = pc.NrPcGens + 1; i <= NrTotalGens; i++)
     pc.Power[i].noalloc();
 
-  /* The Product array is not extended yet, because anyways it won't be used.
-     we'll extend it later, in ReducePcPres */
+  /* The Comm array is not extended yet, because anyways it won't
+     be used.  we'll extend it later, in ReducePcPres */
     
   TimeStamp("AddNewTails()");
 }
@@ -259,7 +246,7 @@ void AddNewTails(pcpresentation &pc, const presentation &pres) {
    in the centre, and renumber says how central generators are to be
    renumbered. */
 
-/* This is time-critical. It can be optimized in various ways:
+/* !!! This is time-critical. It can be optimized in various ways:
    -- g is a central generator, so we can skip the beginning if we ever
       have to call Diff
    -- Matrix is in Hermite normal form -- we could put it in Smith NF, maybe,
@@ -269,40 +256,66 @@ void AddNewTails(pcpresentation &pc, const presentation &pres) {
 */
 
 static void EliminateTrivialGenerators(pcpresentation &pc, const relmatrix &rels, sparsecvec &v, int renumber[]) {
-  bool copied = false;
-  unsigned pos = 0;
-  //!!! avoid this pos thing!!!
-  if (v.empty())
-    return;
+  // !!! we should first improve relmatrix, rather than do this each time. In particular, do all the renumbering in relmatrix.
+  
+  hollowcvec t = vecstack.fresh();
+  t.copysorted(v);
+  v.free();
 
-  for (; !v.issize(pos);) {
-    int newg = renumber[v[pos].first];
-    if (newg >= 1) {
-      v[pos].first = newg;
-      pos++;
-    } else {
-      sparsecvec temp = FreshVec();
-      Diff(temp, v.window(pos+1), v[pos].second, rels[-newg].window(1));
-      if (!copied) { /* we should make sure we have enough space */
-	sparsecvec oldv = v;
-	v.alloc(NrTotalGens);
-	oldv.truncate(pos); /* cut original v at position p, copy to newv */
-	v.copy(oldv);
-	oldv[pos].first = rels[-newg][0].first; /* put it back, so we can free correctly v */
-	oldv.free();
-	copied = true;
+  // first, eliminate
+  for (auto kc : t) {
+    int newg = renumber[kc.first];
+    if (newg < 1)
+      t.submul(kc.second, rels[-newg]);
+  }
+
+  // then, renumber. We're guaranteed that renumber[kc.first] is >= 1
+  hollowcvec u = vecstack.fresh();
+  for (auto kc : t)
+    coeff_set(u[renumber[kc.first]], kc.second);
+  u.liecollect(pc);
+
+  v = u.getsparse();
+
+  vecstack.pop(u);
+  vecstack.pop(t);
+
+#if 0 // premature optimization!!!
+  for (auto q = v.begin(); q != v.end(); q++) {
+    int newg = renumber[q->first];
+    if (newg >= 1)
+      q->first = newg;
+    else {
+      // !!! here we could be smart by examining rels[-newg].
+      // if it's a single term, we're actually shortening v
+      // if it's a sum of two terms, replace one by the other
+
+      // we restart, with a hollow vector
+      t = vecstack.fresh();
+      t.copysorted(q.tail()); // we must collect from here on
+      for (auto kc : t) {
+	int newg = renumber[kc.first];
+	if (newg >= 1) {
+	  coeff_set(t[kc.first], t[newg]);
+	  coeff_set_si(t[newg], 0);
+	} else
+	  t.submul(kc.second, rels[-newg]);
       }
-      v.window(pos).copy(temp);
-      PopVec();
+      q.markend(); // add back the first part of the vector, which is unaffected
+      t.add(v);
+      t.liecollect(pc); // liecollect is OK, since we're in the centre
+
+      v.free();
+      v = t.getsparse();
+      vecstack.pop(t);
+      return;
     }
   }
-  if (copied)
-    v.resize(NrTotalGens, pos);
-  ShrinkCollect(pc, v);
+#endif
 }
 
 /* quotient the centre by the relations rels */
-void ReducePcPres(pcpresentation &pc, const presentation &pres, const relmatrix &rels) {
+void ReducePcPres(pcpresentation &pc, const fppresentation &pres, const relmatrix &rels) {
   unsigned trivialgens = 0;
 
   if (Debug >= 2) {
@@ -325,7 +338,7 @@ void ReducePcPres(pcpresentation &pc, const presentation &pres, const relmatrix 
       coeff_set(pc.Exponent[newk], rels[i][0].second);
       const sparsecvec tail = rels[i].window(1);
       pc.Power[newk].alloc(tail.size());
-      Neg(pc.Power[newk], tail);
+      neg(pc.Power[newk], tail); // negate N*ai+... = 0 to N*ai = -(...)
     } else { /* k is trivial, and will be eliminated */
       trivialgens++;
       renumber[k] = -i; /* mark as trivial */
@@ -355,10 +368,12 @@ void ReducePcPres(pcpresentation &pc, const presentation &pres, const relmatrix 
   /*  Modify the products: */
   for (unsigned j = 1; j <= pc.NrPcGens; j++)
     for (unsigned l = 1; l < j; l++)
-      EliminateTrivialGenerators(pc, rels, pc.Product[j][l], renumber);
+      EliminateTrivialGenerators(pc, rels, pc.Comm[j][l], renumber);
 
-  /* Let us alter the Generator as well. Recall that dead generator cannot
-  have definition at all. It is only the right of the living ones. */
+  /* Let us alter the Generator as well. Recall that dead generators
+   * cannot have definition at all. It is only the right of the living
+   * ones.
+   */
   for (unsigned i = pc.NrPcGens + 1; i <= NrTotalGens; i++)
     if (renumber[i] >= 1)
       pc.Generator[renumber[i]] = pc.Generator[i];
@@ -377,21 +392,110 @@ void ReducePcPres(pcpresentation &pc, const presentation &pres, const relmatrix 
   /* we could shrink the arrays Generator, Exponent, Annihilator,
      Weight, but it's not worth it */
 
-  /* finally extend the Product array, by trivial elements */
-  pc.Product = (sparsecvec **) realloc(pc.Product, (newnrpcgens + 1) * sizeof(sparsecvec *));
-  if (pc.Product == nullptr)
-    abortprintf(2, "ReducePcPres: realloc(Product) failed");
+  /* finally extend the Comm array, by trivial elements */
+  pc.Comm = (sparsecvec **) realloc(pc.Comm, (newnrpcgens + 1) * sizeof(sparsecvec *));
+  if (pc.Comm == nullptr)
+    abortprintf(2, "ReducePcPres: realloc(Comm) failed");
 
   for (unsigned i = pc.NrPcGens + 1; i <= newnrpcgens; i++) {
-    pc.Product[i] = (sparsecvec *) malloc(i * sizeof(sparsecvec));
-    if (pc.Product[i] == nullptr)
-      abortprintf(2, "ReducePcPres: realloc(Product[%d]) failed", i);
+    pc.Comm[i] = (sparsecvec *) malloc(i * sizeof(sparsecvec));
+    if (pc.Comm[i] == nullptr)
+      abortprintf(2, "ReducePcPres: realloc(Comm[%d]) failed", i);
 
     for (unsigned j = 1; j < i; j++)
-      pc.Product[i][j].noalloc();
+      pc.Comm[i][j].noalloc();
   }
   
   TimeStamp("ReducePcPres()");
 
   pc.NrPcGens = newnrpcgens;
+}
+
+/* Some of the newly introduced generators strictly depend on one
+ *  another hence we can compute them inductively.
+ */
+
+// !!!GROUP
+
+/* compute the correct tail for [aj,ai]:
+ *
+ * - if i is defined as [g,h], compute [j,i] = [j,g,h]-[j,h,g]
+ * - if i is defined as N*g, compute [j,i] = N*[j,g]
+ * - if j is defined as N*g, compute [j,i] = N*[g,i] or -N*[i,g]
+ */
+static bool AdjustTail(const pcpresentation &pc, gen j, gen i) {
+  if (pc.Generator[i].t == DGEN && pc.Generator[j].t != DPOW) /* nothing to do, [aj,ai] is a defining generator */
+    return true;
+
+  hollowcvec tail = vecstack.fresh();
+
+  if (pc.Generator[i].t == DCOMM) { /* ai = [g,h] */
+    gen g = pc.Generator[i].g, h = pc.Generator[i].h;
+
+    tail.lie3bracket(pc, j, g, h, true); // [[aj,g],h]
+    tail.lie3bracket(pc, j, h, g, false); // [[aj,h],g]
+    
+    if (Debug >= 2)
+      fprintf(LogFile, "# tail: [a%d,a%d] = [a%d,[a%d,a%d]] = ", j, i, j, g, h);
+  } else if (pc.Generator[i].t == DPOW) { /* ai=N*g */
+    gen g = pc.Generator[i].g;
+    tail.addmul(pc.Exponent[g], pc.Comm[j][g]);
+
+    if (Debug >= 2) {
+      fprintf(LogFile, "# tail: [a%d,a%d] = ", j, i);
+      coeff_out_str(LogFile, pc.Exponent[g]);
+      fprintf(LogFile, "*[a%d,a%d] = ", j, g);
+    }
+  } else { /* aj = N*g */
+    gen g = pc.Generator[j].g;
+    if (g > i)
+      tail.addmul(pc.Exponent[g], pc.Comm[g][i]);
+    else if (g < i)
+      tail.submul(pc.Exponent[g], pc.Comm[i][g]);
+
+    if (Debug >= 2) {
+      fprintf(LogFile, "# tail: [a%d,a%d] = ", j, i);
+      coeff_out_str(LogFile, pc.Exponent[g]);
+      fprintf(LogFile, "*[a%d,a%d] = ", g, i);
+    }
+  }
+
+  tail.liecollect(pc);
+  
+  if (Debug >= 2) {
+    PrintVec(LogFile, tail);
+    fprintf(LogFile, "\n");
+  }
+
+  unsigned len = 0;
+  auto tp = tail.begin();
+  for (auto kc : pc.Comm[j][i]) {
+    if (kc.first != (*tp).first || coeff_cmp(kc.second,(*tp).second))
+      return false;
+    len++;
+    tp++;
+  }
+
+  if (tp != tail.end()) {
+    pc.Comm[j][i].resize(len, tail.size());
+    pc.Comm[j][i].window(len).copy(tp, tail.end());
+  }
+
+  vecstack.pop(tail);
+  return true;
+}
+
+void ComputeTails(const pcpresentation &pc) {
+  for (unsigned i = 1; i <= pc.NrPcGens; i++) {
+    for (unsigned j = i + 1; j <= pc.NrPcGens; j++) {
+      unsigned totalweight = pc.Generator[i].w+pc.Generator[j].w;
+      if (totalweight > pc.Class || (pc.Graded && totalweight != pc.Class))
+	continue;
+      
+      if (!AdjustTail(pc, j, i))
+	abortprintf(5, "Adjustment to tail of [a%d,a%d] doesn't lie in centre", j, i);
+    }
+  }
+  
+  TimeStamp("Tails()");
 }

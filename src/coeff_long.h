@@ -115,6 +115,15 @@ inline void coeff_fdiv_r(coeff &result, const coeff &a, const coeff &b) {
     result.data += b.data; /* C rounds quotient to 0, not down */
 }
 
+inline void coeff_fdiv_qr(coeff &q, coeff &r, const coeff &a, const coeff &b) {
+  r.data = a.data % b.data;
+  q.data = a.data / b.data;
+  if (r.data < 0) {
+    r.data += b.data; /* C rounds quotient to 0, not down */
+    q.data--;
+  }
+}
+
 inline void coeff_mul(coeff &result, const coeff &a, const coeff &b) {
 #ifdef COEFF_UNSAFE
   result.data = a.data * b.data;
