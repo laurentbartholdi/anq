@@ -40,6 +40,7 @@ struct coeff_ops {
 };
 typedef sparsevec<coeff,coeff_ops> sparsecvec;
 typedef sparsecvec::key gen;
+const sparsecvec badsparsecvec((sparsecvec::slot *)0xff00ff00ff00ffLL);
 
 typedef std::vector<sparsecvec> relmatrix;
 
@@ -260,6 +261,8 @@ void TimeStamp(const char *);
  * fill-in using colamd.
  */
 relmatrix GetRelMatrix();
-void AddToRelMatrix(const hollowcvec);
+void QueueInRelMatrix(const hollowcvec);
+bool AddToRelMatrix(const hollowcvec);
+void FlushQueue();
 void InitRelMatrix(const pcpresentation &, unsigned);
 void FreeRelMatrix();

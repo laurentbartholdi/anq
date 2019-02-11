@@ -1,8 +1,6 @@
-* Accept groups: *, ^-1, {a,b} = a^-1*b^-1*a*b, a^b, and combinatorial collector
+* Accept groups: combinatorial collector, correct tails, correct consistency
 
-* Accept endomorphisms with { } notation
-
-* Renumber arrays and generators from 0; use std::set, std::vector rather than C lists
+* Accept endomorphisms: evaluate
 
 * Improve matrix code: use shorter arrays to improve cache locality, avoid fillin, avoid coefficient explosion, use finite fields, (in local rings) permute basis to get rid of redundant generators
 
@@ -12,8 +10,6 @@
   - AddGen(lpres, string)
   - AddRel(lpres, node)
   - LieNQ(lpres, maxclass)
-
-* Make TotalGens local to pcpresentation.cc, possibly with an "ExtendPresentation" doing all the work
 
 * Finish z.h fastint arithmetic
 

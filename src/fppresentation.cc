@@ -585,7 +585,7 @@ void ReadPresentation(fppresentation &pres, const char *InputFileName) {
 	SyntaxError("LHS should be generator, not %s", nodename[n->cont.bin.l->type]);
       ValidateExpression(n->cont.bin.r, n->cont.bin.l->cont.g);
     } else if (n->type == TBRACE || n->type == TMAP) {
-      std::vector<bool> seen(pres.NrGens+1);
+      std::vector<bool> seen(pres.NrGens+1,false);
       node *t;
       for (t = n; t->type == TBRACE; t = t->cont.bin.r)
 	ValidateMap(t->cont.bin.l, pres, seen);

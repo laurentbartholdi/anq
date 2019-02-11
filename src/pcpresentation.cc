@@ -7,6 +7,7 @@
 
 #include "nq.h"
 #include <vector>
+#include <deque>
 
 // during extension of pc presentation, NrTotalGens = new NrPcGens.
 unsigned NrTotalGens;
@@ -38,12 +39,14 @@ void InitPcPres(pcpresentation &pc, const fppresentation &pres, bool Graded, boo
   pc.Epimorphism = (sparsecvec *) malloc((pres.NrGens + 1) * sizeof(sparsecvec));
   if (pc.Epimorphism == NULL)
     abortprintf(2, "InitPcPres: malloc(Epimorphism) failed");
+  pc.Epimorphism[0] = badsparsecvec;
   for (unsigned i = 1; i <= pres.NrGens; i++)
     pc.Epimorphism[i].alloc(0);
   
   pc.Generator = (deftype *) malloc(sizeof(deftype));
   if (pc.Generator == NULL)
     abortprintf(2, "InitPcPres: malloc(Generator) failed");
+  pc.Generator[0] = {.t = DINVALID};
 
   /* we initialize the exponents and annihilators of our pc generators */
   pc.Exponent = (coeff *) malloc(sizeof(coeff));
@@ -57,10 +60,13 @@ void InitPcPres(pcpresentation &pc, const fppresentation &pres, bool Graded, boo
   pc.Power = (sparsecvec *) malloc(sizeof(sparsecvec));
   if (pc.Power == NULL)
     abortprintf(2, "InitPcPres: malloc(Power) failed");
+  pc.Power[0] = badsparsecvec;
 
   pc.Comm = (sparsecvec **) malloc((pc.NrPcGens + 1) * sizeof(sparsecvec *));
   if (pc.Comm == NULL)
     abortprintf(2, "InitPcPres: malloc(Comm) failed");
+
+  TimeStamp("InitPcPres()");  
 }
 
 void FreePcPres(pcpresentation &pc, const fppresentation &pres) {
@@ -556,7 +562,7 @@ void Consistency(const pcpresentation &pc) {
 	  fprintf(LogFile, "\n");
 	}
 
-	AddToRelMatrix(t);	
+	QueueInRelMatrix(t);	
 	vecstack.pop(t);
       }
   }
@@ -587,7 +593,7 @@ void Consistency(const pcpresentation &pc) {
 	fprintf(LogFile, "\n");
       }
       
-      AddToRelMatrix(t);
+      QueueInRelMatrix(t);
       vecstack.pop(t);
 
       for (unsigned j = 1; j <= pc.NrPcGens; j++) {
@@ -625,7 +631,7 @@ void Consistency(const pcpresentation &pc) {
 	  fprintf(LogFile, "\n");
 	}
 
-	AddToRelMatrix(t);
+	QueueInRelMatrix(t);
 	vecstack.pop(t);
       }
     }
@@ -633,6 +639,8 @@ void Consistency(const pcpresentation &pc) {
   coeff_clear(unit);
   coeff_clear(annihilator);
 
+  FlushQueue();
+  
   TimeStamp("Consistency()");
 }
 #else
@@ -646,3 +654,159 @@ void Consistency(const pcpresentation &pc) {
   */
 }
 #endif
+
+void EvalAllRel(const pcpresentation &pc, const fppresentation &pres) {
+  for (auto n : pres.Aliases) {
+    hollowcvec v = vecstack.fresh();
+    v.eval(pc, n->cont.bin.r);
+    v.liecollect(pc);
+
+    if (Debug >= 2) {
+      fprintf(LogFile, "# aliasing relation: ");
+      PrintNode(LogFile, pres, n);
+      fprintf(LogFile, " ("); PrintVec(LogFile, v); fprintf(LogFile, ")\n");
+    }
+    gen g = n->cont.bin.l->cont.g;
+    pc.Epimorphism[g].resize(v.size());
+    pc.Epimorphism[g].copy(v);
+  }
+
+  std::deque<sparsecvec> itrels;
+
+  for (auto n : pres.Relators) {
+    hollowcvec v = vecstack.fresh();
+    v.eval(pc, n);
+    v.liecollect(pc);
+
+    if (Debug >= 2) {
+      fprintf(LogFile, "# relation: ");
+      PrintNode(LogFile, pres, n);
+      fprintf(LogFile, " ("); PrintVec(LogFile, v); fprintf(LogFile, ")\n");
+    }
+
+    if (!pres.Endomorphisms.empty())
+      itrels.push_back(v.getsparse());
+    
+    AddToRelMatrix(v);
+
+    vecstack.pop(v);
+  }
+
+  if (!pres.Endomorphisms.empty()) { // now t is a list of evaluations of rels
+    std::vector<relmatrix> endos;
+
+    for (auto n : pres.Endomorphisms) {
+      std::vector<sparsecvec> phi(NrTotalGens+1,badsparsecvec);
+      for (unsigned g = 1; g <= NrTotalGens; g++) {
+	switch (pc.Generator[g].t) {
+	case DGEN:
+	  {
+	    node *m;
+	    for (node *t = n;; t = t->cont.bin.r) {
+	      if (t->type == TBRACE)
+		m = t->cont.bin.l;
+	      else
+		m = t;
+	      if (m->cont.bin.l->cont.g == pc.Generator[g].g)
+		break;
+	      if (t->type != TBRACE)
+		abortprintf(5, "Could not find generator %u in pc presentation", g);
+	    }
+
+	    hollowcvec v = vecstack.fresh();
+
+	    v.eval(pc, m->cont.bin.r);
+	    phi[g] = v.getsparse();
+
+	    vecstack.pop(v);
+	    break;
+	  }
+	case DCOMM: // g = [g0,g1]
+	  {
+	    hollowcvec c = vecstack.fresh();
+	    hollowcvec v = vecstack.fresh();
+	    hollowcvec w = vecstack.fresh();
+#ifdef LIEALG
+	    v.copysorted(phi[pc.Generator[g].g]);
+	    w.copysorted(phi[pc.Generator[g].h]);
+	    c.liebracket(pc, v, w);
+#else
+	    c.copysorted(phi[pc.Generator[g].g]);
+	    w.copysorted(phi[pc.Generator[g].h]);
+	    v.copy(c);
+	    v.mul(pc, w); // v = phi[g0]*phi[g1]
+	    w.mul(pc, v); // w = phi[g1]*phi[g0]
+	    c.clear();
+	    c.solve(pc, w, v);
+#endif	    
+	    vecstack.pop(w);
+	    vecstack.pop(v);
+	    phi[g] = c.getsparse();
+	    vecstack.pop(c);
+	    break;
+	  }
+	case DPOW: // g = N*g0 or g0^N
+	  {
+	    hollowcvec v = vecstack.fresh();
+#ifdef LIEALG
+	    v.copysorted(phi[pc.Generator[g].g]);
+	    v.mul(pc.Exponent[pc.Generator[g].g]);
+#else
+	    hollowcvec w = vecstack.fresh();
+	    w.copysorted(phi[pc.Generator[g].g]);
+	    v.pow(pc, w, pc.Exponent[pc.Generator[g].g]);
+	    vecstack.pop(w);
+#endif
+	    phi[g] = v.getsparse();
+	    vecstack.pop(v);
+	  }
+	  break;
+	}
+      }
+      for (unsigned g = 1; g <= pc.NrPcGens; g++)
+	phi[g].free();
+      phi.erase(phi.begin(), phi.begin()+pc.NrPcGens+1);
+      endos.push_back(phi);
+      if (Debug >= 2) {
+	fprintf(LogFile, "# endomorphism: ");
+	PrintNode(LogFile, pres, n);
+	fprintf(LogFile, " (");
+	for (unsigned g = pc.NrPcGens+1; g <= NrTotalGens; g++) {
+	  PrintVec(LogFile, phi[g-pc.NrPcGens-1]);
+	  fprintf(LogFile, g == NrTotalGens ? ")\n" : "; ");
+	}
+      }
+    }
+
+    while (!itrels.empty()) {
+      sparsecvec t = itrels.front();
+      itrels.pop_front();
+      
+      for (auto phi : endos) {
+	hollowcvec h = vecstack.fresh();
+	for (auto kc : t)
+	  h.addmul(kc.second, phi[kc.first-pc.NrPcGens-1]);
+	sparsecvec s = h.getsparse();
+	if (Debug >= 2) {
+	  fprintf(LogFile, "# spun relation: ");
+	  PrintVec(LogFile, t);
+	  fprintf(LogFile, " ("); PrintVec(LogFile, s); fprintf(LogFile, ")\n");
+	}
+	if (AddToRelMatrix(h))
+	  s.free();
+	else
+	  itrels.push_back(s);
+	vecstack.pop(h);
+      }
+      
+      t.free();
+    }
+
+    // free memory
+    for (auto phi : endos)
+      for (auto r : phi)
+	r.free();
+  }
+
+  TimeStamp("EvalAllRel()");
+}

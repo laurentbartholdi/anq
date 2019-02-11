@@ -11,6 +11,7 @@
 stack<hollowcvec> vecstack;
 
 /* Lie algebra operations */
+// this += [v,w]
 void hollowcvec::liebracket(const pcpresentation &pc, const hollowcvec v, const hollowcvec w) {
   coeff c;
   coeff_init(c);
@@ -207,7 +208,7 @@ static void pow(hollowcvec &r, const pcpresentation &pc, hollowcvec v, int c) {
       }
       if (rem) p.mul(v);
     default:
-      abortprintf(6, "Unimplemented power %u", base);
+      abortprintf(4, "Unimplemented power %u", base);
     }
     c /= base;
     if (!c)
@@ -353,43 +354,4 @@ void hollowcvec::eval(const pcpresentation &pc, node *rel) {
   default:
     abortprintf(3, "EvalRel: operator of type %s should not occur", nodename[rel->type]);
   }
-}
-
-/* evaluate all relations, and add them to the relation matrix */
-void EvalAllRel(const pcpresentation &pc, const fppresentation &pres) {
-  for (auto n : pres.Aliases) {
-    hollowcvec v = vecstack.fresh();
-    v.eval(pc, n->cont.bin.r);
-    v.liecollect(pc);
-
-    if (Debug >= 2) {
-      fprintf(LogFile, "# aliasing relation: ");
-      PrintNode(LogFile, pres, n);
-      fprintf(LogFile, " ("); PrintVec(LogFile, v); fprintf(LogFile, ")\n");
-    }
-    gen g = n->cont.bin.l->cont.g;
-    pc.Epimorphism[g].resize(v.size());
-    pc.Epimorphism[g].copy(v);
-  }
-  
-  for (auto n : pres.Relators) {
-    hollowcvec v = vecstack.fresh();
-    v.eval(pc, n);
-    v.liecollect(pc);
-
-    if (Debug >= 2) {
-      fprintf(LogFile, "# relation: ");
-      PrintNode(LogFile, pres, n);
-      fprintf(LogFile, " ("); PrintVec(LogFile, v); fprintf(LogFile, ")\n");
-    }
-
-    AddToRelMatrix(v);    
-    vecstack.pop(v);
-  }
-
-  for (auto n : pres.Endomorphisms) {
-    abortprintf(6,"Endomorphisms not yet implemented !!!");
-  }
-
-  TimeStamp("EvalAllRel()");
 }

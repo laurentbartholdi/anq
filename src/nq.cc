@@ -148,8 +148,6 @@ int main(int argc, char **argv) {
   
   InitPcPres(pc, fppres, Graded, PAlgebra, TorsionExp, NilpotencyClass);
 
-  TimeStamp("initialization");
-  
   for (pc.Class = 1; pc.Class <= MaxWeight; pc.Class++) {
     unsigned oldnrpcgens = pc.NrPcGens;
 
@@ -158,7 +156,9 @@ int main(int argc, char **argv) {
     InitRelMatrix(pc, nrcentralgens);
 
     Consistency(pc); // enforce Jacobi and Z-linearity
-    
+
+    //!!! flush matrix queue    
+
     EvalAllRel(pc, fppres); // evaluate relations
 
     relmatrix rels = GetRelMatrix();
