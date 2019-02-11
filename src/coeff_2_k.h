@@ -6,6 +6,7 @@
 */
 
 #include <inttypes.h>
+#include <ctype.h>
 
 #if MODULUS_EXPONENT > 64
 #error MODULUS_EXPONENT must be <= 64; for larger exponent, use coeff_2_mp.h
@@ -97,6 +98,13 @@ inline void coeff_fdiv_r(coeff &result, const coeff &a, const coeff &b) {
   result.data = a.data % b.data;
 }
 
+inline void coeff_fdiv_qr(coeff &q, coeff &r, const coeff &a, const coeff &b) {
+  coeff t;
+  t.data = a.data / b.data;
+  r.data = a.data % b.data;
+  q.data = t.data;
+}
+
 inline void coeff_mul(coeff &result, const coeff &a, const coeff &b) {
   result.data = (a.data * b.data) & COEFF_MASK;
 }
@@ -185,3 +193,16 @@ inline int coeff_out_str(FILE *f, const coeff &a)
 }
 
 #define coeff_base 2
+
+inline void coeff_set_str(coeff &a, const char *s, int base)
+{
+  coeff_set_si(a, 0);
+
+  if (*s == '0') base = coeff_base;
+  
+  while (isalnum(*s)) {
+    coeff_mul_si(a, a, base);
+    coeff_add_si(a, a, isdigit(*s) ? *s - '0' : *s + 10 - (isupper(*s) ? 'A' : 'a'));
+    s++;
+  }
+}

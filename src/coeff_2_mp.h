@@ -6,6 +6,7 @@
 */
 
 #include <gmp.h>
+#include <ctype.h>
 
 #ifndef MODULUS_EXPONENT
 #error You must specify MODULUS_EXPONENT
@@ -146,10 +147,18 @@ inline void coeff_fdiv_q(coeff &result, const coeff &a, const coeff &b) {
   mpn_copyi(result.data, q, COEFF_WORDS-nzlimbs+1);
 }
 
+#ifdef AVOID_MPN_DIVEXACT // internal to gmp >= 6, probably not portable
+#define coeff_divexact coeff_fdiv_q
+#else
+#define mpn_divexact __gmpn_divexact
+extern "C" void mpn_divexact (mp_ptr, mp_srcptr, mp_size_t, mp_srcptr, mp_size_t);
+
 inline void coeff_divexact(coeff &result, const coeff &a, const coeff &b) {
-  return coeff_fdiv_q(result, a, b);
-  // we should be able to call mpn_divexact !!!
+  unsigned nzlimbs = __nzlimbs(b.data, COEFF_WORDS);
+  coeff_zero(result);
+  mpn_divexact(result.data, a.data, COEFF_WORDS, b.data, nzlimbs);
 }
+#endif
 
 inline void coeff_fdiv_r(coeff &result, const coeff &a, const coeff &b) {
   unsigned nzlimbs = __nzlimbs(b.data, COEFF_WORDS);
@@ -158,6 +167,17 @@ inline void coeff_fdiv_r(coeff &result, const coeff &a, const coeff &b) {
 
   mpn_zero(result.data, COEFF_WORDS);
   mpn_copyi(result.data, r, nzlimbs);
+}
+
+inline void coeff_fdiv_qr(coeff &q, coeff &r, const coeff &a, const coeff &b) {
+  unsigned nzlimbs = __nzlimbs(b.data, COEFF_WORDS);
+  mp_limb_t mpq[COEFF_WORDS], mpr[COEFF_WORDS];
+  mpn_tdiv_qr(mpq, mpr, 0, a.data, COEFF_WORDS, b.data, nzlimbs);
+
+  mpn_zero(q.data, COEFF_WORDS);
+  mpn_copyi(q.data, mpq, COEFF_WORDS-nzlimbs+1);
+  mpn_zero(r.data, COEFF_WORDS);
+  mpn_copyi(r.data, mpr, nzlimbs);
 }
 
 inline void coeff_mul(coeff &result, const coeff &a, const coeff &b) {
@@ -279,3 +299,16 @@ inline int coeff_out_str(FILE *f, const coeff &a)
 }
 
 #define coeff_base 2
+
+inline void coeff_set_str(coeff &a, const char *s, int base)
+{
+  coeff_set_si(a, 0);
+
+  if (*s == '0') base = coeff_base;
+  
+  while (isalnum(*s)) {
+    coeff_mul_si(a, a, base);
+    coeff_add_si(a, a, isdigit(*s) ? *s - '0' : *s + 10 - (isupper(*s) ? 'A' : 'a'));
+    s++;
+  }
+}

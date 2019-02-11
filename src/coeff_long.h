@@ -7,9 +7,16 @@
 
 /* COEFF_UNSAFE turns off coefficient overflow detection. It's generally a bad idea to
    disable it, but it's only present in GCC >= 5 */
-#if !defined(__GNUC__) || __GNUC__ <= 4
+#if defined(__GNUC__) && __GNUC__ >= 5
+#define COEFF_SAFE
+#elif defined(__clang__) && __has_builtin(__builtin_saddll_overflow)
+#define COEFF_SAFE
+#endif
+#ifndef COEFF_SAFE
 #define COEFF_UNSAFE
 #endif
+
+#include <ctype.h>
 
 #define COEFF_ID "Z as int64_t"
 
@@ -116,12 +123,14 @@ inline void coeff_fdiv_r(coeff &result, const coeff &a, const coeff &b) {
 }
 
 inline void coeff_fdiv_qr(coeff &q, coeff &r, const coeff &a, const coeff &b) {
-  r.data = a.data % b.data;
+  coeff t;
+  t.data = a.data % b.data;
   q.data = a.data / b.data;
-  if (r.data < 0) {
-    r.data += b.data; /* C rounds quotient to 0, not down */
+  if (t.data < 0) {
+    r.data = t.data+b.data; /* C rounds quotient to 0, not down */
     q.data--;
-  }
+  } else
+    r.data = t.data;
 }
 
 inline void coeff_mul(coeff &result, const coeff &a, const coeff &b) {
@@ -229,7 +238,12 @@ inline int coeff_out_str(FILE *f, const coeff &a)
   return fprintf(f, "%ld", (long) a.data);
 }
 
-inline void coeff_parse(coeff &a, const char *s)
+inline void coeff_set_str(coeff &a, const char *s, int base)
 {
-  coeff_set_si(a, atoll(s));
+  coeff_set_si(a, 0);
+  while (isalnum(*s)) {
+    coeff_mul_si(a, a, base);
+    coeff_add_si(a, a, isdigit(*s) ? *s - '0' : *s + 10 - (isupper(*s) ? 'A' : 'a'));
+    s++;
+  }
 }

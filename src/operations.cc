@@ -59,180 +59,181 @@ void hollowcvec::liecollect(const pcpresentation &pc) {
 }
 
 /* group operations */
-void hollowcvec::mul(const pcpresentation &pc, const hollowcvec) {
-}
+// the basic collector: this *= g^c
+void hollowcvec::mul(const pcpresentation &pc, gen g, const coeff &c) {
+  if (!coeff_cmp_si(c, 0))
+    return;
 
-void hollowcvec::pow(const pcpresentation &pc, const hollowcvec, const coeff &) {
-}
-
-void hollowcvec::quo(const pcpresentation &pc, const hollowcvec) {
-}
-
-void hollowcvec::lquo(const pcpresentation &pc, const hollowcvec, const hollowcvec) {
-}
-
-void hollowcvec::conjugate(const pcpresentation &pc, const hollowcvec, const hollowcvec) {
-}
-
-void hollowcvec::groupbracket(const pcpresentation &pc, const hollowcvec, const hollowcvec) {
-}
-
-void hollowcvec::groupcollect(const pcpresentation &pc) {
-}
-
-#if 0
-/* the main collection function, for groups */
-void GroupCollect(const pcpresentation &pc, sparsecvec vec0, const sparsecvec v) {
-}
-
-void Prod(const pcpresentation &pc, sparsecvec vec0, const sparsecvec vec1, const sparsecvec vec2)
-{
-  vec0.copy(vec1);
-  GroupCollect(pc, vec0, vec2);
-}
-
-// solve vec2*vec0 = vec1*vec2 for vec0
-void Conjugate(const pcpresentation &pc, sparsecvec vec0, const sparsecvec vec1, const sparsecvec vec2)
-{
-  sparsecvec p1p2 = FreshVec();
-  p1p2.copy(vec1);
-  GroupCollect(pc, p1p2, vec2);
-  LQuo(pc, vec0, vec2, p1p2);
-  PopVec();
-}
-
-void Quo(const pcpresentation &pc, sparsecvec vec0, const sparsecvec vec1, const sparsecvec vec2)
-{
-  sparsecvec vec2i = FreshVec();
-#if 0
-  //!!! check order in which we push inverse!
-  for (autounsigned pos = 0; vec2[pos].g != EOW; pos++) {
-    vec2i[pos].g = vec2[pos].g;
-    coeff_neg(vec2i[pos].second, vec2[pos].second);
-  }
-#endif
-  vec0.copy(vec1);
-  GroupCollect(pc, vec0, vec2i);
-  PopVec();
-}
-
-// solve vec1*vec0 = vec2 for vec0
-void LQuo(const pcpresentation &pc, sparsecvec vec0, const sparsecvec vec1, const sparsecvec vec2)
-{
-#if 0
-  sparsecvec p = vec0, p1 = vec1, p2 = FreshVec();
-  p2.Copy(p2, vec2);
-  p->first = EOW;
+  // check if coeff is reduced. if not, reduce !!!
   
-  while (gen g = std::min(vec1->first, vec2->first) != EOW) {
-    if (p1->first == p2->first)
-      coeff_sub(p->second, (p2++)->second, (p1++)->second);
-    else if (g == p1->first)
-      coeff_neg(p->second, (p1++)->second);
-    else
-      coeff_set(p->second, (p2++)->second);
-    if (!coeff_reduced_p(p->second, pc.Exponent[g]))
-      coeff_fdiv_r(p->second, p->second, pc.Exponent[g]);
-    if (coeff_nz_p(p->second)) {
-      p->first = g;
-      (p+1)->first = EOW;
-      GroupCollect(pc, p2, p);
-      p++;
-    }
+  if (lower_bound(g) == end()) {
+    coeff_set((*this)[g], c);
+    return;
   }
-  PopVec();
-#endif
-}
-
-const sparsecvec one((size_t) 0);
-
-void Inv(const pcpresentation &pc, sparsecvec vec0, const sparsecvec vec1)
-{
-  LQuo(pc, vec0, vec1, one);
-}
-
-// solve vec2*vec1*vec0 = vec1*vec2 for vec0
-void GroupBracket(const pcpresentation &pc, sparsecvec vec0, const sparsecvec vec1, const sparsecvec vec2)
-{
-#if 0 // !!!
-  // at each step, we have p2a*p1a*p = p1p2
-  sparsecvec p1a = FreshVec(), p2a = FreshVec(), p1p2 = FreshVec(), p = vec0;
-  Copy(p1p2, vec1);
-  GroupCollect(pc, p1p2, vec2);
-  Copy(p1a, vec1);
-  Copy(p2a, vec2);
-  p->first = EOW;
   
-  while (gen g = std::min(p1p2->first,std::min(p1a->first,p2a->first)) != EOW) {
-    if (g == p1a->first)
-      coeff_neg(p->second, p1a->second); // increment later p1a, after more collecting
-    else
-      coeff_set_si(p->second, 0);
-    if (g == p2a->first)
-      coeff_sub(p->second, p->second, (p2a++)->second);
-    if (g == p1p2->first)
-      coeff_add(p->second, p->second, (p1p2++)->second);
-    if (!coeff_reduced_p(p->second, pc.Exponent[g]))
-      coeff_fdiv_r(p->second, p->second, pc.Exponent[g]);
-    if (coeff_nz_p(p->second)) {
-      p->first = g;
-      (p+1)->first = EOW;
-      GroupCollect(pc, p1a, p);
-      p++;
-    }
-    if (g == p1a->first) {
-      gen oldg = (++p1a)->first;
-      p1a->first = EOW;
-      GroupCollect(pc, p2a, p1a+(-1));
-      p1a->first = oldg;
-    }
-  }
-  PopVec(), PopVec(), PopVec(), PopVec();
-#endif
+  /*
+!!!
+general strategy: collect from the left.
+
+keep a stack of elements to multiply. iterate backwards; while pos > g, remove from vector and put commutator (computed recursively with exponents) and monomials in stack. then drop c^g, and multiply recursively with everything on stack.
+  */
 }
 
-static void Pow(const pcpresentation &pc, sparsecvec vec0, const sparsecvec vec1, int c)
-{
-  if (c == -1) {
-    Inv(pc, vec0, vec1);
-    return;
-  }
-  if(c == 0) {
-    vec0.clear();
-    return;
-  }
-  if (c == 1) {
-    vec0.copy(vec1);
-    return;
-  }
+// this *= v
+void hollowcvec::mul(const pcpresentation &pc, const hollowcvec v) {
+  for (auto kc : v)
+    mul(pc, kc.first, kc.second);
+}
 
-  vec0.clear();
-  sparsecvec s = FreshVec();
-  if (c > 0)
-    s.copy(vec1);
-  else {
-    Inv(pc, s, vec1);
+// this *= v^-1*w. makes v=w in the process.
+void hollowcvec::lquo(const pcpresentation &pc, hollowcvec v, const hollowcvec w) {
+  /* we seek u with v u = w.
+     say v = g^c * v', w = g^d * w'; then u = g^e * u' with e == d-c, and
+     w = vu = v g^e u'; so we seek u' with (v g^e) u' = w, knowing that
+     (v g^e) starts with g^d which we can skip.
+  */
+  
+  auto pv = v.begin(), pw = w.begin();
+  coeff c;
+  coeff_init(c);
+
+  for (;;) {
+    gen g = INFINITY;
+    bool minatv, minatw;
+    if ((minatv = (pv != v.end()))) g = pv->first;
+    if ((minatw = (pw != w.end()))) {
+      if (pw->first > g) minatw = false;
+      if (pw->first < g) g = pw->first, minatv = false;
+    }
+    else if (minatv && minatw)
+      coeff_sub(c, (pw++)->second, pv->second);
+    else if (minatv)
+      coeff_neg(c, pv->second);
+    else if (minatw)
+      coeff_set(c, (pw++)->second);
+    else
+      break;
+    if (!coeff_reduced_p(c, pc.Exponent[g]))
+      coeff_fdiv_r(c, c, pc.Exponent[g]);
+    mul(pc, g, c);
+    v.mul(pc, g, c);
+    pv = v.upper_bound(g);
+  }
+}
+
+// this *= v^-1. modifies v in the process.
+void hollowcvec::inv(const pcpresentation &pc, hollowcvec v) {
+  /* we seek u with v u = 1.
+     say v = g^c * v'; then u = g^d * u' with d == -c, and we have
+     1 = vu = v g^d u'; so we seek u' with (v g^d) u' = 1, knowing that
+     (v g^d) starts with a monomial >g.
+  */
+  coeff c;
+  coeff_init(c);
+  
+  for (auto kc : v) {
+    gen g = kc.first;
+    coeff_neg (c, kc.second);
+    if (!coeff_reduced_p(c, pc.Exponent[g]))
+      coeff_fdiv_r(c, c, pc.Exponent[g]);
+    mul(pc, g, c);
+    v.mul(pc, g, c);
+  }
+  coeff_clear(c);
+}
+
+// multiply this with v^c. modifies v in the process.
+static void pow(hollowcvec &r, const pcpresentation &pc, hollowcvec v, int c) {
+  if (!c)
+    return;
+
+  if (c < 0) {
+    hollowcvec i = vecstack.fresh();
+    i.inv(pc, v);
+    v.copy(i);
+    vecstack.pop(i);
     c = -c;
   }
 
-  //!!! use prime instead of 2 to improve cancellations
   for (;;) {
-    if (c % 2)
-      GroupCollect(pc, vec0, s);
-    c /= 2;
-    if (c == 0)
+    if (c & 1)
+      r.mul(pc, v);
+    c >>= 1;
+    if (!c)
       break;
-    GroupCollect(pc, s, s);
+    v.mul(pc, v);
   }
-  PopVec();
+  
+#if 0 // !!! premature optimization
+  hollowcvec v2, v4;
+  const unsigned base = (coeff_base <= 5) ? coeff_base : 2;
+  // !!! also implement for 7? 
+  if (base > 2)
+    v2 = vecstack.fresh();
+  if (base > 4)
+    v4 = vecstack.fresh();
+    
+  if (c < 0) {
+    hollowcvec i = vecstack.fresh();
+    lquo(pc, i, v, i);
+    v.copy(i);
+    vecstack.pop(i);
+    c = -c;
+  }
+  
+  for (;;) {
+    unsigned rem = c % base;
+    bool did2 = false, did4 = false;
+    switch (base) {
+    case 2: if (rem) mul(v); break;
+    case 3:
+      if (rem & 2) {
+	 rem -= 2;
+	 v2.copy(v); v2.mul(v); did2 = true;
+	 p.mul(v2);
+      }
+      if (rem) p.mul(v);
+      break;
+    case 5: if (rem & 2) {
+	rem -= 2;
+	v2.copy(v); v2.mul(v); did2 = true;
+	p.mul(v2);
+      }
+      if (rem & 4) {
+	rem -= 4;
+	if (!did2) { v2.copy(v); v2.mul(v); did2 = true }
+	v4.copy(v2); v4.mul(v2); did4 = true;
+	p.mul(v4);
+      }
+      if (rem) p.mul(v);
+    default:
+      abortprintf(6, "Unimplemented power %u", base);
+    }
+    c /= base;
+    if (!c)
+      break;
+    switch (base) {
+    case 2: v.mul(v); break;
+    case 3: if (!did2) { v2.copy(v); v2.mul(v); }
+      v.mul(v2);
+      break;
+    case 5: if (!did2) { v2.copy(v); v2.mul(v); }
+      if (!did4) { v4.copy(v2); v4.mul(v2); }
+      v.mul(v4);
+    }
+  }
+  if (base > 4)
+    vecstack.pop(v4);
+  if (base > 2)
+    vecstack.pop(v2);
+#endif
 }
 
-void Pow(const pcpresentation &pc, sparsecvec vec0, const sparsecvec vec1, coeff &c)
-{
-  //!!! what to do with large exponents?
-  Pow(pc, vec0, vec1, coeff_get_si(c));
+// this *= v^c
+void hollowcvec::pow(const pcpresentation &pc, hollowcvec v, const coeff &c) {
+  // !!! what should we do with coefficients that don't fit in a short?
+  ::pow(*this, pc, v, coeff_get_si(c));
 }
-#endif
 
 /* evaluate relator, given as tree */
 void hollowcvec::eval(const pcpresentation &pc, node *rel) {
@@ -262,8 +263,11 @@ void hollowcvec::eval(const pcpresentation &pc, node *rel) {
     {
       eval(pc, rel->cont.bin.l);
       hollowcvec t = vecstack.fresh();
+      hollowcvec u = vecstack.fresh();
       t.eval(pc, rel->cont.bin.r);
-      quo(pc, t);
+      u.inv(pc, t);
+      mul(pc, u);
+      vecstack.pop(u);
       vecstack.pop(t);
     }
     break;
@@ -287,18 +291,16 @@ void hollowcvec::eval(const pcpresentation &pc, node *rel) {
       hollowcvec u = vecstack.fresh();
       t.eval(pc, rel->cont.bin.l);
       u.eval(pc, rel->cont.bin.r);
+#ifdef LIEALG
       liebracket(pc, t, u);
-      vecstack.pop(u);
-      vecstack.pop(t);
-    }
-    break;
-  case TBRACE:
-    {
-      hollowcvec t = vecstack.fresh();
-      hollowcvec u = vecstack.fresh();      
-      t.eval(pc, rel->cont.bin.l);
-      u.eval(pc, rel->cont.bin.r);
-      groupbracket(pc, t, u);
+#else
+      hollowcvec v = vecstack.fresh();
+      v.copy(t);
+      v.mul(pc, u); // v = t*u
+      u.mul(pc, t); // u = u*t
+      lquo(pc, u, v); // this = (u*t) \ (t*u)
+      vecstack.pop(v);
+#endif      
       vecstack.pop(u);
       vecstack.pop(t);
     }
@@ -314,7 +316,7 @@ void hollowcvec::eval(const pcpresentation &pc, node *rel) {
     {
       hollowcvec t = vecstack.fresh();
       t.eval(pc, rel->cont.u);
-      quo(pc, t);
+      inv(pc, t);
       vecstack.pop(t);
     }
     break;
@@ -341,7 +343,8 @@ void hollowcvec::eval(const pcpresentation &pc, node *rel) {
       hollowcvec u = vecstack.fresh();
       t.eval(pc, rel->cont.bin.l);
       u.eval(pc, rel->cont.bin.r);
-      conjugate(pc, t, u);
+      u.mul(pc, t);
+      lquo(pc, t, u);
       vecstack.pop(u);
       vecstack.pop(t);
       break;
@@ -380,140 +383,13 @@ void EvalAllRel(const pcpresentation &pc, const fppresentation &pres) {
       fprintf(LogFile, " ("); PrintVec(LogFile, v); fprintf(LogFile, ")\n");
     }
 
-    AddToRelMatrix(v);
-    
+    AddToRelMatrix(v);    
     vecstack.pop(v);
   }
-  
+
+  for (auto n : pres.Endomorphisms) {
+    abortprintf(6,"Endomorphisms not yet implemented !!!");
+  }
+
   TimeStamp("EvalAllRel()");
-}
-
-/* check consistency of pc presentation, and deduce relations to
- * impose on centre
- */
-
-// !!!GROUP
-
-/*
-**  The relations to be enforced are of form
-**  [ a, b, c ] + [ b, c, a ] + [ c, a, b ]    where <a> is of weight 1
-**  and  <a> < <b> < <c>  with respect to the linear ordering of the
-**  generators.
-*/
-static void CheckJacobi(const pcpresentation &pc, gen a, gen b, gen c) {
-  hollowcvec t = vecstack.fresh();
-  t.lie3bracket(pc, a, b, c, true);
-  t.lie3bracket(pc, b, c, a, true);
-  t.lie3bracket(pc, c, a, b, true);
-  t.liecollect(pc);
-
-  if (Debug >= 2) {
-    fprintf(LogFile, "# consistency: jacobi(a%d,a%d,a%d) = ", a, b, c);
-    PrintVec(LogFile, t);
-    fprintf(LogFile, "\n");
-  }
-
-  AddToRelMatrix(t);
-
-  vecstack.pop(t);
-}
-
-/*
-**  The following function checks the consistency relation for
-**  o_i[ a, b ] = [ (( o_ia )), b ] where (()) means the substitution
-**  of the argument with its relation.
-**
-*/
-static void CheckPower(const pcpresentation &pc, gen a, gen b) {
-  hollowcvec t = vecstack.fresh();
-  
-  for (auto kc : pc.Power[a]) {
-    gen g = kc.first;
-    if (g > pc.NrPcGens)
-      break;
-    if (g > b)
-      t.submul(kc.second, pc.Comm[g][b]);
-    else if (g < b)
-      t.addmul(kc.second, pc.Comm[b][g]);
-  }
-
-  if (a > b)
-    t.addmul(pc.Exponent[a], pc.Comm[a][b]);
-  else if (a < b)
-    t.submul(pc.Exponent[a], pc.Comm[b][a]);
-  t.liecollect(pc);
-
-  if (Debug >= 2) {
-    fprintf(LogFile, "# consistency: ");
-    coeff_out_str(LogFile, pc.Exponent[a]);
-    fprintf(LogFile, "*[a%d,a%d]-[", a, b);
-    coeff_out_str(LogFile, pc.Exponent[a]);
-    fprintf(LogFile, "*a%d,a%d] = ", a, b);
-    PrintVec(LogFile, t);
-    fprintf(LogFile, "\n");
-  }
-
-  AddToRelMatrix(t);
-  
-  vecstack.pop(t);
-}
-
-/* if N*v = 0 in our ring, and we have a power relation A*g = w,
- * enforce (N/A)*w = 0
- */
-static void CheckTorsion(const pcpresentation &pc, unsigned i) {
-  hollowcvec t = vecstack.fresh();
-  coeff annihilator, unit;
-  coeff_init(annihilator);
-  coeff_init(unit); // unused
-  
-  coeff_unit_annihilator(unit, annihilator, pc.Exponent[i]);
-  t.addmul(annihilator, pc.Power[i]);
-  t.liecollect(pc);
-  
-  if (Debug >= 2) {
-    fprintf(LogFile, "# consistency: ");
-    coeff_out_str(LogFile, annihilator);
-    fprintf(LogFile, "*");
-    coeff_out_str(LogFile, pc.Exponent[i]);
-    fprintf(LogFile, "*a%d = ", i);
-    PrintVec(LogFile, t);
-    fprintf(LogFile, "\n");
-  }
-
-  AddToRelMatrix(t);
-
-  coeff_clear(unit);
-  coeff_clear(annihilator);
-  vecstack.pop(t);
-}
-
-void Consistency(const pcpresentation &pc) {
-  for (unsigned i = 1; i <= pc.NrPcGens; i++) {
-    if (pc.Generator[i].t != DGEN)
-      continue;
-    for (unsigned j = i + 1; j <= pc.NrPcGens; j++)
-      for (unsigned k = j + 1; k <= pc.NrPcGens; k++) {
-	unsigned totalweight = pc.Generator[i].w + pc.Generator[j].w + pc.Generator[k].w;
-	if (totalweight > pc.Class || (pc.Graded && totalweight != pc.Class))
-	  continue;
-	
-        CheckJacobi(pc, i, j, k);
-      }
-  }
-  
-  for (unsigned i = 1; i <= pc.NrPcGens; i++)
-    if (coeff_nz_p(pc.Exponent[i])) {
-      CheckTorsion(pc, i);
-
-      for (unsigned j = 1; j <= pc.NrPcGens; j++) {
-	unsigned totalweight = pc.Generator[i].w + pc.Generator[j].w;
-	if (totalweight > pc.Class || (pc.Graded && totalweight != pc.Class))
-	  continue;
-  	
-	CheckPower(pc, i, j);
-      }
-    }
-  
-  TimeStamp("Consistency()");
 }

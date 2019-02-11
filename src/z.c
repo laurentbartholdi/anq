@@ -27,7 +27,7 @@ void __z_add(z_t &result, const z_t &a, const z_t &b) {
 void __z_mul(z_t &result, const z_t &a, const z_t &b) {
   if (result.t)
     result.p = new mpz_t;
-  if (a.t && a.t)
+  if (a.t && b.t)
     mpz_set_si(result.p, a.d >> 1), mpz_mul_si(result.p, result.p, b.d >> 1);
   else {
     if (a.t) mpz_mul_si(result.p, b.p, a.d >> 1);

@@ -24,8 +24,10 @@ CC = $(CXX)
 NQ_OBJ = fppresentation.o pcpresentation.o print.o operations.o matrix.o nq.o
 NQ_INCL = nq.h coeff.h vectors.hh
 
-all: nql_long
-#all: nql_2_64 nql_2_320 nql_3_39 nql_5_27 nql_5_100 nql_long nql_mpz nqg_2_64 nqg_2_320 nqg_3_39 nqg_5_27 nqg_5_100 nqg_long nqg_mpz
+all: nql_2_64 nql_2_320 nql_3_39 nql_5_27 nql_5_100 nql_long nql_mpz \
+	nqg_2_64 nqg_2_320 nqg_3_39 nqg_5_27 nqg_5_100 nqg_long nqg_mpz
+
+nql: nql_long nql_mpz
 
 profile: clean
 	$(MAKE) CXX=g++ DEBUG="-g -fprofile-instr-generate -fcoverage-mapping"
@@ -35,7 +37,7 @@ viewprofile:
 	llvm-cov show ./nql_long -instr-profile=default.profdata $(NAME)
 
 clean:
-	rm -fr *.o *.gc?? nql_[0-9]*_[0-9]* nql_mpz nql_long nql_z *.dSYM
+	rm -fr *.o *.gc?? nq[lg]_[0-9]*_[0-9]* nq[lg]_mpz nq[lg]_long nq[lg]_z *.dSYM
 
 nql_mpz: $(subst .o,l_mpz.o,$(NQ_OBJ))
 

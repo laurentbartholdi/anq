@@ -8,6 +8,7 @@
 #include "nq.h"
 #include <vector>
 
+// during extension of pc presentation, NrTotalGens = new NrPcGens.
 unsigned NrTotalGens;
 
 /* add generator newgen to vector v, and store its definition */
@@ -87,7 +88,7 @@ void FreePcPres(pcpresentation &pc, const fppresentation &pres) {
  * order to do that we define new generators for the images of the
  * generators of the finite presentation which are not definitions.
  */
-void AddNewTails(pcpresentation &pc, const fppresentation &pres) {
+unsigned AddTails(pcpresentation &pc, const fppresentation &pres) {
   NrTotalGens = pc.NrPcGens;
 
   /* inverse lookup tables:
@@ -239,7 +240,120 @@ void AddNewTails(pcpresentation &pc, const fppresentation &pres) {
   /* The Comm array is not extended yet, because anyways it won't
      be used.  we'll extend it later, in ReducePcPres */
     
-  TimeStamp("AddNewTails()");
+  vecstack.setsize(NrTotalGens);
+  if (Debug >= 2)
+    fprintf(LogFile, "# added new tails, total number of generators is %u\n", NrTotalGens);
+
+/* Some of the newly introduced generators strictly depend on one
+ *  another hence we can compute them inductively.
+ */
+
+  for (unsigned i = 1; i <= pc.NrPcGens; i++) {
+    for (unsigned j = i + 1; j <= pc.NrPcGens; j++) {
+      unsigned totalweight = pc.Generator[i].w+pc.Generator[j].w;
+      if (totalweight > pc.Class || (pc.Graded && totalweight != pc.Class))
+	continue;
+      
+      if (pc.Generator[i].t == DGEN && pc.Generator[j].t != DPOW) /* nothing to do, [aj,ai] is a defining generator */
+	continue;
+
+      /* compute the correct tail for [aj,ai]: in Lie algebra,
+       * - if ai is defined as [g,h], compute [aj,ai] = [aj,g,h]-[aj,h,g]
+       * - if ai is defined as N*g, compute [aj,ai] = N*[aj,g]
+       * - if aj is defined as N*g, compute [aj,ai] = N*[g,ai] or -N*[ai,g].
+       * in groups,
+       * - if ai is defined as [g,h], compute [aj,ai] = !!!
+       * - if ai is defined an g^N, compute [aj,ai] = [aj,g^N]...
+       * - if aj is defined as g^N, compute [aj,ai] = ...
+
+       !!! think more. Can we use the fact that there's only a correction in the centre? Can we expand the commutator as aj^-1 ai^-1 aj ai ?
+       */
+
+      hollowcvec tail = vecstack.fresh();
+
+      if (pc.Generator[i].t == DCOMM) { /* ai = [g,h] */
+	gen g = pc.Generator[i].g, h = pc.Generator[i].h;
+#ifdef LIEALG
+	tail.lie3bracket(pc, j, g, h, true); // +[[aj,g],h]
+	tail.lie3bracket(pc, j, h, g, false); // -[[aj,h],g]
+	tail.liecollect(pc);
+#else
+	abortprintf(6,"tail for DCOMM");
+	/* compute [aj,[g,h]] = [aj,h] [aj,g] [aj,g,h] [aj,h^-1] [aj,g^-1] [aj,g^-1,h^-1] ....
+gap> EpimorphismFromFreeGroup(xc);
+[ x1, x2, x3, x4, x5, x6, x7, x8 ] -> [ j^-1*g^-1*j*g, j^-1*h^-1*j*h,
+  g*j^-1*g^-1*j*h^-1*j^-1*g*j*g^-1*h, g^-1*j^-1*g*j*h^-1*j^-1*g^-1*j*g*h,
+  h*j^-1*h^-1*j*g^-1*j^-1*h*j*h^-1*g,
+  h*g*j^-1*g^-1*j*h^-1*j^-1*g*j*g^-1*j^-1*g^-1*j*h*j^-1*g*j*g^-1*h^-1*g,
+  g^-1*h*j^-1*h^-1*j*g*j^-1*h*j*h^-1*j^-1*h^-1*j*g^-1*j^-1*h*j*h^-1*g*h,
+  g^-1*h*g*j^-1*g^-1*j*h^-1*j^-1*g*j*g*j^-1*g^-1*j*h*j^-1*g*j*g^-1*h^-1*g*j^-1*g^-1*j*h^-1*j^-1*g*j\
+*g^-1*j^-1*g^-1*j*h*j^-1*g*j*g^-1*h^-1*g*h ]
+gap> PreImagesRepresentative(EpimorphismFromFreeGroup(xc),c);
+x2*x1*x4*x2^-1*x5*x7*x4^-1*x1^-1*x3^-1*x6*x8
+	*/
+#endif
+	if (Debug >= 2)
+	  fprintf(LogFile, "# tail: [a%d,a%d] = [a%d,[a%d,a%d]] = ", j, i, j, g, h);
+      } else if (pc.Generator[i].t == DPOW) { /* ai=N*g or g^N */
+	gen g = pc.Generator[i].g;
+#ifdef LIEALG
+	tail.addmul(pc.Exponent[g], pc.Comm[j][g]);
+	tail.liecollect(pc);
+#else
+	abortprintf(6,"tail for DPOW(i)");
+	/* [aj,g^N] = [aj,g^P] [aj,g^Q] [aj,g^Q,g^P] for any P+Q=N */
+#endif
+	if (Debug >= 2) {
+	  fprintf(LogFile, "# tail: [a%d,a%d] = ", j, i);
+	  coeff_out_str(LogFile, pc.Exponent[g]);
+	  fprintf(LogFile, "*[a%d,a%d] = ", j, g);
+	}
+      } else if (pc.Generator[j].t == DPOW) { /* aj = N*g or g^N */
+	gen g = pc.Generator[j].g;
+#ifdef LIEALG
+	if (g > i)
+	  tail.addmul(pc.Exponent[g], pc.Comm[g][i]);
+	else if (g < i)
+	  tail.submul(pc.Exponent[g], pc.Comm[i][g]);
+	tail.liecollect(pc);
+#else
+	abortprintf(6,"tail for DPOW(j)");
+	/* [g^N,ai] = [g^P,[g^Q,ai]] [g^Q,ai] [g^P,ai] for any P+Q=N */
+#endif
+	if (Debug >= 2) {
+	  fprintf(LogFile, "# tail: [a%d,a%d] = ", j, i);
+	  coeff_out_str(LogFile, pc.Exponent[g]);
+	  fprintf(LogFile, "*[a%d,a%d] = ", g, i);
+	}
+      } else
+	abortprintf(5, "ComputeTails: unknown definition for [a%d,a%d]", j, i);
+      
+      if (Debug >= 2) {
+	PrintVec(LogFile, tail);
+	fprintf(LogFile, "\n");
+      }
+
+      unsigned len = 0;
+      auto tp = tail.begin();
+      for (auto kc : pc.Comm[j][i]) {
+	if (kc.first != (*tp).first || coeff_cmp(kc.second,(*tp).second))
+	  abortprintf(5, "Adjustment to tail of [a%d,a%d] doesn't lie in centre", j, i);
+	len++;
+	tp++;
+      }
+
+      if (tp != tail.end()) {
+	pc.Comm[j][i].resize(len, tail.size());
+	pc.Comm[j][i].window(len).copy(tp, tail.end());
+      }
+
+      vecstack.pop(tail);
+    }
+  }
+  
+  TimeStamp("AddTails()");
+
+  return NrTotalGens - pc.NrPcGens;
 }
 
 /* eliminate redundant generators from v; rels is a list of relations
@@ -253,10 +367,10 @@ void AddNewTails(pcpresentation &pc, const fppresentation &pres) {
       and then the collection would be simpler?
    -- often w will have only 1 or 2 non-trivial entries, in which case the
       operation can be done in-place
+   -- Matrix could be renumbered once rather than at each time
 */
 
 static void EliminateTrivialGenerators(pcpresentation &pc, const relmatrix &rels, sparsecvec &v, int renumber[]) {
-  // !!! we should first improve relmatrix, rather than do this each time. In particular, do all the renumbering in relmatrix.
   
   hollowcvec t = vecstack.fresh();
   t.copysorted(v);
@@ -265,22 +379,25 @@ static void EliminateTrivialGenerators(pcpresentation &pc, const relmatrix &rels
   // first, eliminate
   for (auto kc : t) {
     int newg = renumber[kc.first];
-    if (newg < 1)
-      t.submul(kc.second, rels[-newg]);
+    if (newg < 1) {
+      t.submul(kc.second, rels[-newg].window(1));
+      coeff_set_si(kc.second, 0);
+    }
   }
 
   // then, renumber. We're guaranteed that renumber[kc.first] is >= 1
   hollowcvec u = vecstack.fresh();
   for (auto kc : t)
     coeff_set(u[renumber[kc.first]], kc.second);
-  u.liecollect(pc);
+  u.liecollect(pc); /* only collect the exponents in the abelian part,
+		       same for Lie algebra and group */
 
   v = u.getsparse();
 
   vecstack.pop(u);
   vecstack.pop(t);
 
-#if 0 // premature optimization!!!
+#if 0 // premature optimization
   for (auto q = v.begin(); q != v.end(); q++) {
     int newg = renumber[q->first];
     if (newg >= 1)
@@ -411,91 +528,121 @@ void ReducePcPres(pcpresentation &pc, const fppresentation &pres, const relmatri
   pc.NrPcGens = newnrpcgens;
 }
 
-/* Some of the newly introduced generators strictly depend on one
- *  another hence we can compute them inductively.
+/* check consistency of pc presentation, and deduce relations to
+ * impose on centre
  */
-
-// !!!GROUP
-
-/* compute the correct tail for [aj,ai]:
- *
- * - if i is defined as [g,h], compute [j,i] = [j,g,h]-[j,h,g]
- * - if i is defined as N*g, compute [j,i] = N*[j,g]
- * - if j is defined as N*g, compute [j,i] = N*[g,i] or -N*[i,g]
- */
-static bool AdjustTail(const pcpresentation &pc, gen j, gen i) {
-  if (pc.Generator[i].t == DGEN && pc.Generator[j].t != DPOW) /* nothing to do, [aj,ai] is a defining generator */
-    return true;
-
-  hollowcvec tail = vecstack.fresh();
-
-  if (pc.Generator[i].t == DCOMM) { /* ai = [g,h] */
-    gen g = pc.Generator[i].g, h = pc.Generator[i].h;
-
-    tail.lie3bracket(pc, j, g, h, true); // [[aj,g],h]
-    tail.lie3bracket(pc, j, h, g, false); // [[aj,h],g]
-    
-    if (Debug >= 2)
-      fprintf(LogFile, "# tail: [a%d,a%d] = [a%d,[a%d,a%d]] = ", j, i, j, g, h);
-  } else if (pc.Generator[i].t == DPOW) { /* ai=N*g */
-    gen g = pc.Generator[i].g;
-    tail.addmul(pc.Exponent[g], pc.Comm[j][g]);
-
-    if (Debug >= 2) {
-      fprintf(LogFile, "# tail: [a%d,a%d] = ", j, i);
-      coeff_out_str(LogFile, pc.Exponent[g]);
-      fprintf(LogFile, "*[a%d,a%d] = ", j, g);
-    }
-  } else { /* aj = N*g */
-    gen g = pc.Generator[j].g;
-    if (g > i)
-      tail.addmul(pc.Exponent[g], pc.Comm[g][i]);
-    else if (g < i)
-      tail.submul(pc.Exponent[g], pc.Comm[i][g]);
-
-    if (Debug >= 2) {
-      fprintf(LogFile, "# tail: [a%d,a%d] = ", j, i);
-      coeff_out_str(LogFile, pc.Exponent[g]);
-      fprintf(LogFile, "*[a%d,a%d] = ", g, i);
-    }
-  }
-
-  tail.liecollect(pc);
-  
-  if (Debug >= 2) {
-    PrintVec(LogFile, tail);
-    fprintf(LogFile, "\n");
-  }
-
-  unsigned len = 0;
-  auto tp = tail.begin();
-  for (auto kc : pc.Comm[j][i]) {
-    if (kc.first != (*tp).first || coeff_cmp(kc.second,(*tp).second))
-      return false;
-    len++;
-    tp++;
-  }
-
-  if (tp != tail.end()) {
-    pc.Comm[j][i].resize(len, tail.size());
-    pc.Comm[j][i].window(len).copy(tp, tail.end());
-  }
-
-  vecstack.pop(tail);
-  return true;
-}
-
-void ComputeTails(const pcpresentation &pc) {
+#ifdef LIEALG
+void Consistency(const pcpresentation &pc) {
+  // check Jacobi identity
   for (unsigned i = 1; i <= pc.NrPcGens; i++) {
-    for (unsigned j = i + 1; j <= pc.NrPcGens; j++) {
-      unsigned totalweight = pc.Generator[i].w+pc.Generator[j].w;
-      if (totalweight > pc.Class || (pc.Graded && totalweight != pc.Class))
-	continue;
-      
-      if (!AdjustTail(pc, j, i))
-	abortprintf(5, "Adjustment to tail of [a%d,a%d] doesn't lie in centre", j, i);
-    }
+    if (pc.Generator[i].t != DGEN)
+      continue;
+
+    for (unsigned j = i + 1; j <= pc.NrPcGens; j++)
+      for (unsigned k = j + 1; k <= pc.NrPcGens; k++) {
+	unsigned totalweight = pc.Generator[i].w + pc.Generator[j].w + pc.Generator[k].w;
+	if (totalweight > pc.Class || (pc.Graded && totalweight != pc.Class))
+	  continue;
+	
+	hollowcvec t = vecstack.fresh();
+	t.lie3bracket(pc, i, j, k, true);
+	t.lie3bracket(pc, j, k, i, true);
+	t.lie3bracket(pc, k, i, j, true);
+	t.liecollect(pc);
+
+	if (Debug >= 2) {
+	  fprintf(LogFile, "# consistency: jacobi(a%d,a%d,a%d) = ", i, j, k);
+	  PrintVec(LogFile, t);
+	  fprintf(LogFile, "\n");
+	}
+
+	AddToRelMatrix(t);	
+	vecstack.pop(t);
+      }
   }
   
-  TimeStamp("Tails()");
+  coeff annihilator, unit;
+  coeff_init(annihilator);
+  coeff_init(unit); // unused
+
+  // check torsion relations
+  for (unsigned i = 1; i <= pc.NrPcGens; i++)
+    if (coeff_nz_p(pc.Exponent[i])) {
+      /* if N*v = 0 in our ring, and we have a power relation A*g = w,
+       * enforce (N/A)*w = 0
+       */
+      hollowcvec t = vecstack.fresh();
+  
+      coeff_unit_annihilator(unit, annihilator, pc.Exponent[i]);
+      t.addmul(annihilator, pc.Power[i]);
+      t.liecollect(pc);
+  
+      if (Debug >= 2) {
+	fprintf(LogFile, "# consistency: ");
+	coeff_out_str(LogFile, annihilator);
+	fprintf(LogFile, "*");
+	coeff_out_str(LogFile, pc.Exponent[i]);
+	fprintf(LogFile, "*a%d = ", i);
+	PrintVec(LogFile, t);
+	fprintf(LogFile, "\n");
+      }
+      
+      AddToRelMatrix(t);
+      vecstack.pop(t);
+
+      for (unsigned j = 1; j <= pc.NrPcGens; j++) {
+	unsigned totalweight = pc.Generator[i].w + pc.Generator[j].w;
+	if (totalweight > pc.Class || (pc.Graded && totalweight != pc.Class))
+	  continue;
+
+	/* enforce N*[a,b] = [N*a,b] if N is the order of a */
+
+	t = vecstack.fresh();
+  
+	for (auto kc : pc.Power[i]) {
+	  gen g = kc.first;
+	  if (g > pc.NrPcGens)
+	    break;
+	  if (g > j)
+	    t.submul(kc.second, pc.Comm[g][j]);
+	  else if (g < j)
+	    t.addmul(kc.second, pc.Comm[j][g]);
+	}
+
+	if (i > j)
+	  t.addmul(pc.Exponent[i], pc.Comm[i][j]);
+	else if (i < j)
+	  t.submul(pc.Exponent[i], pc.Comm[j][i]);
+	t.liecollect(pc);
+
+	if (Debug >= 2) {
+	  fprintf(LogFile, "# consistency: ");
+	  coeff_out_str(LogFile, pc.Exponent[i]);
+	  fprintf(LogFile, "*[a%d,a%d]-[", i, j);
+	  coeff_out_str(LogFile, pc.Exponent[i]);
+	  fprintf(LogFile, "*a%d,a%d] = ", i, j);
+	  PrintVec(LogFile, t);
+	  fprintf(LogFile, "\n");
+	}
+
+	AddToRelMatrix(t);
+	vecstack.pop(t);
+      }
+    }
+
+  coeff_clear(unit);
+  coeff_clear(annihilator);
+
+  TimeStamp("Consistency()");
 }
+#else
+void Consistency(const pcpresentation &pc) {
+  abortprintf(6, "Consistency not yet implemented for group!!!");
+
+  /* !!!
+     consistency is: all triple products (i*j)*k = i*(j*k).
+     all power relations a^n*b = a^(n-1)*(a*b)
+     ...
+  */
+}
+#endif

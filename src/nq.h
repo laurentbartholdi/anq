@@ -53,13 +53,13 @@ typedef std::vector<sparsecvec> relmatrix;
 enum nodetype {
   TNUM,
   TGEN,
-  TBRACK, TBRACE, TPROD, TQUO, TLQUO, TPOW, TSUM, TDIFF, TREL, TDREL, TDRELR,
+  TBRACK, TBRACE, TMAP, TPROD, TQUO, TLQUO, TPOW, TSUM, TDIFF, TREL, TDREL, TDRELR,
   TNEG, TINV
 };
 static const char *nodename[] __attribute__((unused)) = {
   "TNUM",
   "TGEN",
-  "TBRACK","TBRACE","TPROD","TQUO","TLQUO","TPOW","TSUM","TDIFF","TREL","TDREL","TDRELR",
+  "TBRACK","TBRACE","TMAP","TPROD","TQUO","TLQUO","TPOW","TSUM","TDIFF","TREL","TDREL","TDRELR",
   "TNEG", "TINV"
 };
 const nodetype TINVALID = (nodetype) -1;
@@ -83,7 +83,7 @@ struct fppresentation {
   unsigned NrGens;
   std::vector<unsigned> Weight;
   std::vector<std::string> GeneratorName;
-  std::vector<node *> Relators, Aliases, Extra;
+  std::vector<node *> Relators, Aliases, Endomorphisms, Extra;
 };
 
 void ReadPresentation(fppresentation &, const char *);
@@ -112,8 +112,6 @@ struct deftype {
   unsigned w, cw; // weight and commutator weight
 };
 
-extern unsigned  NrTotalGens; // during extension of pc presentation, NrTotalGens = new NrPcGens. UGLY!!!
-
 struct pcpresentation {
   sparsecvec **Comm, // the commutators: [aj,ai] = ... for j>i
     *Power, // powers: Exponent[i]*ai = ...
@@ -131,9 +129,9 @@ struct pcpresentation {
 
 void InitPcPres(pcpresentation &, const fppresentation &, bool, bool, coeff &, unsigned);
 void FreePcPres(pcpresentation &, const fppresentation &);
-void AddNewTails(pcpresentation &, const fppresentation &);
+unsigned AddTails(pcpresentation &, const fppresentation &);
+void Consistency(const pcpresentation &);
 void ReducePcPres(pcpresentation &, const fppresentation &, const relmatrix &);
-void ComputeTails(const pcpresentation &);
 
 /****************************************************************
  * some global variables dictating the behaviour of nq; in particular,
@@ -182,13 +180,6 @@ struct hollowcvec : hollowvec<coeff,coeff_ops> {
     for (auto kc : *this)
       coeff_mul((*this)[kc.first], kc.second, c);
   }
-
-  void print() const {
-    fprintf(stderr,"[%ld",size());
-    for (auto kc : *this)
-      fprintf(stderr,":%d=%lld",kc.first,kc.second.data);
-    fprintf(stderr,"]");
-  }
     
   void eval(const pcpresentation &, node *);
 
@@ -199,24 +190,18 @@ struct hollowcvec : hollowvec<coeff,coeff_ops> {
 
   // functions for groups
   void mul(const pcpresentation &, const hollowcvec); // this *= v
-  void pow(const pcpresentation &, const hollowcvec, const coeff &); // this *= v^n
-  void quo(const pcpresentation &, const hollowcvec); // this /= v^-1
-  void lquo(const pcpresentation &, const hollowcvec, const hollowcvec); // this *= v^-1 w
-  void conjugate(const pcpresentation &, const hollowcvec, const hollowcvec); // this *= w^-1 v w
-  void groupbracket(const pcpresentation &, const hollowcvec, const hollowcvec); // this *= v^-1 w^-1 v w
-  void groupcollect(const pcpresentation &); // this *= v^n
+  void mul(const pcpresentation &, gen g, const coeff &c); // this *= g^c
+  void pow(const pcpresentation &, hollowcvec, const coeff &); // this *= v^n
+  void lquo(const pcpresentation &, hollowcvec, const hollowcvec); // this = v^-1 w
+  void inv(const pcpresentation &, hollowcvec); // this = v^-1
 };
 
+/****************************************************************
+ * a stack to supply with very low overhead a fresh vector
+ */
 extern stack<hollowcvec> vecstack;
 
-inline void InitStack(void) { }
-inline void FreeStack(void) { }
-inline hollowcvec &FreshVec(void) { return vecstack.fresh(); }
-inline void PopVec(void) { vecstack.pop(); }
-inline void PopVec(hollowcvec &v) { vecstack.pop(v); }
-
 void EvalAllRel(const pcpresentation &, const fppresentation &);
-void Consistency(const pcpresentation &);
 
 template <typename V, typename W> inline int Compare(const V vec1, const W vec2) {
   auto p1 = vec1.begin(), p2 = vec2.begin();
@@ -246,8 +231,22 @@ template <typename T> inline void neg(sparsecvec &v, const T w) {
 /****************************************************************
  * print functions
  */
+template<typename V> static void PrintVec(FILE *f, const V v) {
+  bool first = true;
+  for (auto kc : v) {
+#ifdef LIEALG
+    if (first) first = false; else fprintf(f, " + ");
+    coeff_out_str(f, kc.second);
+    fprintf(f, "*a%d", kc.first);
+#else
+    if (first) first = false; else fprintf(f, " * ");
+    fprintf(f, "a%d^", kc.first);
+    coeff_out_str(f, kc.second);
+#endif
+  }
+}
+
 void abortprintf(int, const char *, ...) __attribute__((format(printf, 2, 3),noreturn));
-template <typename V> void PrintVec(FILE *f, const V);
 void PrintPcPres(FILE *f, const pcpresentation &, const fppresentation &, bool, bool, bool);
 void PrintGAPPres(FILE *f, const pcpresentation &, const fppresentation &);
 void TimeStamp(const char *);
@@ -260,7 +259,7 @@ void TimeStamp(const char *);
  * best numerical values as pivots, but attempting to avoid too much
  * fill-in using colamd.
  */
-relmatrix GetRelMatrix(void);
+relmatrix GetRelMatrix();
 void AddToRelMatrix(const hollowcvec);
 void InitRelMatrix(const pcpresentation &, unsigned);
-void FreeRelMatrix(void);
+void FreeRelMatrix();

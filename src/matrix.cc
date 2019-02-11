@@ -34,7 +34,7 @@ and "Queue.insert(cv);" should become
 
 std::set<sparsecvec,bool(*)(sparsecvec,sparsecvec)> Queue([](sparsecvec v1, sparsecvec v2){ return Compare(v1,v2) < 0; });
 
-static void InitTorsion(void) {  
+static void InitTorsion() {  
   if (Torsion) {
     for (unsigned i = 0; i < NrCols; i++) {
       Matrix[i].alloc(1);
@@ -55,17 +55,17 @@ void InitRelMatrix(const pcpresentation &pc, unsigned nrcentralgens) {
   InitTorsion();
 }
 
-void FreeRelMatrix(void) {
+void FreeRelMatrix() {
   if (!Queue.empty())
     abortprintf(5, "FreeMatrix: row queue not empty");
   
   for (sparsecvec v : Matrix)
-    v.free(NrCols);
+    v.free();
   Matrix.clear();
 }
 
 // for debugging purposes
-void PrintMatrix(void) {
+void PrintMatrix() {
   for (const sparsecvec v : Matrix)
     if (v.allocated())
       PrintVec(stdout, v);
@@ -106,7 +106,7 @@ std::vector<int> colamd(relmatrix &m) {
 }
 
 /* collect the vectors in Queue and Matrix, and combine them back into Matrix */
-void LU(void) {
+void LU() {
   /* remove unbound entries in Matrix */
   Matrix.erase(std::remove(Matrix.begin(), Matrix.end(), sparsecvec(nullptr)), Matrix.end());
 
@@ -155,9 +155,9 @@ void LU(void) {
 #ifdef COEFF_IS_MPZ // check coefficient explosion
 	  if (Debug >= 1) {
 	    long maxsize = 0;
-	    for (coeff &c : currow)
-	      maxsize = std::max(maxsize, labs(c->_mp_size));
-	    fprintf(LogFile, "# Changed v: max coeff size %ld\n", maxsize);
+	    for (auto kc : currow)
+	      maxsize = std::max(maxsize, labs(kc.second->_mp_size));
+	    fprintf(LogFile, "# Changed currow: max coeff size %ld\n", maxsize);
 	  }
 #endif
 	} else {
@@ -190,7 +190,7 @@ void LU(void) {
   TimeStamp("LU");
 }
 
-relmatrix GetRelMatrix(void) {
+relmatrix GetRelMatrix() {
   LU();
 
   relmatrix rels;
@@ -199,7 +199,7 @@ relmatrix GetRelMatrix(void) {
   /* reduce all the head columns, to achieve Hermite normal form. */
   coeff q;
   coeff_init(q);
-  for (unsigned j = 0; j < NrCols; j++) { // !!! would this be faster looping backwards?
+  for (unsigned j = 0; j < NrCols; j++) { // @@@ performance: would this be faster looping backwards?
     if (!Matrix[j].allocated())
       continue;
 
@@ -222,10 +222,11 @@ relmatrix GetRelMatrix(void) {
     vecstack.pop(currow);
   }
 
-  /* !!! we could also improve this code by eliminating redundant
-   generators; e.g. [2 1;0 2] could become [4 0;0 1] and allow
-   elimination of the second vector. this requires a different format,
-   and is perhaps best done outside this matrix code. */
+  /* @@@ We could improve this code by eliminating redundant
+   generators; e.g. [2 1;0 2] could become [4 0;2 1] and allow
+   elimination of the second vector, after permuting the first and
+   second columns. This requires a different format, and is perhaps
+   best done outside this matrix code. */
 
   coeff_clear(q);
 
@@ -237,7 +238,8 @@ relmatrix GetRelMatrix(void) {
 void AddToRelMatrix(hollowcvec hv) {
   if (hv.empty()) // easy case: trivial relation, change nothing
     return;
-  
+
+  // @@@ performance critical: if hv is in the queue, don't make a copy
   sparsecvec cv = hv.getsparse();
   
   if (cv[0].first < FirstCentral) // sanity check
@@ -249,6 +251,9 @@ void AddToRelMatrix(hollowcvec hv) {
     return;
   }
 
-  if (Queue.size() >= 10*NrCols) // !!! adjust extra factor
+  /* @@@ optimize for the factor "10". If too small, we'll cause
+     fill-in in the matrix. If too large, we'll use too much
+     memory. */
+  if (Queue.size() >= 10*NrCols)
     LU();
 }

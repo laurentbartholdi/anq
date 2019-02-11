@@ -6,6 +6,7 @@
 */
 
 #include <inttypes.h>
+#include <ctype.h>
 
 #if !defined(MODULUS_PRIME) || !defined(MODULUS_EXPONENT)
 #error You must specify MODULUS_PRIME AND MODULUS_EXPONENT
@@ -57,7 +58,7 @@ static int print_u128_t(uint128_t u128)
 }
 
 constexpr inline uint64_t powint(uint64_t x, uint64_t p) {
-  return p ? (p & 1 ? x : 1)*powint(x*x, p>>1) : 1;
+  return p ? ((p & 1) ? x : 1)*powint(x*x, p>>1) : 1;
 }
 
 constexpr inline uint64_t montgomery_gcd(uint64_t a, uint64_t b) {
@@ -184,6 +185,12 @@ inline void coeff_fdiv_q(coeff &result, const coeff &a, const coeff &b) {
 
 inline void coeff_fdiv_r(coeff &result, const coeff &a, const coeff &b) {
   result = uint64_t2coeff(coeff2uint64_t(a) % coeff2uint64_t(b));
+}
+
+inline void coeff_fdiv_qr(coeff &q, coeff &r, const coeff &a, const coeff &b) {
+  uint64_t xa = coeff2uint64_t(a), xb = coeff2uint64_t(b);
+  q = uint64_t2coeff(xa / xb);
+  r = uint64_t2coeff(xa % xb);
 }
 
 inline void coeff_mul(coeff &result, const coeff &a, const coeff &b) {
@@ -345,3 +352,16 @@ inline int coeff_out_str(FILE *f, const coeff &a)
 }
 
 #define coeff_base MODULUS_PRIME
+
+inline void coeff_set_str(coeff &a, const char *s, int base)
+{
+  coeff_set_si(a, 0);
+
+  if (*s == '0') base = coeff_base;
+  
+  while (isalnum(*s)) {
+    coeff_mul_si(a, a, base);
+    coeff_add_si(a, a, isdigit(*s) ? *s - '0' : *s + 10 - (isupper(*s) ? 'A' : 'a'));
+    s++;
+  }
+}

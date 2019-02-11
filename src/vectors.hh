@@ -12,7 +12,6 @@
    - assume given a type T with function is_zero(T&) and set_zero(T&)
  */
 
-#include <ostream>
 #include <stdexcept>
 #include <vector>
 
@@ -46,7 +45,6 @@
    resize(olds=size(),news): semantically the same as free+alloc.
    &operator[](k) == k'th slot
    copy(v)
-   operator<<: write on ostream in format "[key:data] ... [key:data]"
 
    begin(), end(), front(), back(): iterators (see below)
 
@@ -101,16 +99,11 @@ public:
     clear();
   }
   
-  void free(size_t s) {
-    for (key k = 0; k < s; k++)
-      U::clear(p[k].second);
-    if (p != nullptr) ::free(p);
-  }
-
   void free() {
+    if (p == nullptr) return;
     for (auto kd : *this)
       U::clear(kd.second);
-    if (p != nullptr) ::free(p);
+    ::free(p);
   }
 
   void resize(size_t olds, size_t news) {
@@ -185,18 +178,6 @@ public:
     i.markend();
   }
   
-  friend std::ostream& operator<< (std::ostream& stream, const sparsevec& v) {
-    bool first = true;
-    for (auto kc : v) {
-      if (first)
-	first = false;
-      else
-	stream << " ";
-      stream << "[" << kc.first << ":" << kc.second << "]";
-    }
-    return stream;
-  }
-
   friend sparsevec emptyvec() { sparsevec v; v.alloc(0); return v; }
 };
 
@@ -260,7 +241,7 @@ private:
     return k;
   }
 
-  inline key prevkey(key k) const { // find previous unallocated key
+  inline key prevkey(key k) const { // find previous allocated key
     if ((k & 1) && p[k-1].set) // k = ...1, p[...0] not allocated
       return k-1;
     key h = k & ~1; // h = ...0
@@ -305,17 +286,25 @@ private:
   }
 
   class iterator {
-    const slot *p;
+    slot *const p;
     skey k;
-    typedef std::pair<key,T> key_data;
-    //typedef std::pair<skey,T &> key_data; //!!! fix: we could have writable enumerator
+    struct key_data {
+      key first;
+      T &second;
+      key_data* operator->() { return this; }
+    };
     inline skey next_key(skey k) { do k = p[k].next; while (k != nil && !U::nz_p(p[k].data)); return k; }
     inline skey prev_key(skey k) { do k = p[k].prev; while (k != nil && !U::nz_p(p[k].data)); return k; }
   public:
     iterator() = default;
-    iterator(const slot *_p, skey _k) : p(_p), k(_k) { }
-    key_data operator*() const { return key_data(k,p[k].data); }
-    //key_data operator->() const { return &key_data(k,p[k].data); }
+    iterator(slot *const _p, skey _k) : p(_p), k(_k) { }
+    void operator=(const iterator &that) {
+      if (p != that.p)
+	throw std::logic_error("assigning iterator to different vector");
+      k = that.k;
+    }
+    key_data operator*() const { return key_data{(key)k,p[k].data}; }
+    key_data operator->() const { return key_data{(key)k,p[k].data}; }
     iterator operator++() { k = next_key(k); return *this; }
     iterator operator++(int) { auto old = iterator(p,k); ++(*this); return old; }    
     iterator operator--() { k = prev_key(k); return *this; }
@@ -416,6 +405,12 @@ U::setzero(p[k].data); p[k].next = p[k].prev = 0;
     p[nil].next = p[nil].prev = nil;
   }
 
+  template <typename V> void copy(const V &v) {
+    clear_recur(topbit());
+    for (auto kc : v)
+      coeff_set((*this)[kc.first], kc.second);
+  }
+  
   template <typename V> void copysorted(const V &v) { // load a sorted vector
     clear_recur(topbit());
     skey prev = nil;
@@ -444,19 +439,25 @@ U::setzero(p[k].data); p[k].next = p[k].prev = 0;
   iterator end() const { return iterator(p,nil); }
   iterator front() const { return begin(); }
   iterator back() const { return --end(); }
-
+  iterator lower_bound(key k) {
+    if (p[k].set && U::nz_p(p[k].data))
+      return iterator(p,k);
+    else
+      return ++iterator(p,prevkey(k));
+  }
+  iterator upper_bound(key k) {
+    if (p[k].set)
+      return ++iterator(p,k);
+    else
+      return ++iterator(p,prevkey(k));
+  }
+  
   bool operator==(const hollowvec &that) const { return p == that.p; }
   bool operator!=(const hollowvec &that) const { return p != that.p; }
-
-  void dump(std::ostream& f) {
-    f << "HEAD: " << p[nil].next << " TAIL: " << p[nil].prev << " TOPBIT: " << topbit() << "\n#: data/prev/next/set/herd\n";
-    for (key k = 0; k < topbit()<<1; k++)
-      f << k << ": " << p[k].data << "/" << p[k].prev << "/" << p[k].next << "/" << p[k].set << "/" << p[k].herd << std::endl;
-  }
 };
 
 /****************************************************************
- * a primitive stack of hollow vectors.
+ * a primitive stack of vectors.
  *
  * sometimes it's useful to have a large collection of hollow vectors,
  * ready to be filled in and discarded. We don't want to malloc() and

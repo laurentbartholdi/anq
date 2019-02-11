@@ -103,7 +103,7 @@ int main(int argc, char **argv) {
       break;
     case 'X':
       PAlgebra = true;
-      coeff_parse(TorsionExp, optarg);
+      coeff_set_str(TorsionExp, optarg, 10);
       sprintf(flags + strlen(flags), "-X%lu ", coeff_get_si(TorsionExp));
       break;
     case 'W':
@@ -153,13 +153,9 @@ int main(int argc, char **argv) {
   for (pc.Class = 1; pc.Class <= MaxWeight; pc.Class++) {
     unsigned oldnrpcgens = pc.NrPcGens;
 
-    AddNewTails(pc, fppres); // add fresh tails
+    unsigned nrcentralgens = AddTails(pc, fppres); // add fresh tails
 
-    vecstack.setsize(NrTotalGens);
-
-    ComputeTails(pc); // compute other tails
-    
-    InitRelMatrix(pc, NrTotalGens-pc.NrPcGens);
+    InitRelMatrix(pc, nrcentralgens);
 
     Consistency(pc); // enforce Jacobi and Z-linearity
     
@@ -187,7 +183,6 @@ int main(int argc, char **argv) {
       break;
   }
 
-  vecstack.setsize(NrTotalGens);
   if (Gap)
     PrintGAPPres(OutputFile, pc, fppres);  
   else

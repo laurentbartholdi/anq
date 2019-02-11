@@ -6,6 +6,7 @@
 */
 
 #include <gmp.h>
+#include <ctype.h>
 
 #if !defined(MODULUS_PRIME) || !defined(MODULUS_EXPONENT)
 #error You must specify MODULUS_PRIME AND MODULUS_EXPONENT
@@ -237,6 +238,13 @@ inline void coeff_fdiv_r(coeff &result, const coeff &a, const coeff &b) {
   mpn_tdiv_qr(q.data, result.data, 0, a.data, COEFF_WORDS, b.data, nzlimbs);
 }
 
+inline void coeff_fdiv_qr(coeff &q, coeff &r, const coeff &a, const coeff &b) {
+  unsigned nzlimbs = __nzlimbs(b.data, COEFF_WORDS);
+  coeff_zero(q);
+  coeff_zero(r);
+  mpn_tdiv_qr(q.data, r.data, 0, a.data, COEFF_WORDS, b.data, nzlimbs);
+}
+
 inline void coeff_mul(coeff &result, const coeff &a, const coeff &b) {
   doublecoeff temp;
   mpn_mul_n(temp.data, a.data, b.data, COEFF_WORDS);
@@ -405,3 +413,16 @@ inline int coeff_out_str(FILE *f, const coeff &a)
 }
 
 #define coeff_base MODULUS_PRIME
+
+inline void coeff_set_str(coeff &a, const char *s, int base)
+{
+  coeff_set_si(a, 0);
+
+  if (*s == '0') base = coeff_base;
+  
+  while (isalnum(*s)) {
+    coeff_mul_si(a, a, base);
+    coeff_add_si(a, a, isdigit(*s) ? *s - '0' : *s + 10 - (isupper(*s) ? 'A' : 'a'));
+    s++;
+  }
+}
