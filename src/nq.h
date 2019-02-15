@@ -190,7 +190,10 @@ struct hollowcvec : hollowvec<coeff,coeff_ops> {
   void liecollect(const pcpresentation &);
 
   // functions for groups
-  void mul(const pcpresentation &, const hollowcvec); // this *= v
+  //  void mul(const pcpresentation &, const hollowcvec); // this *= v
+  //void mul(const pcpresentation &, const sparsecvec); // this *= v
+  template <typename V> void mul(const pcpresentation &, const V); // this *= v
+  void mul(const pcpresentation &, gen g); // this *= g
   void mul(const pcpresentation &, gen g, const coeff &c); // this *= g^c
   void pow(const pcpresentation &, hollowcvec, const coeff &); // this *= v^n
   void lquo(const pcpresentation &, hollowcvec, const hollowcvec); // this = v^-1 w
@@ -232,7 +235,7 @@ template <typename T> inline void neg(sparsecvec &v, const T w) {
 /****************************************************************
  * print functions
  */
-template<typename V> static void PrintVec(FILE *f, const V v) {
+template <typename V> static void PrintVec(FILE *f, const V v) {
   bool first = true;
   for (auto kc : v) {
 #ifdef LIEALG

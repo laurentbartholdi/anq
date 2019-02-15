@@ -80,12 +80,23 @@ keep a stack of elements to multiply. iterate backwards; while pos > g, remove f
   */
 }
 
+// this *= g
+void hollowcvec::mul(const pcpresentation &pc, gen g) {
+  if (lower_bound(g) == end()) {
+    coeff_set_si((*this)[g], 1);
+    return;
+  }
+}
+
 // this *= v
-void hollowcvec::mul(const pcpresentation &pc, const hollowcvec v) {
+template <typename V> void hollowcvec::mul(const pcpresentation &pc, const V v) {
   for (auto kc : v)
     mul(pc, kc.first, kc.second);
 }
 
+template void hollowcvec::mul<sparsecvec>(const pcpresentation &, const sparsecvec);
+template void hollowcvec::mul<hollowcvec>(const pcpresentation &, const hollowcvec);
+		
 // this *= v^-1*w. makes v=w in the process.
 void hollowcvec::lquo(const pcpresentation &pc, hollowcvec v, const hollowcvec w) {
   /* we seek u with v u = w.

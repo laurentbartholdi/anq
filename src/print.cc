@@ -289,7 +289,7 @@ void PrintGAPPres(FILE *f, const pcpresentation &pc, const fppresentation &pres)
 	  "end,[]);\n");
 }
 #else
-template<typename V> bool PrintGAPVec(FILE *f, const V v) {
+template<typename V> void PrintGAPVec(FILE *f, const V v) {
   bool first = true;
   for (auto kc : v) {
     if (first) first = false; else fprintf(f, "*");
@@ -297,7 +297,7 @@ template<typename V> bool PrintGAPVec(FILE *f, const V v) {
     coeff_out_str(f, kc.second);
   }
   if (first)
-    coeff_out_str("One(F)");
+    fprintf(f, "One(F)");
 }
 
 void PrintGAPPres(FILE *f, const pcpresentation &pc, const fppresentation &pres) {
@@ -317,14 +317,14 @@ void PrintGAPPres(FILE *f, const pcpresentation &pc, const fppresentation &pres)
       fprintf(f, "\tSetRelativeOrder(c,%u,", i);
       coeff_out_str(f, pc.Exponent[i]);
       fprintf(f, ");\n\tSetPower(c,%u,", i);
-      PrintGAPVec(pc.Power[i]);
+      PrintGAPVec(f, pc.Power[i]);
       fprintf(f, ");\n");
     }
   for (unsigned j = 1; j <= pc.NrPcGens; j++)
     for (unsigned i = 1; i < j; i++)
       if (!pc.Comm[j][i].empty()) {
-        fprintf(f, "\tSetCommutator(c,%u,%u,");
-	PrintGAPVec(pc.Comm[j][i]);
+        fprintf(f, "\tSetCommutator(c,%u,%u,", j, i);
+	PrintGAPVec(f, pc.Comm[j][i]);
 	fprintf(f, ");\n");
       }
   fprintf(f, "\n\tF := PcpGroupByCollector(c);\n");

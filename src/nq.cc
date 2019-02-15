@@ -155,15 +155,15 @@ int main(int argc, char **argv) {
 
     InitRelMatrix(pc, nrcentralgens);
 
-    Consistency(pc); // enforce Jacobi and Z-linearity
+    Consistency(pc); // enforce Jacobi and Z-linearity, via queue
 
-    //!!! flush matrix queue    
+    FlushQueue();
 
     EvalAllRel(pc, fppres); // evaluate relations
 
     relmatrix rels = GetRelMatrix();
     
-    ReducePcPres(pc, fppres, rels); // enforce relations
+    ReducePcPres(pc, fppres, rels); // quotient the cover by rels
 
     FreeRelMatrix();
 
