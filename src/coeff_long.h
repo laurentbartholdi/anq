@@ -244,7 +244,7 @@ inline char *coeff_get_str(char *s, int base, const coeff &a)
 {
   char *p;
   if (s == NULL)
-    p = (char *) malloc(20);
+    p = (char *) malloc(25);
   else
     p = s;
 #ifdef TRIO_TRIO_H

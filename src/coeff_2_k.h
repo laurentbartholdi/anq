@@ -194,7 +194,32 @@ inline int coeff_out_str(FILE *f, const coeff &a)
 
 inline char *coeff_get_str(char *s, int base, const coeff &a)
 {
-  !!!;
+  char *p;
+  if (s == NULL)
+    p = (char *) malloc(25);
+  else
+    p = s;
+#ifdef TRIO_TRIO_H
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wall"
+#else
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wall"
+#endif
+  trio_sprintf(p, "%..*" PRIu64, base, a.data);
+#ifdef __clang__
+#pragma clang diagnostic pop
+#elif defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
+#else
+  sprintf(p, "%" PRIu64, a.data);
+#endif
+  if (s == NULL)
+    p = (char *) realloc(p, strlen(p)+1);
+
+  return p;
 }
 
 #define coeff_base 2
