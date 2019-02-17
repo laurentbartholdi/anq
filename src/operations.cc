@@ -60,32 +60,113 @@ void hollowcvec::liecollect(const pcpresentation &pc) {
 }
 
 /* group operations */
+#if 1
+// a simple collector, for debugging; written recursively.
+struct stackslot {
+  sparsecvec v;
+  int e;
+};
+
+static int signint(int i) { return (i > 0) - (i < 0); }
+
+void SimpleCollect(const pcpresentation &pc, hollowcvec &lhs, const sparsecvec &rhs, int e) {
+  if (e < 0) {
+    hollowcvec i = vecstack.fresh();
+    hollowcvec j = vecstack.fresh();
+    j.copysorted(rhs);
+    i.inv(pc, j);
+    sparsecvec s = i.getsparse();
+    vecstack.pop(j);
+    vecstack.pop(i);
+    SimpleCollect(pc, lhs, s, -e);
+    s.free();
+    return;
+  }
+
+  while (e--)
+    for (auto kc : rhs) {
+      int e = coeff_get_si(kc.second);
+      //      int deltae = (2*pc.Generators[kc.first].w > pc.Class) ? e : signint(e);
+      int deltae = signint(e);
+
+      for (; e != 0; e -= deltae) {
+	std::vector<stackslot> collectstack;
+	// move kc.first^deltae to its correct position in lhs
+      
+	for (auto p = lhs.back(); p != lhs.end() && p->first > kc.first; p--)
+	  if (pc.Generator[p->first].w+pc.Generator[kc.first].w <= pc.Class) {
+	    // push [(p->first)^(kc.first^deltae)]^p.second
+	    stackslot s;
+	    if (deltae == 1) {
+	      s.v.alloc(pc.Comm[p->first][kc.first].size()+1);
+	      s.v.front()->first = p->first;
+	      coeff_set_si(s.v.front()->second, 1);
+	      s.v.window(1).copy(pc.Comm[p->first][kc.first]);
+	    } else {
+	      unsigned len = pc.Comm[p->first][kc.first].size()+3;
+	      s.v.alloc(len);
+	      s.v[0].first = p->first;
+	      coeff_set_si(s.v[0].second, 1);
+	      s.v[1].first = kc.first;
+	      coeff_set_si(s.v[1].second, 1);
+	      for (unsigned i = 0; i < len; i++) {
+		s.v[i+2].first = pc.Comm[p->first][kc.first][len-1-i].first;
+		coeff_neg(s.v[i+2].second, pc.Comm[p->first][kc.first][len-1-i].second);
+	      }
+	      s.v[len+2].first = kc.first;
+	      coeff_set_si(s.v[len+2].second, -1);
+	      s.v.truncate(len+3);
+	    }
+	    s.e = coeff_get_si(p->second);
+	    collectstack.push_back(s);
+
+	    coeff_set_si(p->second, 0);
+	  }
+	coeff_add_si(lhs[kc.first], lhs[kc.first], deltae);
+	if (!coeff_reduced_p(lhs[kc.first], pc.Exponent[kc.first])) {
+	  coeff q;
+	  coeff_init(q);
+	  coeff_fdiv_qr(q, lhs[kc.first], lhs[kc.first], pc.Exponent[kc.first]);
+	  stackslot s;
+	  s.v.alloc(pc.Power[kc.first].size());
+	  s.v.copy(pc.Power[kc.first]);
+	  s.e = coeff_get_si(q);
+	  coeff_clear(q);
+	  collectstack.push_back(s);
+	}
+	while (!collectstack.empty()) {
+	  SimpleCollect(pc, lhs, collectstack.back().v, collectstack.back().e);
+	  collectstack.back().v.free();
+	  collectstack.pop_back();
+	}
+      }
+    }
+}
+#endif
+
 // the basic collector: this *= g^c
 void hollowcvec::mul(const pcpresentation &pc, gen g, const coeff &c) {
   if (!coeff_cmp_si(c, 0))
     return;
 
-  // check if coeff is reduced. if not, reduce !!!
-  
-  if (lower_bound(g) == end()) {
-    coeff_set((*this)[g], c);
-    return;
-  }
-  
-  /*
-!!!
-general strategy: collect from the left.
-
-keep a stack of elements to multiply. iterate backwards; while pos > g, remove from vector and put commutator (computed recursively with exponents) and monomials in stack. then drop c^g, and multiply recursively with everything on stack.
-  */
+  sparsecvec v;
+  v.alloc(1);
+  v.front()->first = g;
+  coeff_set(v.front()->second, c);
+  v.truncate(1);
+  SimpleCollect(pc, *this, v, 1);
+  v.free();
 }
 
 // this *= g
 void hollowcvec::mul(const pcpresentation &pc, gen g) {
-  if (lower_bound(g) == end()) {
-    coeff_set_si((*this)[g], 1);
-    return;
-  }
+  sparsecvec v;
+  v.alloc(1);
+  v.front()->first = g;
+  coeff_set_si(v.front()->second, 1);
+  v.truncate(1);
+  SimpleCollect(pc, *this, v, 1);
+  v.free();
 }
 
 // this *= v

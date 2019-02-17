@@ -1,8 +1,6 @@
 *~
 *.o
-src/lienq_*
-src/mat
-src/rips
+src/nq[lg]_*
 *.dSYM
 OLD/
 roman/

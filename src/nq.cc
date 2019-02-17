@@ -14,7 +14,7 @@
 #endif
 
 FILE *OutputFile = stdout, *LogFile = stdout;
-unsigned Debug = 0;
+unsigned Debug = 4; // !!!
 
 const char USAGE[] = "Usage: nq <options> [<inputfile>]\n"
   "(with no input file, presentation is read from STDIN)\n"
@@ -23,7 +23,9 @@ const char USAGE[] = "Usage: nq <options> [<inputfile>]\n"
   "\t[-D]\tincrease debug level\n"
   "\t[-F <outputfile>]\n"
   "\t[-G]\ttoggle graded Lie algebra, default false\n"
+  "\t[-J]\ttoggle Jennings series / Jacobson restricted Lie algebra, default false\n"
   "\t[-L <logfile>]\n"
+  "\t[-M]\ttoggle metabelian, default false\n"
   "\t[-N <nilpotency class>]\n"
   "\t[-P]\ttoggle printing definitions of basic commutators, default false\n"
   "\t[-W <maximal weight>]\n"
@@ -31,7 +33,7 @@ const char USAGE[] = "Usage: nq <options> [<inputfile>]\n"
   "\t[-Z]\ttoggle printing zeros in multiplication table, default false";
 
 const char EXTENDEDUSAGE[] = "Presentation format:\n"
-  "\tpresentation = '<' (';'* gen (',' gen)*)* '|' exprlist? ('|' exprlist?)? '>'\n"
+  "\tpresentation = '<' (';'* gen (',' gen)*)* '|' exprlist? '>'\n"
   "(each ';' in presentation increases weight, starting from 1.)\n"
   "(second exprlist gives relations. third exprlist is evaluated in quotient)\n"
   "\tgen = '[a-zA-Z_.]' '[a-zA-Z0-9_.]'*\n"
@@ -40,34 +42,23 @@ const char EXTENDEDUSAGE[] = "Presentation format:\n"
   "\tterm = '-' expr | '~' expr | '(' expr ')' | '[' exprlist ']' | '{' exprlist '}' | number | gen (with usual precedence)\n"
   "\tnumber = [0-9]+ (if starting with 0 then in given base, otherwise base 10)\n";
 
-static const char *ordinal(unsigned n) {
-  if (n % 10 == 1 && n != 11) return "st";
-  if (n % 10 == 2 && n != 12) return "nd";
-  if (n % 10 == 3 && n != 13) return "rd";
-  return "th";
-}
-
-static const char *plural(unsigned n) {
-  return n == 1 ? "" : "s";
-}
-
 int main(int argc, char **argv) {
   char flags[1000] = "";
   int c;
-  bool PrintZeros = false, PrintCompact = true, PrintDefs = false, Gap = false, Graded = false, PAlgebra = false;
+  bool PrintZeros = false, PrintCompact = true, PrintDefs = false, Gap = false, Graded = false, PAlgebra = false, Metabelian = false, Jacobson = false;
   coeff TorsionExp;
   coeff_init_set_si(TorsionExp, 0);
   unsigned MaxWeight = INFINITY, NilpotencyClass = INFINITY;
   const char *InputFileName;
   
-  while ((c = getopt (argc, argv, "ACDF:GhL:N:PX:W:Z")) != -1)
+  while ((c = getopt (argc, argv, "ACDF:GhJL:MN:PX:W:Z")) != -1)
     switch (c) {
     case 'A':
-      Gap = !Gap;
+      Gap ^= true;
       strcat(flags, "-A ");
       break;
     case 'C':
-      PrintCompact = !PrintCompact;
+      PrintCompact ^= true;
       strcat(flags, "-C ");
       break;
     case 'D':
@@ -81,24 +72,32 @@ int main(int argc, char **argv) {
       sprintf(flags + strlen(flags), "-F'%s' ", optarg);
       break;
     case 'G':
-      Graded = !Graded;
+      Graded ^= true;
       strcat(flags, "-G ");
       break;
     case 'h':
       printf("%s\n\n%s", USAGE, EXTENDEDUSAGE);
       return 0;
+    case 'J':
+      Jacobson ^= true;
+      strcat(flags, "-J ");
+      break;
     case 'L':
       LogFile = fopen(optarg, "w");
       if (LogFile == NULL)
 	abortprintf(1, "I can't open log file '%s'", optarg);
       sprintf(flags + strlen(flags), "-L'%s' ", optarg);
       break;
+    case 'M':
+      Metabelian ^= true;
+      strcat(flags, "-M ");
+      break;
     case 'N':
       NilpotencyClass = atoi(optarg);
       sprintf(flags + strlen(flags), "-N%u ", NilpotencyClass);
       break;
     case 'P':
-      PrintDefs = !PrintDefs;
+      PrintDefs ^= true;
       strcat(flags, "-P ");
       break;
     case 'X':
@@ -111,7 +110,7 @@ int main(int argc, char **argv) {
       sprintf(flags + strlen(flags), "-W%u ", MaxWeight);
       break;
     case 'Z':
-      PrintZeros = !PrintZeros;
+      PrintZeros ^= true;
       strcat(flags, "-Z ");
       break;
     default:
@@ -125,28 +124,35 @@ int main(int argc, char **argv) {
   else
     abortprintf(1, "I need precisely at most one argument as input filename\n%s", USAGE);
 
+  {
+    char hostname[128];
+    gethostname(hostname, 128);
+
+    time_t t = time((time_t *) 0);
+    char timestring[128];
+    strftime(timestring, 128, "%c", localtime(&t));
+
+    fprintf(LogFile, "# The %s nilpotent quotient program, by Csaba Schneider & Laurent Bartholdi\n", LIEGPSTRING);
+    fprintf(LogFile, "# Version %s, coefficients %s\n", VERSION, COEFF_ID);
+    fprintf(LogFile, "# \"%s %s%s\" started %s on %s\n", argv[0], flags, InputFileName, timestring, hostname);
+    fprintf(LogFile, "# nilpotency class %u; maximal weight %u\n\n", NilpotencyClass, MaxWeight);
+  }
+  
   fppresentation fppres;
   ReadPresentation(fppres, InputFileName);
-  
-  char hostname[128];
-  gethostname(hostname, 128);
-  
-  time_t t = time((time_t *) 0);
-  char timestring[128];
-  strftime(timestring, 128, "%c", localtime(&t));
-  
-  fprintf(LogFile, "# The %s nilpotent quotient program, by Csaba Schneider & Laurent Bartholdi\n", LIEGPSTRING);
-  fprintf(LogFile, "# Version %s, coefficients %s\n", VERSION, COEFF_ID);
-  fprintf(LogFile, "# \"%s %s%s\" started %s on %s\n", argv[0], flags, InputFileName, timestring, hostname);
-  fprintf(LogFile, "# nilpotency class %u; maximal weight %u\n\n", NilpotencyClass, MaxWeight);
-
+    
 #ifdef MEMCHECK
   mtrace();
 #endif
 
-  pcpresentation pc;
-  
-  InitPcPres(pc, fppres, Graded, PAlgebra, TorsionExp, NilpotencyClass);
+  pcpresentation pc;  
+  InitPcPres(pc, fppres);
+  pc.Graded = Graded;
+  pc.PAlgebra = PAlgebra;
+  pc.Metabelian = Metabelian;
+  pc.Jacobson = Jacobson;
+  pc.NilpotencyClass = NilpotencyClass;
+  coeff_set(pc.TorsionExp, TorsionExp);
 
   for (pc.Class = 1; pc.Class <= MaxWeight; pc.Class++) {
     unsigned oldnrpcgens = pc.NrPcGens;

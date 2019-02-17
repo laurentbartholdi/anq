@@ -26,6 +26,17 @@
 #include /abort
 #endif
 
+inline const char *ordinal(unsigned n) {
+  if (n % 10 == 1 && n != 11) return "st";
+  if (n % 10 == 2 && n != 12) return "nd";
+  if (n % 10 == 3 && n != 13) return "rd";
+  return "th";
+}
+
+inline const char *plural(unsigned n) {
+  return n == 1 ? "" : "s";
+}
+
 /****************************************************************
  * generator-coefficient pairs and vectors.
  * Used to store structure constants and sparse matrix rows;
@@ -84,7 +95,7 @@ struct fppresentation {
   unsigned NrGens;
   std::vector<unsigned> Weight;
   std::vector<std::string> GeneratorName;
-  std::vector<node *> Relators, Aliases, Endomorphisms, Extra;
+  std::vector<node *> Relators, Aliases, Endomorphisms;
 };
 
 void ReadPresentation(fppresentation &, const char *);
@@ -123,12 +134,14 @@ struct pcpresentation {
   unsigned Class, // current class
     NrPcGens; // number of ai in current consistent pc presentation
   bool Graded; // is it a graded Lie algebra?
-  bool PAlgebra; // is it a p-Lie algebra?
+  bool PAlgebra; // is it a p-Lie algebra/group?
+  bool Jacobson; // is the algebra restricted/the Jennings series?
+  bool Metabelian; // is the algebra/group metabelian?
   coeff TorsionExp; // if PAlgebra, enforce TorsionExp*ai in next class
   unsigned NilpotencyClass; // commutators of longer length must die
 };
 
-void InitPcPres(pcpresentation &, const fppresentation &, bool, bool, coeff &, unsigned);
+void InitPcPres(pcpresentation &, const fppresentation &);
 void FreePcPres(pcpresentation &, const fppresentation &);
 unsigned AddTails(pcpresentation &, const fppresentation &);
 void Consistency(const pcpresentation &);

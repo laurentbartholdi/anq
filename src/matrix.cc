@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <set>
 #include <utility>
+#include <unistd.h>
 
 /* static variables, cached from InitMatrix */
 unsigned NrCentral, FirstCentral;
@@ -172,7 +173,38 @@ std::vector<int> colamd(relmatrix &m) {
   intmat.reserve(alloc);
   int ok = colamd(NrCentral, m.size(), alloc, intmat.data(), ind.data(), NULL, stats);
   if (Debug >= 3) {
+    // we capture the output of colamd_report, and pipe it to LogFile.
+    // strangely enough, the documentation says that colamd_report writes to
+    // stderr, but it seems that it writes, rather, to stdout.
+
+    int fds[2], oldstdout;
+
+    pipe(fds);
+    oldstdout = dup(STDOUT_FILENO);
+    dup2(fds[1], STDOUT_FILENO);
+
     colamd_report(stats);
+    fprintf(stdout, "$\n"); // end
+    fflush(stdout);
+
+    dup2(oldstdout, STDOUT_FILENO);
+
+    { // ideally, we would fork() in a child who does the printing.
+      // the output is short enough that there's no trouble doing it
+      // here: pipe(2) should guarantee 64k of buffering.
+      char c;
+      bool begin = true;
+      while (read(fds[0],&c,1) == 1) {
+	if (c == '$')
+	  break;
+	fprintf(LogFile, "%s%c", begin ? "# " : "", c);
+	begin = (c == '\n');
+      }
+    }
+
+    close(fds[0]);
+    close(fds[1]);
+    
     fprintf(LogFile, "# row permutation:");
     for (unsigned i = 0; i < m.size(); i++)
       fprintf(LogFile, " %u", ind[i]);

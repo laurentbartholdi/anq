@@ -12,14 +12,8 @@ CFLAGS = -Wall -Werror $(DEBUG) $(OPT)
 CXXFLAGS = -std=gnu++11 $(CFLAGS)
 LDFLAGS = $(DEBUG) -lcolamd -lgmp
 
-## LieNQ prefers GNU C compiler, for debugging.
-
-ifeq ($(shell uname -s),Darwin)
-    CXX = g++-8
-else
-    CXX = g++
-endif
-CC = $(CXX)
+CXX=g++
+CC=$(CXX)
 
 NQ_OBJ = fppresentation.o pcpresentation.o print.o operations.o matrix.o nq.o
 NQ_INCL = nq.h coeff.h vectors.hh

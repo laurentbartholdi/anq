@@ -609,21 +609,6 @@ void ReadPresentation(fppresentation &pres, const char *InputFileName) {
       break;
   }
 
-  /* get extra elements to evaluate in result */
-  if (Token == PIPE) {
-    NextToken();
-
-    while (is_relation(Token)) {
-      node *n = Expression(pres, 0);
-      ValidateExpression(n, INFINITY);
-      pres.Extra.push_back(n);
-      if (Token == COMMA)
-	NextToken();
-      else
-	break;
-    }
-  }
-
   if (Token != RANGLE)
     SyntaxError("'>' expected");
 
@@ -644,11 +629,6 @@ void ReadPresentation(fppresentation &pres, const char *InputFileName) {
       fprintf(LogFile, "\n#\t");
       PrintNode(LogFile, pres, n);
     }
-    fprintf(LogFile, "\n# extra:");
-    for (auto n : pres.Extra) {
-      fprintf(LogFile, "\n#\t");
-      PrintNode(LogFile, pres, n);
-    }
     fprintf(LogFile, "\n# endomorphisms:");
     for (auto n : pres.Endomorphisms) {
       fprintf(LogFile, "\n#\t");
@@ -666,8 +646,6 @@ void FreePresentation(fppresentation &pres) {
   for (auto n : pres.Aliases)
     FreeNode(n);
   for (auto n : pres.Endomorphisms)
-    FreeNode(n);
-  for (auto n : pres.Extra)
     FreeNode(n);
 }
 

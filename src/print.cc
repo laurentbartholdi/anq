@@ -47,11 +47,15 @@ void PrintPcPres(FILE *f, const pcpresentation &pc, const fppresentation &pres, 
 
   unsigned curclass = 0;
   bool first;
+  std::vector<unsigned> count(pc.NrPcGens+1, 0);
+  for (unsigned i = 1; i <= pc.NrPcGens; i++)
+    count[pc.Generator[i].w]++;
+  
   for (unsigned i = 1; i <= pc.NrPcGens; i++) {
     while (pc.Generator[i].w > curclass) {
       if (curclass++ > 0)
 	fprintf(f, ";\n");
-      fprintf(f, "# generators of weight %d:\n", curclass);
+      fprintf(f, "# %u generator%s of weight %d:\n", count[curclass], plural(count[curclass]), curclass);
       first = true;
     }
     if (!first)
@@ -130,8 +134,13 @@ void PrintPcPres(FILE *f, const pcpresentation &pc, const fppresentation &pres, 
       if (!first)
 	  fprintf(f, ",\n");
       fprintf(f, "%10s", "");
+#ifdef LIEALG
       coeff_out_str(f, pc.Exponent[i]);
       fprintf(f, "*a%d", i);
+#else
+      fprintf(f, "a%d^", i);
+      coeff_out_str(f, pc.Exponent[i]);
+#endif
       if (pc.Power[i].allocated()) {
 	gen g = pc.Power[i][0].first;
 	if (!pc.Power[i].empty()) {
@@ -173,21 +182,6 @@ void PrintPcPres(FILE *f, const pcpresentation &pc, const fppresentation &pres, 
       first = false;
     }
   
-  if (!pres.Extra.empty()) {
-    fprintf(f, " |\n# The extra elements:\n");
-    first = true;
-    for (node *n : pres.Extra) {
-      hollowcvec v = vecstack.fresh();
-      v.eval(pc, n);
-      v.liecollect(pc);
-      if (!first)
-	fprintf(f, ",\n");
-      fprintf(f, "%10s", ""); PrintVec(f, v);
-      if (v.empty()) fprintf(f, "0*a1");
-      vecstack.pop(v);
-      first = false;
-    }
-  }
   fprintf(f, " >\n");
 }
 
@@ -201,15 +195,23 @@ template<typename V> bool PrintGAPVec(FILE *f, const V v, bool first) {
   return first;
 }
 
+// create a GAP-readable file:
+// gap> L := ReadAsFunction(filename)();
+// will construct a Lie ring L in GAP.
+// it has attributes
+// - FreeAlgebraOfFpAlgebra, the free algebra with the original generators
+// - CanonicalProjection, a function from FreeAlgebraOfFpAlgebra(L) to L
 void PrintGAPPres(FILE *f, const pcpresentation &pc, const fppresentation &pres) {
-  fprintf(f, "LoadPackage(\"liering\");\n"
-	  "F := FreeLieRing(Integers,[");
+  fprintf(f, // "L := CallFuncList(function()\n"
+	  "\tlocal T, L, bas, epi, src, genimgs, eval;\n\n"
+	  "\tLoadPackage(\"liering\");\n\n");
+
+  fprintf(f, "\tsrc := FreeLieRing(Integers,[");
   for (unsigned i = 1; i <= pres.NrGens; i++)
     fprintf(f, "%s\"%s\"", i > 1 ? "," : "", pres.GeneratorName[i].c_str());
   fprintf(f, "]);\n");
-  fprintf(f, "L := CallFuncList(function()\n"
-	  "\tlocal T, L, bas, epi, src, genimgs, eval;\n"
-	  "\tT := EmptySCTable(%d,0,\"antisymmetric\");\n", pc.NrPcGens);
+
+  fprintf(f, "\tT := EmptySCTable(%d,0,\"antisymmetric\");\n", pc.NrPcGens);
   for (unsigned j = 1; j <= pc.NrPcGens; j++)
     for (unsigned i = 1; i < j; i++) {
       if (!pc.Comm[j][i].empty()) {
@@ -248,26 +250,10 @@ void PrintGAPPres(FILE *f, const pcpresentation &pc, const fppresentation &pres)
     fprintf(f, ")^epi");
   }
   fprintf(f,"];\n");
-
-  if (!pres.Extra.empty()) {
-    fprintf(f, "\tRange(epi)!.extra := [");
-    bool first = true;
-    for (node *n : pres.Extra) {
-      hollowcvec v = vecstack.fresh();
-      v.eval(pc, n);
-      v.liecollect(pc);
-      fprintf(f, "%s(", first ? "" : ",");
-      if (PrintGAPVec(f, v, true))
-	fprintf(f,"Zero(L)");
-      fprintf(f, ")^epi");
-      first = false;
-      vecstack.pop(v);
-    }
-    fprintf(f, "];\n");
-  }
   
-  fprintf(f, "\tL := Range(epi);\n");
-  fprintf(f, "\tsrc := F;\n");
+  fprintf(f, "\tL := Range(epi);\n"
+	  "\tSetFreeAlgebraOfFpAlgebra(L,src);\n");
+
   fprintf(f, "\teval := function(expr)\n"
 	  "\t\tif IsBound(expr.var) then\n"
 	  "\t\t\treturn genimgs[expr.var];\n"
@@ -286,7 +272,8 @@ void PrintGAPPres(FILE *f, const pcpresentation &pc, const fppresentation &pres)
 	  "\t\treturn res;\n"
 	  "\tend);\n");
   fprintf(f, "\treturn L;\n"
-	  "end,[]);\n");
+	  // "end,[]);\n"
+	  );
 }
 #else
 template<typename V> void PrintGAPVec(FILE *f, const V v) {
@@ -300,16 +287,21 @@ template<typename V> void PrintGAPVec(FILE *f, const V v) {
     fprintf(f, "One(F)");
 }
 
+// create a GAP-readable file:
+// gap> G := ReadAsFunction(filename)();
+// will construct a group G in GAP.
+// it has attributes
+// - FreeGroupOfFpGroup, the free group with the original generators
+// - EpimorphismFromFreeGroup, a homomorphism from its FreeGroupOfFpGroup(G) to G
 void PrintGAPPres(FILE *f, const pcpresentation &pc, const fppresentation &pres) {
-  fprintf(f, "LoadPackage(\"nq\");\n"
-	  "F := FreeGroup(IsSyllableWordsFamily,[");
+  fprintf(f, // "G := CallFuncList(function()\n"
+	  "\tlocal F, P, c, g;\n\n"
+	  "\tLoadPackage(\"nq\");\n\n"
+	  "P := FreeGroup(IsSyllableWordsFamily,[");
   for (unsigned i = 1; i <= pres.NrGens; i++)
     fprintf(f, "%s\"%s\"", i > 1 ? "," : "", pres.GeneratorName[i].c_str());
-  fprintf(f, "]);\n");
-
-  fprintf(f, "G := CallFuncList(function()\n"
-	  "\tlocal F, c, g;\n"
-	  "\tF := FreeGroup(%d,\"a\");\n"
+  fprintf(f, "]);\n"
+	  "\tF := FreeGroup(IsSyllableWordsFamily,%d,\"a\");\n"
 	  "\tg := GeneratorsOfGroup(F);\n"
 	  "\tc := FromTheLeftCollector(%d);\n", pc.NrPcGens, pc.NrPcGens);
   for (unsigned i = 1; i <= pc.NrPcGens; i++)
@@ -327,15 +319,17 @@ void PrintGAPPres(FILE *f, const pcpresentation &pc, const fppresentation &pres)
 	PrintGAPVec(f, pc.Comm[j][i]);
 	fprintf(f, ");\n");
       }
-  fprintf(f, "\n\tF := PcpGroupByCollector(c);\n");
+  fprintf(f, "\n\tF := PcpGroupByCollector(c);\n"
+	  "\tSetFreeGroupOfFpGroup(F,P);\n");
   fprintf(f, "\tg := GeneratorsOfGroup(F);\n");
-  fprintf(f, "\tSetEpimorphismFromFreeGroup(G,GroupHomomorphismByImages(F,G,[");
+  fprintf(f, "\tSetEpimorphismFromFreeGroup(F,GroupHomomorphismByImages(P,F,[");
   for (unsigned i = 1; i <= pres.NrGens; i++) {
     if (i > 1) fprintf(f, ",");
     PrintGAPVec(f, pc.Epimorphism[i]);
   }
   fprintf(f, "]));\n");
-  fprintf(f, "\treturn PcpGroupByCollector(c);\n"
-	  "end,[]);\n");
+  fprintf(f, "\treturn F;\n"
+	  // "end,[]);\n"
+	  );
 }
 #endif
