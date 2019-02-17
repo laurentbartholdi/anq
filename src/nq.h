@@ -4,6 +4,16 @@
  * Based on code by Csaba Schneider
  */
 
+#ifndef NO_TRIO
+#include <trio.h>
+#define printf trio_printf
+#define sprintf trio_sprintf
+#define fprintf trio_fprintf
+#define PRIcoeff "$<c%p:>"
+#define PRIsparsecvec "$<s%p:>"
+#define PRIhollowcvec "$<h%p:>"
+#endif
+
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -253,21 +263,19 @@ template <typename V> static void PrintVec(FILE *f, const V v) {
   for (auto kc : v) {
 #ifdef LIEALG
     if (first) first = false; else fprintf(f, " + ");
-    coeff_out_str(f, kc.second);
-    fprintf(f, "*a%d", kc.first);
+    fprintf(f, PRIcoeff "*a%d", &kc.second, kc.first);
 #else
     if (first) first = false; else fprintf(f, " * ");
-    fprintf(f, "a%d^", kc.first);
-    coeff_out_str(f, kc.second);
+    fprintf(f, "a%d^" PRIcoeff, kc.first, &kc.second);
 #endif
   }
 }
 
-void abortprintf(int, const char *, ...) __attribute__((format(printf, 2, 3),noreturn));
+void abortprintf(int, const char *, ...) __attribute__((format(__printf__, 2, 3),noreturn));
 void PrintPcPres(FILE *f, const pcpresentation &, const fppresentation &, bool, bool, bool);
 void PrintGAPPres(FILE *f, const pcpresentation &, const fppresentation &);
 void TimeStamp(const char *);
-  
+
 /****************************************************************
  * matrix functions.
  * matrices are stored as std::vector<sparsecvec>

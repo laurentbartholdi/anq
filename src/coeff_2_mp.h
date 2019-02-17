@@ -283,18 +283,38 @@ inline void coeff_unit_annihilator(coeff &unit, coeff &annihilator, const coeff 
     mpn_zero(annihilator.data, COEFF_WORDS);
 }
 
-inline int coeff_out_str(FILE *f, const coeff &a)
+inline char *coeff_get_str(char *s, int base, const coeff &a)
 {
+  char *p;
+
   mp_limb_t temp[COEFF_WORDS];
   mpn_copyi(temp, a.data, COEFF_WORDS);
   unsigned nzlimbs = __nzlimbs(temp, COEFF_WORDS);
   size_t digits = mpn_sizeinbase(temp, nzlimbs, 10);
-  unsigned char str[digits+1];
-  digits = mpn_get_str(str, 10, temp, nzlimbs);
+
+  if (s == NULL)
+    p = malloc(digits+1);
+  else
+    p = s;
+
+  digits = mpn_get_str(p, base, temp, nzlimbs);
   for (unsigned i = 0; i < digits; i++)
-    str[i] += '0';
-  str[digits] = 0;
-  fprintf(f, "%s", str); /* maybe we should print in binary or hex? */
+    p[i] += '0';
+  p[digits] = 0;
+
+  if (s == NULL)
+    p = realloc(p, digits+1);
+
+  return p;
+}
+
+inline int coeff_out_str(FILE *f, const coeff &a)
+{
+  char *s = coeff_get_str(NULL, 10, a);
+  fprintf(f, "%s", s); /* maybe we should print in base MODULUS_PRIME? */
+  int digits = strlen(s);
+  free(s);
+  
   return digits;
 }
 

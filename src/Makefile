@@ -5,12 +5,13 @@
 ##                                                           schcs@math.klte.hu
 ##
 
+TRIO = trio-1.16
 NQVERSION = -DVERSION='"4.0.0 2019-01-26"'
 OPT = -march=native -O0 #-Ofast
 DEBUG = -g -ggdb # -fsanitize=address -fprofile-arcs -ftest-coverage
-CFLAGS = -Wall -Werror $(DEBUG) $(OPT)
+CFLAGS = -Wall -Werror -I$(TRIO) $(DEBUG) $(OPT)
 CXXFLAGS = -std=gnu++11 $(CFLAGS)
-LDFLAGS = $(DEBUG) -lcolamd -lgmp
+LDFLAGS = $(DEBUG) -L$(TRIO) -lcolamd -lgmp -ltrio
 
 CXX=g++
 CC=$(CXX)
@@ -18,10 +19,16 @@ CC=$(CXX)
 NQ_OBJ = fppresentation.o pcpresentation.o print.o operations.o matrix.o nq.o
 NQ_INCL = nq.h coeff.h vectors.hh
 
-all: nql_2_64 nql_2_320 nql_3_39 nql_5_27 nql_5_100 nql_long nql_mpz \
+all: trio nql_2_64 nql_2_320 nql_3_39 nql_5_27 nql_5_100 nql_long nql_mpz \
 	nqg_2_64 nqg_2_320 nqg_3_39 nqg_5_27 nqg_5_100 nqg_long nqg_mpz
 
-nql: nql_long nql_mpz
+nql: trio nql_long nql_mpz
+
+trio: $(TRIO)/libtrio.a
+
+$(TRIO)/libtrio.a:
+	(cd $(TRIO); ./configure)
+	make -C $(TRIO) libtrio.a
 
 profile: clean
 	$(MAKE) CXX=g++ DEBUG="-g -fprofile-instr-generate -fcoverage-mapping"

@@ -71,11 +71,8 @@ void PrintPcPres(FILE *f, const pcpresentation &pc, const fppresentation &pres, 
     gen g = pc.Epimorphism[i][0].first;
     if (!pc.Epimorphism[i].empty() && pc.Generator[g].t == DGEN && pc.Generator[g].g == i)
       fprintf(f, ": a%d\n", g);
-    else {
-      fprintf(f, " ");
-      PrintVec(f, pc.Epimorphism[i]);
-      fprintf(f, "\n");
-    }
+    else
+      fprintf(f, " " PRIsparsecvec "\n", &pc.Epimorphism[i]);
   }
   if (PrintDefs) {
     fprintf(f, "# The definitions:\n");
@@ -89,12 +86,9 @@ void PrintPcPres(FILE *f, const pcpresentation &pc, const fppresentation &pres, 
 	break;
       case DPOW:
 #ifdef LIEALG
-	coeff_out_str(f, pc.Exponent[i]);
-	fprintf(f, "*a%d = ", pc.Generator[i].g);
+	fprintf(f, PRIcoeff "*a%d = ", &pc.Exponent[i], pc.Generator[i].g);
 #else
-	fprintf(f, "a%d^", pc.Generator[i].g);
-	coeff_out_str(f, pc.Exponent[i]);
-	fprintf(f, " = ");
+	fprintf(f, "a%d^" PRIcoeff " = ", pc.Generator[i].g, &pc.Exponent[i]);
 #endif
 	break;
       case DGEN:;
@@ -102,8 +96,7 @@ void PrintPcPres(FILE *f, const pcpresentation &pc, const fppresentation &pres, 
 
       gen g = i;
       while (pc.Generator[g].t == DPOW) {
-	coeff_out_str(f, pc.Exponent[g]);
-	fprintf(f,"*");
+	fprintf(f,PRIcoeff "*", &pc.Exponent[g]);
 	g = pc.Generator[g].g;
       }
       std::vector<gen> cv;
@@ -135,21 +128,17 @@ void PrintPcPres(FILE *f, const pcpresentation &pc, const fppresentation &pres, 
 	  fprintf(f, ",\n");
       fprintf(f, "%10s", "");
 #ifdef LIEALG
-      coeff_out_str(f, pc.Exponent[i]);
-      fprintf(f, "*a%d", i);
+      fprintf(f, PRIcoeff "*a%d", &pc.Exponent[i], i);
 #else
-      fprintf(f, "a%d^", i);
-      coeff_out_str(f, pc.Exponent[i]);
+      fprintf(f, "a%d^" PRIcoeff, i, &pc.Exponent[i]);
 #endif
       if (pc.Power[i].allocated()) {
 	gen g = pc.Power[i][0].first;
 	if (!pc.Power[i].empty()) {
 	  if (pc.Generator[g].t == DPOW && pc.Generator[g].g == i)
 	    fprintf(f, " =: a%d", g);
-	  else {
-	    fprintf(f, " = ");
-	    PrintVec(f, pc.Power[i]);
-	  }
+	  else
+	    fprintf(f, " = " PRIsparsecvec, &pc.Power[i]);
 	}
       }
       first = false;
@@ -174,10 +163,8 @@ void PrintPcPres(FILE *f, const pcpresentation &pc, const fppresentation &pres, 
 	gen g = pc.Comm[j][i][0].first;
 	if (pc.Generator[g].g == j && pc.Generator[g].h == i)
 	  fprintf(f, " =: a%d", g);
-	else {
-	  fprintf(f, " = ");
-	  PrintVec(f, pc.Comm[j][i]);
-	}
+	else
+	  fprintf(f, " = " PRIsparsecvec, &pc.Comm[j][i]);
       }
       first = false;
     }
@@ -189,8 +176,7 @@ void PrintPcPres(FILE *f, const pcpresentation &pc, const fppresentation &pres, 
 template<typename V> bool PrintGAPVec(FILE *f, const V v, bool first) {
   for (auto kc : v) {
     if (first) first = false; else fprintf(f, " + ");
-    coeff_out_str(f, kc.second);
-    fprintf(f, "*bas[%d]", kc.first);
+    fprintf(f, PRIcoeff "*bas[%d]", &kc.second, kc.first);
   }
   return first;
 }
@@ -219,8 +205,7 @@ void PrintGAPPres(FILE *f, const pcpresentation &pc, const fppresentation &pres)
 	bool first = true;
 	for (auto kc : pc.Comm[j][i]) {
 	  if (!first) fprintf(f, ",");
-	  coeff_out_str(f, kc.second);
-	  fprintf(f, ",%d", kc.first);
+	  fprintf(f, PRIcoeff ",%d", &kc.second, kc.first);
 	  first = false;
 	}
 	fprintf(f, "]);\n");
@@ -232,9 +217,7 @@ void PrintGAPPres(FILE *f, const pcpresentation &pc, const fppresentation &pres)
   bool first = true;
   for (unsigned i = 1; i <= pc.NrPcGens; i++) {
     if (coeff_nz_p(pc.Exponent[i])) {
-      fprintf(f, "%s-", first ? "" : ",\n\t\t");
-      coeff_out_str(f, pc.Exponent[i]);
-      fprintf(f, "*bas[%d]", i);
+      fprintf(f, "%s-" PRIcoeff "*bas[%d]", first ? "" : ",\n\t\t", &pc.Exponent[i], i);
       if (pc.Power[i].allocated())
 	PrintGAPVec(f, pc.Power[i], false);
       first = false;
@@ -280,8 +263,7 @@ template<typename V> void PrintGAPVec(FILE *f, const V v) {
   bool first = true;
   for (auto kc : v) {
     if (first) first = false; else fprintf(f, "*");
-    fprintf(f, "g[%u]^", kc.first);
-    coeff_out_str(f, kc.second);
+    fprintf(f, "g[%u]^" PRIcoeff, kc.first, &kc.second);
   }
   if (first)
     fprintf(f, "One(F)");
@@ -297,7 +279,7 @@ void PrintGAPPres(FILE *f, const pcpresentation &pc, const fppresentation &pres)
   fprintf(f, // "G := CallFuncList(function()\n"
 	  "\tlocal F, P, c, g;\n\n"
 	  "\tLoadPackage(\"nq\");\n\n"
-	  "P := FreeGroup(IsSyllableWordsFamily,[");
+	  "\tP := FreeGroup(IsSyllableWordsFamily,[");
   for (unsigned i = 1; i <= pres.NrGens; i++)
     fprintf(f, "%s\"%s\"", i > 1 ? "," : "", pres.GeneratorName[i].c_str());
   fprintf(f, "]);\n"
@@ -306,10 +288,8 @@ void PrintGAPPres(FILE *f, const pcpresentation &pc, const fppresentation &pres)
 	  "\tc := FromTheLeftCollector(%d);\n", pc.NrPcGens, pc.NrPcGens);
   for (unsigned i = 1; i <= pc.NrPcGens; i++)
     if (coeff_nz_p(pc.Exponent[i])) {
-      fprintf(f, "\tSetRelativeOrder(c,%u,", i);
-      coeff_out_str(f, pc.Exponent[i]);
-      fprintf(f, ");\n\tSetPower(c,%u,", i);
-      PrintGAPVec(f, pc.Power[i]);
+      fprintf(f, "\tSetRelativeOrder(c,%u," PRIcoeff ");\n", i, &pc.Exponent[i]);
+      fprintf(f, "\tSetPower(c,%u,", i); PrintGAPVec(f, pc.Power[i]);
       fprintf(f, ");\n");
     }
   for (unsigned j = 1; j <= pc.NrPcGens; j++)

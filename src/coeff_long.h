@@ -17,6 +17,8 @@
 #endif
 
 #include <ctype.h>
+#include <inttypes.h>
+#include <string.h>
 
 #define COEFF_ID "Z as int64_t"
 
@@ -235,7 +237,37 @@ inline void coeff_unit_annihilator(coeff &unit, coeff &annihilator, const coeff 
 
 inline int coeff_out_str(FILE *f, const coeff &a)
 {
-  return fprintf(f, "%ld", (long) a.data);
+  return fprintf(f, "%" PRId64, a.data);
+}
+
+inline char *coeff_get_str(char *s, int base, const coeff &a)
+{
+  char *p;
+  if (s == NULL)
+    p = (char *) malloc(20);
+  else
+    p = s;
+#ifdef TRIO_TRIO_H
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wall"
+#else
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wall"
+#endif
+  trio_sprintf(p, "%..*" PRId64, base, a.data);
+#ifdef __clang__
+#pragma clang diagnostic pop
+#elif defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
+#else
+  sprintf(p, "%" PRId64, a.data);
+#endif
+  if (s == NULL)
+    p = (char *) realloc(p, strlen(p)+1);
+
+  return p;
 }
 
 inline void coeff_set_str(coeff &a, const char *s, int base)

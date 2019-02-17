@@ -90,11 +90,7 @@ void FreePcPres(pcpresentation &pc, const fppresentation &pres) {
 
 #ifdef GROUP
 // return fresh tail to (f*g)*h / f*(g*h), with f > g > h
-typedef enum { TAIL, CONSISTENCY } tail_mode;
-// when mode=TAIL, we're computing the tail of [f,[g,h]]
-// when mode=CONSISTENCY, we're checking associativity
-// the code is the same, the debugging messages are different.
-static hollowcvec tail_assoc(const pcpresentation &pc, gen f, gen g, gen h, tail_mode mode) {
+static hollowcvec tail_assoc(const pcpresentation &pc, gen f, gen g, gen h) {
   hollowcvec rhs = vecstack.fresh();
   hollowcvec lhs = vecstack.fresh();
   
@@ -110,15 +106,6 @@ static hollowcvec tail_assoc(const pcpresentation &pc, gen f, gen g, gen h, tail
   rhs.sub(lhs);
   vecstack.pop(lhs);
 
-  if (Debug >= 2) {
-    if (mode == TAIL)
-      fprintf(LogFile, "# tail: [a%d,a%d] *= ", f, pc.Comm[g][h].front()->first);
-    else
-      fprintf(LogFile, "# consistency: ");
-    fprintf(LogFile, "associator(a%d,a%d,a%d) = ", f, g, h);
-    PrintVec(LogFile, rhs);
-    fprintf(LogFile, "\n");
-  }
   return rhs;
 }
 
@@ -126,66 +113,35 @@ static hollowcvec tail_assoc(const pcpresentation &pc, gen f, gen g, gen h, tail
 // if f>g: it's f*g^N \ f*g*g^(N-1)
 // if f=g: it's f^N*f \ f*f^N
 // if f<g: it's g^N*f \ g^(N-1)*f*g*[g,f]
-static hollowcvec tail_pow(const pcpresentation &pc, gen f, gen g, tail_mode mode) {
-  hollowcvec lhs = vecstack.fresh();
+static hollowcvec tail_pow(const pcpresentation &pc, gen f, gen g) {
   hollowcvec rhs = vecstack.fresh();
+  hollowcvec lhs = vecstack.fresh();
   
-  if (f > g) { /* f*g^N = f*g*g^(N-1) */
+  if (f > g) { /* f*g*g^(N-1) = f*g^N */
     coeff_set_si(lhs[f], 1);
-    lhs.mul(pc, pc.Power[g]);
-
+    lhs.mul(pc, g, pc.Exponent[g]);
+    
     coeff_set_si(rhs[f], 1);
-    rhs.mul(pc, g);
-    coeff c;
-    coeff_init(c);
-    coeff_add_si(c, pc.Exponent[g], -1); // maybe can do in 1 go? !!!
-    rhs.mul(pc, g, c);
-    coeff_clear(c);
-
-    if (Debug >= 2) {
-      if (mode == TAIL)
-	fprintf(LogFile, "# tail: [a%d,a%d] *= ", f, g);
-      else
-	fprintf(LogFile, "# consistency: associator(a%d^(N-1),a%d,a%d) = ", f, f, g);
-    }
+    rhs.mul(pc, pc.Power[g]);
   } else if (f < g) { /* g^N*f = g^(N-1)*f*g*[g,f] */
     lhs.copysorted(pc.Power[g]);
     lhs.mul(pc, f);
-
 
     coeff_add_si(rhs[g], pc.Exponent[g], -1);
     rhs.mul(pc, f);
     rhs.mul(pc, g);
     rhs.mul(pc, pc.Comm[g][f]);
-
-    if (Debug >= 2) {
-      if (mode == TAIL)
-	fprintf(LogFile, "# tail: [a%d,a%d] *= ", f, g);
-      else
-	fprintf(LogFile, "# consistency: associator(a%d,a%d,a%d^(N-1)) = ", g, f, f);
-    }
   } else { /* f*f^N = f^N*f */
     lhs.copysorted(pc.Power[f]);
     lhs.mul(pc, f);
 
     coeff_set_si(rhs[f], 1);
     rhs.mul(pc, pc.Power[f]);
-
-    if (Debug >= 2) {
-      if (mode == TAIL)
-	fprintf(LogFile, "# tail: [a%d,a%d] *= ", f, g);
-      else
-	fprintf(LogFile, "# consistency: commutator(a%d,a%d^N) = ", g, f);
-    }
   }
-  lhs.sub(rhs);
-  vecstack.pop(rhs);
+  rhs.sub(lhs);
+  vecstack.pop(lhs);
 
-  if (Debug >= 2) {
-    PrintVec(LogFile, lhs);
-    fprintf(LogFile, "\n");
-  }
-  return lhs;
+  return rhs;
 }
 #endif
 
@@ -379,18 +335,16 @@ unsigned AddTails(pcpresentation &pc, const fppresentation &pres) {
 	tail.lie3bracket(pc, j, g, h, true); // +[[aj,g],h]
 	tail.lie3bracket(pc, j, h, g, false); // -[[aj,h],g]
 	tail.liecollect(pc);
-	if (Debug >= 2) {
-	  fprintf(LogFile, "# tail: [a%d,a%d] = [a%d,[a%d,a%d]] = ", j, i, j, g, h);
-	}
+
+	if (Debug >= 2)
+	  fprintf(LogFile, "# tail: [a%d,a%d] = [a%d,[a%d,a%d]] = " PRIhollowcvec "\n", j, i, j, g, h, &tail);
       } else if (pc.Generator[i].t == DPOW) { /* ai = N*g */
 	gen g = pc.Generator[i].g;
 	tail.addmul(pc.Exponent[g], pc.Comm[j][g]);
 	tail.liecollect(pc);
-	if (Debug >= 2) {
-	  fprintf(LogFile, "# tail: [a%d,a%d] = ", j, i);
-	  coeff_out_str(LogFile, pc.Exponent[g]);
-	  fprintf(LogFile, "*[a%d,a%d] = ", j, g);
-	}
+
+	if (Debug >= 2)
+	  fprintf(LogFile, "# tail: [a%d,a%d] = " PRIcoeff "*[a%d,a%d] = " PRIhollowcvec "\n", j, i, &pc.Exponent[g], j, g, &tail);
       } else if (pc.Generator[j].t == DPOW) { /* aj = N*g */
 	gen g = pc.Generator[j].g;
 	if (g > i)
@@ -398,19 +352,12 @@ unsigned AddTails(pcpresentation &pc, const fppresentation &pres) {
 	else if (g < i)
 	  tail.submul(pc.Exponent[g], pc.Comm[i][g]);
 	tail.liecollect(pc);
-	if (Debug >= 2) {
-	  fprintf(LogFile, "# tail: [a%d,a%d] = ", j, i);
-	  coeff_out_str(LogFile, pc.Exponent[g]);
-	  fprintf(LogFile, "*[a%d,a%d] = ", g, i);
-	}
+
+	if (Debug >= 2)
+	  fprintf(LogFile, "# tail: [a%d,a%d] = " PRIcoeff "*[a%d,a%d] = " PRIhollowcvec "\n", j, i, &pc.Exponent[g], g, i, &tail);
       } else
 	abortprintf(5, "AddTails: unknown definition for [a%d,a%d]", j, i);
       
-      if (Debug >= 2) {
-	PrintVec(LogFile, tail);
-	fprintf(LogFile, "\n");
-      }
-
       unsigned len = 0;
       auto tp = tail.begin();
       for (auto kc : pc.Comm[j][i]) {
@@ -433,14 +380,23 @@ unsigned AddTails(pcpresentation &pc, const fppresentation &pres) {
        */
       hollowcvec tail;
 
-      if (pc.Generator[i].t == DCOMM) /* ai = [g,h] */
-	tail = tail_assoc(pc, j, pc.Generator[i].g, pc.Generator[i].h, TAIL);
-      else if (pc.Generator[i].t == DPOW) /* ai = g^N */
-	tail = tail_pow(pc, j, pc.Generator[i].g, TAIL);
-      else if (pc.Generator[j].t == DPOW) /* aj = g^N */
-	tail = tail_pow(pc, i, pc.Generator[j].g, TAIL);
-	// !!! check sign
-      else
+      if (pc.Generator[i].t == DCOMM) { /* ai = [g,h] */
+	tail = tail_assoc(pc, j, pc.Generator[i].g, pc.Generator[i].h);
+
+	if (Debug >= 2)
+	  fprintf(LogFile, "# tail: [a%d,a%d] = [a%d,[a%d,a%d]] *= " PRIhollowcvec "\n", j, i, j, pc.Generator[i].g, pc.Generator[i].h, &tail);
+      } else if (pc.Generator[i].t == DPOW) { /* ai = g^N */
+	tail = tail_pow(pc, j, pc.Generator[i].g);
+	tail.neg();
+
+	if (Debug >= 2)
+	  fprintf(LogFile, "# tail: [a%d,a%d] = [a%d,a%d^" PRIcoeff "] *= " PRIhollowcvec "\n", j, i, j, pc.Generator[i].g, &pc.Exponent[pc.Generator[i].g], &tail);
+      } else if (pc.Generator[j].t == DPOW) { /* aj = g^N */
+	tail = tail_pow(pc, i, pc.Generator[j].g);
+
+	if (Debug >= 2)
+	  fprintf(LogFile, "# tail: [a%d,a%d] = [a%d^" PRIcoeff ",a%d] *= " PRIhollowcvec "\n", j, i, pc.Generator[j].g, &pc.Exponent[pc.Generator[j].g], i, &tail);
+      } else
 	abortprintf(5, "AddTails: unknown definition for [a%d,a%d]", j, i);
 
       if (!tail.empty()) {
@@ -484,11 +440,8 @@ void Consistency(const pcpresentation &pc) {
 	t.lie3bracket(pc, k, i, j, true);
 	t.liecollect(pc);
 
-	if (Debug >= 2) {
-	  fprintf(LogFile, "# consistency: jacobi(a%d,a%d,a%d) = ", i, j, k);
-	  PrintVec(LogFile, t);
-	  fprintf(LogFile, "\n");
-	}
+	if (Debug >= 2)
+	  fprintf(LogFile, "# consistency: jacobi(a%d,a%d,a%d) = " PRIhollowcvec "\n", i, j, k, &t);
 
 	QueueInRelMatrix(t);	
 	vecstack.pop(t);
@@ -511,15 +464,8 @@ void Consistency(const pcpresentation &pc) {
       t.addmul(annihilator, pc.Power[i]);
       t.liecollect(pc);
   
-      if (Debug >= 2) {
-	fprintf(LogFile, "# consistency: ");
-	coeff_out_str(LogFile, annihilator);
-	fprintf(LogFile, "*");
-	coeff_out_str(LogFile, pc.Exponent[i]);
-	fprintf(LogFile, "*a%d = ", i);
-	PrintVec(LogFile, t);
-	fprintf(LogFile, "\n");
-      }
+      if (Debug >= 2)
+	fprintf(LogFile, "# consistency: " PRIcoeff "*" PRIcoeff "*a%d = " PRIhollowcvec "\n", &annihilator, &pc.Exponent[i], i, &t);
       
       QueueInRelMatrix(t);
       vecstack.pop(t);
@@ -549,15 +495,8 @@ void Consistency(const pcpresentation &pc) {
 	  t.submul(pc.Exponent[i], pc.Comm[j][i]);
 	t.liecollect(pc);
 
-	if (Debug >= 2) {
-	  fprintf(LogFile, "# consistency: ");
-	  coeff_out_str(LogFile, pc.Exponent[i]);
-	  fprintf(LogFile, "*[a%d,a%d]-[", i, j);
-	  coeff_out_str(LogFile, pc.Exponent[i]);
-	  fprintf(LogFile, "*a%d,a%d] = ", i, j);
-	  PrintVec(LogFile, t);
-	  fprintf(LogFile, "\n");
-	}
+	if (Debug >= 2)
+	  fprintf(LogFile, "# consistency: " PRIcoeff "*[a%d,a%d]-[" PRIcoeff "*a%d,a%d] = " PRIhollowcvec "\n", &pc.Exponent[i], i, j, &pc.Exponent[i], i, j, &t);
 
 	QueueInRelMatrix(t);
 	vecstack.pop(t);
@@ -584,7 +523,11 @@ void Consistency(const pcpresentation &pc) {
 	if (totalweight > pc.Class || (pc.Graded && totalweight != pc.Class))
 	  continue;
 	
-	hollowcvec tail = tail_assoc(pc, k, j, i, CONSISTENCY);
+	hollowcvec tail = tail_assoc(pc, k, j, i);
+
+	if (Debug >= 2)
+	  fprintf(LogFile, "# consistency: ");
+	  fprintf(LogFile, "associator(a%d,a%d,a%d) = " PRIhollowcvec "\n", k, j, i, &tail);
 
 	QueueInRelMatrix(tail);	
 	vecstack.pop(tail);
@@ -608,16 +551,8 @@ void Consistency(const pcpresentation &pc) {
       t.pow(pc, u, annihilator);
       vecstack.pop(u);
       
-      if (Debug >= 2) {
-	fprintf(LogFile, "# consistency: ");
-	fprintf(LogFile, "(a%d^", i);
-	coeff_out_str(LogFile, pc.Exponent[i]);
-	fprintf(LogFile, ")^");
-	coeff_out_str(LogFile, annihilator);
-	fprintf(LogFile, " = ");
-	PrintVec(LogFile, t);
-	fprintf(LogFile, "\n");
-      }
+      if (Debug >= 2)
+	fprintf(LogFile, "# consistency: (a%d^" PRIcoeff ")^" PRIcoeff " = " PRIhollowcvec "\n", i, &pc.Exponent[i], &annihilator, &t);
       
       QueueInRelMatrix(t);
       vecstack.pop(t);
@@ -629,7 +564,11 @@ void Consistency(const pcpresentation &pc) {
 
 	/* enforce a^N*b = a^(N-1)*(a*b) or a*b^N = (a*b)*b^(N-1) */
 
-	hollowcvec tail = tail_pow(pc, j, i, CONSISTENCY);
+	hollowcvec tail = tail_pow(pc, j, i);
+
+	if (Debug >= 2)
+	  fprintf(LogFile, "# consistency: associator(a%d,a%d,a%d^(N-1)) = " PRIhollowcvec "\n", j, i, i, &tail);
+	
 	QueueInRelMatrix(tail);
 	vecstack.pop(tail);
       }
@@ -653,7 +592,7 @@ void EvalAllRel(const pcpresentation &pc, const fppresentation &pres) {
     if (Debug >= 2) {
       fprintf(LogFile, "# aliasing relation: ");
       PrintNode(LogFile, pres, n);
-      fprintf(LogFile, " ("); PrintVec(LogFile, v); fprintf(LogFile, ")\n");
+      fprintf(LogFile, " (" PRIhollowcvec ")\n", &v);
     }
     gen g = n->cont.bin.l->cont.g;
     pc.Epimorphism[g].resize(v.size());
@@ -671,7 +610,7 @@ void EvalAllRel(const pcpresentation &pc, const fppresentation &pres) {
     if (Debug >= 2) {
       fprintf(LogFile, "# relation: ");
       PrintNode(LogFile, pres, n);
-      fprintf(LogFile, " ("); PrintVec(LogFile, v); fprintf(LogFile, ")\n");
+      fprintf(LogFile, " (" PRIhollowcvec ")\n", &v);
     }
 
     if (!pres.Endomorphisms.empty())
@@ -751,6 +690,8 @@ void EvalAllRel(const pcpresentation &pc, const fppresentation &pres) {
 	    vecstack.pop(v);
 	  }
 	  break;
+	case DINVALID:
+	  abortprintf(5, "I can't compute the endomorphism, there's a to-be-eliminated generator a%d", g);
 	}
       }
       for (unsigned g = 1; g <= pc.NrPcGens; g++)
@@ -761,10 +702,8 @@ void EvalAllRel(const pcpresentation &pc, const fppresentation &pres) {
 	fprintf(LogFile, "# endomorphism: ");
 	PrintNode(LogFile, pres, n);
 	fprintf(LogFile, " (");
-	for (unsigned g = pc.NrPcGens+1; g <= NrTotalGens; g++) {
-	  PrintVec(LogFile, phi[g-pc.NrPcGens-1]);
-	  fprintf(LogFile, g == NrTotalGens ? ")\n" : "; ");
-	}
+	for (unsigned g = pc.NrPcGens+1; g <= NrTotalGens; g++)
+	  fprintf(LogFile, PRIsparsecvec "%s", &phi[g-pc.NrPcGens-1], g == NrTotalGens ? ")\n" : "; ");
       }
     }
 
@@ -777,11 +716,8 @@ void EvalAllRel(const pcpresentation &pc, const fppresentation &pres) {
 	for (auto kc : t)
 	  h.addmul(kc.second, phi[kc.first-pc.NrPcGens-1]);
 	sparsecvec s = h.getsparse();
-	if (Debug >= 2) {
-	  fprintf(LogFile, "# spun relation: ");
-	  PrintVec(LogFile, t);
-	  fprintf(LogFile, " ("); PrintVec(LogFile, s); fprintf(LogFile, ")\n");
-	}
+	if (Debug >= 2)
+	  fprintf(LogFile, "# spun relation: " PRIsparsecvec " (" PRIsparsecvec ")\n", &t, &s);
 	if (AddToRelMatrix(h))
 	  s.free();
 	else
@@ -882,9 +818,8 @@ void ReducePcPres(pcpresentation &pc, const fppresentation &pres, const relmatri
 
   if (Debug >= 2) {
     fprintf(LogFile, "# relations matrix:\n");
-    for (const sparsecvec r : rels) {
-      fprintf(LogFile, "# "); PrintVec(LogFile, r); fprintf(LogFile, "\n");
-    }
+    for (const sparsecvec r : rels)
+      fprintf(LogFile, "# " PRIsparsecvec "\n", &r);
   }
 
   /* renumber[k] = j >= 1 means generator k should be renumbered j.

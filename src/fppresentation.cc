@@ -131,7 +131,7 @@ static gen GenNumber(fppresentation &pres, genstatus status, unsigned weight) {
   return pres.NrGens;
 }
 
-static void SyntaxError(const char *format, ...) __attribute__((format(printf, 1, 2),noreturn));
+static void SyntaxError(const char *format, ...) __attribute__((format(__printf__, 1, 2),noreturn));
 static void SyntaxError(const char *format, ...) {
   va_list va;
   va_start (va, format);
@@ -652,7 +652,7 @@ void FreePresentation(fppresentation &pres) {
 void PrintNode(FILE *f, const fppresentation &pres, node *n) {
   switch (n->type) {
   case TNUM:
-    coeff_out_str(f, n->cont.n);
+    fprintf(f, "$<%p:>", &n->cont.n);
     break;
   case TGEN:
     fprintf(f, "%s", pres.GeneratorName[n->cont.g].c_str());

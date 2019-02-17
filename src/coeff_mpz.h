@@ -25,6 +25,7 @@ inline bool coeff_z_p(const coeff a) {
 #define coeff_get_si mpz_get_si
 #define coeff_set mpz_set
 #define coeff_set_si mpz_set_si
+#define coeff_get_str mpz_get_str
 #define coeff_set_str mpz_set_str
 #define coeff_clear mpz_clear
 

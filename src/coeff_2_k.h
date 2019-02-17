@@ -189,7 +189,12 @@ inline void coeff_unit_annihilator(coeff &unit, coeff &annihilator, const coeff 
 
 inline int coeff_out_str(FILE *f, const coeff &a)
 {
-  return fprintf(f, "%lu", (unsigned long) a.data); /* maybe we should print in binary or hex? */
+  return fprintf(f, "%" PRIu64, a.data); /* maybe we should print in binary or hex? */
+}
+
+inline char *coeff_get_str(char *s, int base, const coeff &a)
+{
+  !!!;
 }
 
 #define coeff_base 2
