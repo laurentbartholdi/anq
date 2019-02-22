@@ -44,7 +44,7 @@ void InitPcPres(pcpresentation &pc, const fppresentation &pres) {
   pc.Generator = (deftype *) malloc(sizeof(deftype));
   if (pc.Generator == NULL)
     abortprintf(2, "InitPcPres: malloc(Generator) failed");
-  pc.Generator[0] = {.t = DINVALID};
+  pc.Generator[0] = {.t = (gendeftype) -1};
 
   /* we initialize the exponents and annihilators of our pc generators */
   pc.Exponent = (coeff *) malloc(sizeof(coeff));
@@ -119,7 +119,10 @@ static hollowcvec tail_pow(const pcpresentation &pc, gen f, gen g) {
   
   if (f > g) { /* f*g*g^(N-1) = f*g^N */
     coeff_set_si(lhs[f], 1);
-    lhs.mul(pc, g, pc.Exponent[g]);
+    lhs.mul(pc, g);
+    coeff_add_si(rhs[g], pc.Exponent[g], -1);
+    lhs.mul(pc, rhs);
+    rhs.clear();
     
     coeff_set_si(rhs[f], 1);
     rhs.mul(pc, pc.Power[g]);
@@ -145,6 +148,27 @@ static hollowcvec tail_pow(const pcpresentation &pc, gen f, gen g) {
 }
 #endif
 
+// should [i,j] receive a tail?
+inline bool isgoodweight_comm(const pcpresentation &pc, int i, int j) {
+  unsigned totalweight = pc.Generator[i].w + pc.Generator[j].w;
+
+  if (totalweight > pc.Class)
+    return false;
+
+  if (pc.Graded && totalweight != pc.Class)
+    return false;
+
+  unsigned totalcweight = pc.Generator[i].cw + pc.Generator[j].cw;
+
+  if (totalcweight > pc.NilpotencyClass)
+    return false;
+  
+  if (pc.Metabelian && pc.Generator[i].cw > 1 && pc.Generator[j].cw > 1)
+    return false;
+
+  return true;  
+}
+
 /* The first step, to extend a pc presentation one class ahead, is to
  * define new generators for all relations which are not definitions,
  * the so-called "tails".
@@ -162,12 +186,8 @@ unsigned AddTails(pcpresentation &pc, const fppresentation &pres) {
   std::vector<std::vector<bool>> is_dcomm(pc.NrPcGens+1);
 
   /* first mark aliases */
-  for (node *n : pres.Aliases) {
-    gen g = n->cont.bin.l->cont.g;
-    if (is_dgen[g])
-      abortprintf(3, "(At least) two definitions for generator %d", g);
-    is_dgen[g] = true;
-  }
+  for (auto n : pres.Aliases)
+    is_dgen[n->cont.bin.l->cont.g] = true;
     
   for (unsigned i = 1; i <= pc.NrPcGens; i++) {
     is_dcomm[i] = std::vector<bool>(i,false);
@@ -182,6 +202,8 @@ unsigned AddTails(pcpresentation &pc, const fppresentation &pres) {
     case DPOW:
       is_dpow[pc.Generator[i].g] = true;
       break;
+    default:
+      abortprintf(4, "Generator %d should have been eliminated", i);
     }
   }
 
@@ -194,7 +216,7 @@ unsigned AddTails(pcpresentation &pc, const fppresentation &pres) {
   for (unsigned i = 1; i <= pres.NrGens; i++) {
     if (is_dgen[i] || pres.Weight[i] >= pc.Class || pc.Graded)
       continue;
-    AddSingleGenerator(pc, pc.Epimorphism[i], {.t = DINVALID, .g = i});
+    AddSingleGenerator(pc, pc.Epimorphism[i], {.t = TEMPGEN, .g = i, .w = pc.Class, .cw = 1});
     if (Debug >= 2)
       fprintf(LogFile, "# added tail a%d to epimorphic image of %s\n", NrTotalGens, pres.GeneratorName[i].c_str());
   }
@@ -220,11 +242,14 @@ unsigned AddTails(pcpresentation &pc, const fppresentation &pres) {
       for (unsigned i = 1; i <= pc.NrPcGens; i++) {
 	if (is_dpow[i] || !coeff_nz_p(pc.Exponent[i]))
 	  continue;
-	if (pc.Graded && (!pc.PAlgebra || pc.Generator[i].w+1 != pc.Class))
+	unsigned targetweight = (pc.Jennings ? pc.Generator[i].w*coeff_base : pc.Generator[i].w+1);
+	if (targetweight > pc.Class || (pc.Graded && targetweight != pc.Class))
 	  continue;
-	AddSingleGenerator(pc, pc.Power[i], {.t = (pc.PAlgebra ? DPOW : DINVALID), .g = i, .w = pc.Class, .cw = pc.Generator[i].cw});
+	if (pc.Graded && !pc.PAlgebra)
+	  continue;
+	AddSingleGenerator(pc, pc.Power[i], {.t = (pc.PAlgebra ? DPOW : TEMPPOW), .g = i, .w = pc.Class, .cw = pc.Generator[i].cw});
 	if (Debug >= 2)
-	  fprintf(LogFile, "# added tail a%d to non-defining torsion generator a%d\n", NrTotalGens, i);
+	  fprintf(LogFile, "# added tail a%d to non-defining torsion a%d^" PRIcoeff "\n", NrTotalGens, i, &pc.Exponent[i]);
       }
     }
 
@@ -241,9 +266,7 @@ unsigned AddTails(pcpresentation &pc, const fppresentation &pres) {
 	 to be sure that the generator that will be kept after consistency
 	 and relations are imposed is a valid defining generator (namely,
 	 of totalweight = pc.Class). */
-      for (unsigned weight = 2; weight <= pc.Class; weight++) {
-	if (pc.Graded && weight != pc.Class)
-	  continue;
+      for (unsigned weight = (pc.Graded ? pc.Class : 2); weight <= pc.Class; weight++) {
 	for (unsigned i = 1; i <= pc.NrPcGens; i++) {
 	  if (pc.Generator[i].t != DGEN)
 	    continue;
@@ -255,11 +278,11 @@ unsigned AddTails(pcpresentation &pc, const fppresentation &pres) {
 	    unsigned totalweight = pc.Generator[i].w+pc.Generator[j].w;
 	    if (totalweight != weight)
 	      continue;
-	    unsigned totalcweight = pc.Generator[i].cw + pc.Generator[j].cw;
-	    if (totalcweight > pc.NilpotencyClass)
+
+	    if (!isgoodweight_comm(pc, i, j))
 	      continue;
-	  
-	    AddSingleGenerator(pc, pc.Comm[j][i], {.t = (weight == pc.Class ? DCOMM : DINVALID), .g = j, .h = i, .w = pc.Class, .cw = totalcweight});
+	    
+	    AddSingleGenerator(pc, pc.Comm[j][i], {.t = (weight == pc.Class ? DCOMM : TEMPCOMM), .g = j, .h = i, .w = pc.Class, .cw = pc.Generator[i].cw+pc.Generator[j].cw});
 	    if (Debug >= 2)
 	      fprintf(LogFile, "# added tail a%d to non-defining commutator [a%d,a%d]\n", NrTotalGens, j, i);
 	  }
@@ -315,10 +338,9 @@ unsigned AddTails(pcpresentation &pc, const fppresentation &pres) {
    */
   for (unsigned j = pc.NrPcGens; j >= 1; j--) {
     for (unsigned i = 1; i < j; i++) {
-      unsigned totalweight = pc.Generator[i].w+pc.Generator[j].w;
-      if (totalweight > pc.Class || (pc.Graded && totalweight != pc.Class))
+      if (!isgoodweight_comm(pc, i, j))
 	continue;
-      
+	  
       if (pc.Generator[i].t == DGEN && pc.Generator[j].t != DPOW) /* nothing to do, [aj,ai] is a defining generator */
 	continue;
 
@@ -356,7 +378,7 @@ unsigned AddTails(pcpresentation &pc, const fppresentation &pres) {
 	if (Debug >= 2)
 	  fprintf(LogFile, "# tail: [a%d,a%d] = " PRIcoeff "*[a%d,a%d] = " PRIhollowcvec "\n", j, i, &pc.Exponent[g], g, i, &tail);
       } else
-	abortprintf(5, "AddTails: unknown definition for [a%d,a%d]", j, i);
+	abortprintf(4, "AddTails: unknown definition for [a%d,a%d]", j, i);
       
       unsigned len = 0;
       auto tp = tail.begin();
@@ -376,7 +398,7 @@ unsigned AddTails(pcpresentation &pc, const fppresentation &pres) {
       /* compute the correct tail for [aj,ai]: in groups,
        * - if ai is defined as [g,h], compute [aj,ai] *= (aj(gh))^-1 * (ajg)h
        * - if ai is defined as g^N, compute [aj,ai] *= (aj g^N)^-1 * (ajg)g^(N-1)
-       * - if aj is defined as g^N, compute [aj,ai] *= !!!
+       * - if aj is defined as g^N, compute [aj,ai] *= (g^N a_i)^-1 * (g^(N-1)*(g*a_i))
        */
       hollowcvec tail;
 
@@ -397,7 +419,7 @@ unsigned AddTails(pcpresentation &pc, const fppresentation &pres) {
 	if (Debug >= 2)
 	  fprintf(LogFile, "# tail: [a%d,a%d] = [a%d^" PRIcoeff ",a%d] *= " PRIhollowcvec "\n", j, i, pc.Generator[j].g, &pc.Exponent[pc.Generator[j].g], i, &tail);
       } else
-	abortprintf(5, "AddTails: unknown definition for [a%d,a%d]", j, i);
+	abortprintf(4, "AddTails: unknown definition for [a%d,a%d]", j, i);
 
       if (!tail.empty()) {
 	if (tail.front()->first <= pc.NrPcGens)
@@ -421,19 +443,28 @@ unsigned AddTails(pcpresentation &pc, const fppresentation &pres) {
 /* check consistency of pc presentation, and deduce relations to
  * impose on centre
  */
-#ifdef LIEALG
 void Consistency(const pcpresentation &pc) {
   // check Jacobi identity
   for (unsigned i = 1; i <= pc.NrPcGens; i++) {
     if (pc.Generator[i].t != DGEN)
       continue;
 
-    for (unsigned j = i + 1; j <= pc.NrPcGens; j++)
+    unsigned commi = (pc.Generator[i].cw > 1);
+    
+    for (unsigned j = i + 1; j <= pc.NrPcGens; j++) {
+      unsigned commij = commi + (pc.Generator[j].cw > 1);
+      if (pc.Metabelian && commij >= 2)
+	continue;
+      
       for (unsigned k = j + 1; k <= pc.NrPcGens; k++) {
 	unsigned totalweight = pc.Generator[i].w + pc.Generator[j].w + pc.Generator[k].w;
 	if (totalweight > pc.Class || (pc.Graded && totalweight != pc.Class))
 	  continue;
 	
+	if (pc.Metabelian && commij + (pc.Generator[k].cw > 1) >= 2)
+	  continue;
+	
+#ifdef LIEALG
 	hollowcvec t = vecstack.fresh();
 	t.lie3bracket(pc, i, j, k, true);
 	t.lie3bracket(pc, j, k, i, true);
@@ -442,10 +473,16 @@ void Consistency(const pcpresentation &pc) {
 
 	if (Debug >= 2)
 	  fprintf(LogFile, "# consistency: jacobi(a%d,a%d,a%d) = " PRIhollowcvec "\n", i, j, k, &t);
+#else
+	hollowcvec t = tail_assoc(pc, k, j, i);
 
-	QueueInRelMatrix(t);	
+	if (Debug >= 2)
+	  fprintf(LogFile, "# consistency: associator(a%d,a%d,a%d) = " PRIhollowcvec "\n", k, j, i, &t);
+#endif
+	QueueInMatrix(t);	
 	vecstack.pop(t);
       }
+    }
   }
   
   coeff annihilator, unit;
@@ -456,27 +493,39 @@ void Consistency(const pcpresentation &pc) {
   for (unsigned i = 1; i <= pc.NrPcGens; i++)
     if (coeff_nz_p(pc.Exponent[i])) {
       /* if N*v = 0 in our ring, and we have a power relation A*g = w,
-       * enforce (N/A)*w = 0
+       * enforce (N/A)*w = 0.
+       * if the group's exponent is given (by the torsion in the
+       * ccoefficients), impose a power relation.
        */
       hollowcvec t = vecstack.fresh();
   
       coeff_unit_annihilator(unit, annihilator, pc.Exponent[i]);
+#ifdef LIEALG
       t.addmul(annihilator, pc.Power[i]);
       t.liecollect(pc);
   
       if (Debug >= 2)
 	fprintf(LogFile, "# consistency: " PRIcoeff "*" PRIcoeff "*a%d = " PRIhollowcvec "\n", &annihilator, &pc.Exponent[i], i, &t);
+#else
+      hollowcvec u = vecstack.fresh();
+      u.copysorted(pc.Power[i]);      
+      t.pow(pc, u, annihilator);
+      vecstack.pop(u);
       
-      QueueInRelMatrix(t);
+      if (Debug >= 2)
+	fprintf(LogFile, "# consistency: (a%d^" PRIcoeff ")^" PRIcoeff " = " PRIhollowcvec "\n", i, &pc.Exponent[i], &annihilator, &t);
+#endif      
+      QueueInMatrix(t);
       vecstack.pop(t);
 
       for (unsigned j = 1; j <= pc.NrPcGens; j++) {
-	unsigned totalweight = pc.Generator[i].w + pc.Generator[j].w;
-	if (totalweight > pc.Class || (pc.Graded && totalweight != pc.Class))
+	if (!isgoodweight_comm(pc, i, j))
 	  continue;
 
-	/* enforce N*[a,b] = [N*a,b] if N is the order of a */
-
+	/* enforce N*[a,b] = [N*a,b] if N is the order of a; or
+	 * a^N*b = a^(N-1)*(a*b) or a*b^N = (a*b)*b^(N-1) in groups
+	 */
+#ifdef LIEALG
 	hollowcvec t = vecstack.fresh();
   
 	for (auto kc : pc.Power[i]) {
@@ -497,8 +546,13 @@ void Consistency(const pcpresentation &pc) {
 
 	if (Debug >= 2)
 	  fprintf(LogFile, "# consistency: " PRIcoeff "*[a%d,a%d]-[" PRIcoeff "*a%d,a%d] = " PRIhollowcvec "\n", &pc.Exponent[i], i, j, &pc.Exponent[i], i, j, &t);
+#else
+	hollowcvec t = tail_pow(pc, j, i);
 
-	QueueInRelMatrix(t);
+	if (Debug >= 2)
+	  fprintf(LogFile, "# consistency: associator(a%d,a%d,a%d^(N-1)) = " PRIhollowcvec "\n", j, i, i, &t);
+#endif	
+	QueueInMatrix(t);
 	vecstack.pop(t);
       }
     }
@@ -506,83 +560,26 @@ void Consistency(const pcpresentation &pc) {
   coeff_clear(unit);
   coeff_clear(annihilator);
 
-  FlushQueue();
-  
   TimeStamp("Consistency()");
 }
-#else
-void Consistency(const pcpresentation &pc) {
-  // check associativity
-  for (unsigned i = 1; i <= pc.NrPcGens; i++) {
-    if (pc.Generator[i].t != DGEN)
+
+// compute result = src^phi, except for the symbol g in src
+void MapEndo(hollowcvec &result, const pcpresentation &pc, sparsecvec src, gen avoid, const sparsecmat &phi) {
+  for (auto kc : src) {
+    if (kc.first == avoid)
       continue;
-
-    for (unsigned j = i + 1; j <= pc.NrPcGens; j++)
-      for (unsigned k = j + 1; k <= pc.NrPcGens; k++) {
-	unsigned totalweight = pc.Generator[i].w + pc.Generator[j].w + pc.Generator[k].w;
-	if (totalweight > pc.Class || (pc.Graded && totalweight != pc.Class))
-	  continue;
-	
-	hollowcvec tail = tail_assoc(pc, k, j, i);
-
-	if (Debug >= 2)
-	  fprintf(LogFile, "# consistency: ");
-	  fprintf(LogFile, "associator(a%d,a%d,a%d) = " PRIhollowcvec "\n", k, j, i, &tail);
-
-	QueueInRelMatrix(tail);	
-	vecstack.pop(tail);
-      }
-  }
-  
-  coeff annihilator, unit;
-  coeff_init(annihilator);
-  coeff_init(unit); // unused
-
-  // check torsion relations
-  for (unsigned i = 1; i <= pc.NrPcGens; i++)
-    if (coeff_nz_p(pc.Exponent[i])) {
-      /* if the group's exponent is given (by the torsion in the
-	 coefficients), impose a power relation */
-      hollowcvec t = vecstack.fresh();
-      coeff_unit_annihilator(unit, annihilator, pc.Exponent[i]);
-
-      hollowcvec u = vecstack.fresh();
-      u.copysorted(pc.Power[i]);      
-      t.pow(pc, u, annihilator);
-      vecstack.pop(u);
-      
-      if (Debug >= 2)
-	fprintf(LogFile, "# consistency: (a%d^" PRIcoeff ")^" PRIcoeff " = " PRIhollowcvec "\n", i, &pc.Exponent[i], &annihilator, &t);
-      
-      QueueInRelMatrix(t);
-      vecstack.pop(t);
-
-      for (unsigned j = 1; j <= pc.NrPcGens; j++) {
-	unsigned totalweight = pc.Generator[i].w + pc.Generator[j].w;
-	if (totalweight > pc.Class || (pc.Graded && totalweight != pc.Class))
-	  continue;
-
-	/* enforce a^N*b = a^(N-1)*(a*b) or a*b^N = (a*b)*b^(N-1) */
-
-	hollowcvec tail = tail_pow(pc, j, i);
-
-	if (Debug >= 2)
-	  fprintf(LogFile, "# consistency: associator(a%d,a%d,a%d^(N-1)) = " PRIhollowcvec "\n", j, i, i, &tail);
-	
-	QueueInRelMatrix(tail);
-	vecstack.pop(tail);
-      }
-    }
-
-  coeff_clear(unit);
-  coeff_clear(annihilator);
-
-  FlushQueue();
-  
-  TimeStamp("Consistency()");
-}
+#ifdef LIEALG
+    result.addmul(kc.second, phi[kc.first]);
+#else
+    hollowcvec p = vecstack.fresh();
+    p.copysorted(phi[kc.first]);
+    result.pow(pc, p, kc.second);
+    vecstack.pop(p);
 #endif
+  }
+}
 
+// Evaluate all relations in pc, ship them to Matrix
 void EvalAllRel(const pcpresentation &pc, const fppresentation &pres) {
   for (auto n : pres.Aliases) {
     hollowcvec v = vecstack.fresh();
@@ -616,83 +613,86 @@ void EvalAllRel(const pcpresentation &pc, const fppresentation &pres) {
     if (!pres.Endomorphisms.empty())
       itrels.push_back(v.getsparse());
     
-    AddToRelMatrix(v);
+    AddToMatrix(v);
 
     vecstack.pop(v);
   }
 
   if (!pres.Endomorphisms.empty()) { // now t is a list of evaluations of rels
-    std::vector<relmatrix> endos;
+    std::vector<sparsecmat> endos;
 
     for (auto n : pres.Endomorphisms) {
-      std::vector<sparsecvec> phi(NrTotalGens+1,badsparsecvec);
+      sparsecmat phi(NrTotalGens+1,badsparsecvec);
+
       for (unsigned g = 1; g <= NrTotalGens; g++) {
+	hollowcvec rhs = vecstack.fresh();
+	hollowcvec lhs = vecstack.fresh();
+	const gen g0 = pc.Generator[g].g;
+	
 	switch (pc.Generator[g].t) {
-	case DGEN:
+	case DGEN: case TEMPGEN:
 	  {
 	    node *m;
-	    for (node *t = n;; t = t->cont.bin.r) {
+	    for (node *t = n;; t = t->cont.bin.l) {
 	      if (t->type == TBRACE)
-		m = t->cont.bin.l;
+		m = t->cont.bin.r;
 	      else
 		m = t;
-	      if (m->cont.bin.l->cont.g == pc.Generator[g].g)
+	      if (m->cont.bin.l->cont.g == g0)
 		break;
 	      if (t->type != TBRACE)
 		abortprintf(5, "Could not find generator %u in pc presentation", g);
 	    }
 
-	    hollowcvec v = vecstack.fresh();
-
-	    v.eval(pc, m->cont.bin.r);
-	    phi[g] = v.getsparse();
-
-	    vecstack.pop(v);
+	    MapEndo(lhs, pc, pc.Epimorphism[g0], g, phi);
+	    rhs.eval(pc, m->cont.bin.r);
 	    break;
 	  }
-	case DCOMM: // g = [g0,g1]
+	case DCOMM: case TEMPCOMM: // g = [g0,g1]
 	  {
-	    hollowcvec c = vecstack.fresh();
+	    const gen g1 = pc.Generator[g].h;
+	    
+	    MapEndo(lhs, pc, pc.Comm[g0][g1], g, phi);
+	    
 	    hollowcvec v = vecstack.fresh();
 	    hollowcvec w = vecstack.fresh();
 #ifdef LIEALG
-	    v.copysorted(phi[pc.Generator[g].g]);
-	    w.copysorted(phi[pc.Generator[g].h]);
-	    c.liebracket(pc, v, w);
+	    v.copysorted(phi[g0]);
+	    w.copysorted(phi[g1]);
+	    rhs.liebracket(pc, v, w);
 #else
-	    c.copysorted(phi[pc.Generator[g].g]);
-	    w.copysorted(phi[pc.Generator[g].h]);
-	    v.copy(c);
-	    v.mul(pc, w); // v = phi[g0]*phi[g1]
-	    w.mul(pc, v); // w = phi[g1]*phi[g0]
-	    c.clear();
-	    c.lquo(pc, w, v);
+	    v.copysorted(phi[g0]);
+	    v.mul(pc, phi[g1]); // v = phi[g0]*phi[g1]
+	    w.copysorted(phi[g1]);
+	    w.mul(pc, phi[g0]); // w = phi[g1]*phi[g0]
+	    rhs.lquo(pc, w, v);
 #endif	    
 	    vecstack.pop(w);
 	    vecstack.pop(v);
-	    phi[g] = c.getsparse();
-	    vecstack.pop(c);
 	    break;
 	  }
-	case DPOW: // g = N*g0 or g0^N
+	case DPOW: case TEMPPOW: // g = N*g0 or g0^N
 	  {
-	    hollowcvec v = vecstack.fresh();
+	    MapEndo(lhs, pc, pc.Power[g0], g, phi);
+	    
 #ifdef LIEALG
-	    v.copysorted(phi[pc.Generator[g].g]);
-	    v.mul(pc.Exponent[pc.Generator[g].g]);
+	    rhs.copysorted(phi[g0]);
+	    rhs.mul(pc.Exponent[g0]);
 #else
 	    hollowcvec w = vecstack.fresh();
-	    w.copysorted(phi[pc.Generator[g].g]);
-	    v.pow(pc, w, pc.Exponent[pc.Generator[g].g]);
+	    w.copysorted(phi[g0]);
+	    rhs.pow(pc, w, pc.Exponent[g0]);
 	    vecstack.pop(w);
 #endif
-	    phi[g] = v.getsparse();
-	    vecstack.pop(v);
+	    break;
 	  }
-	  break;
-	case DINVALID:
-	  abortprintf(5, "I can't compute the endomorphism, there's a to-be-eliminated generator a%d", g);
 	}
+
+	rhs.sub(lhs);
+	vecstack.pop(lhs);
+	rhs.liecollect(pc); // this is OK for groups too, it's all in the centre
+	phi[g] = rhs.getsparse();
+	vecstack.pop(rhs);	
       }
       for (unsigned g = 1; g <= pc.NrPcGens; g++)
 	phi[g].free();
@@ -703,7 +703,7 @@ void EvalAllRel(const pcpresentation &pc, const fppresentation &pres) {
 	PrintNode(LogFile, pres, n);
 	fprintf(LogFile, " (");
 	for (unsigned g = pc.NrPcGens+1; g <= NrTotalGens; g++)
-	  fprintf(LogFile, PRIsparsecvec "%s", &phi[g-pc.NrPcGens-1], g == NrTotalGens ? ")\n" : "; ");
+	  fprintf(LogFile, "a%u → " PRIsparsecvec "%s", g, &phi[g-pc.NrPcGens-1], g == NrTotalGens ? ")\n" : "; ");
       }
     }
 
@@ -718,7 +718,7 @@ void EvalAllRel(const pcpresentation &pc, const fppresentation &pres) {
 	sparsecvec s = h.getsparse();
 	if (Debug >= 2)
 	  fprintf(LogFile, "# spun relation: " PRIsparsecvec " (" PRIsparsecvec ")\n", &t, &s);
-	if (AddToRelMatrix(h))
+	if (AddToMatrix(h))
 	  s.free();
 	else
 	  itrels.push_back(s);
@@ -739,30 +739,24 @@ void EvalAllRel(const pcpresentation &pc, const fppresentation &pres) {
 
 /* eliminate redundant generators from v; rels is a list of relations
    in the centre, and renumber says how central generators are to be
-   renumbered. */
+   renumbered.
 
-/* !!! This is time-critical. It can be optimized in various ways:
-   -- g is a central generator, so we can skip the beginning if we ever
-      have to call Diff
-   -- Matrix is in Hermite normal form -- we could put it in Smith NF, maybe,
-      and then the collection would be simpler?
-   -- often w will have only 1 or 2 non-trivial entries, in which case the
-      operation can be done in-place
-   -- Matrix could be renumbered once rather than at each time
-*/
-
-static void EliminateTrivialGenerators(pcpresentation &pc, const relmatrix &rels, sparsecvec &v, int renumber[]) {
+   @@@ this is time-critical. */
+static void EliminateTrivialGenerators(pcpresentation &pc, const sparsecmat &rels, sparsecvec &v, int renumber[]) {
   
   hollowcvec t = vecstack.fresh();
   t.copysorted(v);
   v.free();
 
-  // first, eliminate
+  // first, eliminate !!! we should call MatrixReduce on the tail of v
   for (auto kc : t) {
     int newg = renumber[kc.first];
     if (newg < 1) {
+      // we can't do that, because kc.second will get modified in the process
+      // (it would be OK if we could subtract in descending direction)
+      //t.submul(kc.second, rels[-newg]);
       t.submul(kc.second, rels[-newg].window(1));
-      coeff_set_si(kc.second, 0);
+      coeff_zero(t[kc.first]);
     }
   }
 
@@ -779,41 +773,31 @@ static void EliminateTrivialGenerators(pcpresentation &pc, const relmatrix &rels
   vecstack.pop(t);
 
 #if 0 // premature optimization
-  for (auto q = v.begin(); q != v.end(); q++) {
+  for (auto q = v.upper_bound(pc.NrPcGens); q != v.end(); q++) {
     int newg = renumber[q->first];
     if (newg >= 1)
-      q->first = newg;
+      q->first = newg; // renumber in-place
     else {
-      // !!! here we could be smart by examining rels[-newg].
-      // if it's a single term, we're actually shortening v
-      // if it's a sum of two terms, replace one by the other
-
-      // we restart, with a hollow vector
-      t = vecstack.fresh();
-      t.copysorted(q.tail()); // we must collect from here on
-      for (auto kc : t) {
-	int newg = renumber[kc.first];
-	if (newg >= 1) {
-	  coeff_set(t[kc.first], t[newg]);
-	  coeff_set_si(t[newg], 0);
-	} else
-	  t.submul(kc.second, rels[-newg]);
+      const sparsecvec rel = rels[-newg].window(1);
+      if (rel.empty()) {
+	// we're actually removing an entry from q
+	q--;
+      } else if (rel.window(1).empty()) {
+	// we're replacing an entry with another
+	q->first = rel[0].first;
+	coeff_neg(q->second, q->second);
+	coeff_mul(q->second, rel[0].second, q->second);
+      } else {
+	// now we should make a copy of the vector, and work with the hollow one
+#error copy code above
       }
-      q.markend(); // add back the first part of the vector, which is unaffected
-      t.add(v);
-      t.liecollect(pc); // liecollect is OK, since we're in the centre
-
-      v.free();
-      v = t.getsparse();
-      vecstack.pop(t);
-      return;
     }
   }
 #endif
 }
 
 /* quotient the centre by the relations rels */
-void ReducePcPres(pcpresentation &pc, const fppresentation &pres, const relmatrix &rels) {
+void ReducePcPres(pcpresentation &pc, const fppresentation &pres, const sparsecmat &rels) {
   unsigned trivialgens = 0;
 
   if (Debug >= 2) {
@@ -877,7 +861,7 @@ void ReducePcPres(pcpresentation &pc, const fppresentation &pres, const relmatri
 
   if (!pc.PAlgebra) /* sanity check */
     for (unsigned i = 1; i <= newnrpcgens; i++)
-      if (pc.Generator[i].t == DINVALID)
+      if (pc.Generator[i].t & TEMPMASK)
 	abortprintf(5, "Generator %d should have been eliminated", i);
   
   for (unsigned i = newnrpcgens+1; i <= NrTotalGens; i++) {

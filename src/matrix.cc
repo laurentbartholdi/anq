@@ -8,22 +8,22 @@
 #include "nq.h"
 #include "colamd.h"
 #include <algorithm>
-#include <set>
+//#include <set>
+#include <unordered_set>
 #include <utility>
 #include <unistd.h>
 
 /* static variables, cached from InitMatrix */
-unsigned NrCentral, FirstCentral;
-bool Torsion;
+unsigned NrCols, Shift;
 const coeff *TorsionExp;
 
-/* we maintain a square NrCentralxNrCentral matrix (with sparse rows)
+/* we maintain a square NrColsxNrCols matrix (with sparse rows)
    to store the current relations. If row Matrix[i] is allocated, then
-   its pivot should be in position i+FirstCentral; so the matrix
+   its pivot should be in position i+Shift; so the matrix
    really has (row,column)-space equal to
-   [0,NrCentral) x [FirstCentral,NrTotalGens].
+   [0,NrCols) x [Shift,NrTotalGens].
 */
-std::vector<sparsecvec> Matrix;
+sparsecmat Matrix;
 
 #ifdef HACK_to_allow_pointer_to_be_changed_in_set
 // @@@ this experiment was to hack into the std::set by allowing a
@@ -45,30 +45,31 @@ and "Queue.insert(cv);" should become
 }
 #endif
 
-std::set<sparsecvec,bool(*)(sparsecvec,sparsecvec)> Queue([](sparsecvec v1, sparsecvec v2){ return Compare(v1,v2) < 0; });
+std::unordered_set<sparsecvec,hashvec<sparsecvec>,equal_tovec<sparsecvec>> Queue;
+
+//std::set<sparsecvec,bool(*)(sparsecvec,sparsecvec)> Queue([](sparsecvec v1, sparsecvec v2){ return Compare(v1,v2) < 0; });
 
 static void InitTorsion() {  
-  if (Torsion) {
-    for (unsigned i = 0; i < NrCentral; i++) {
+  if (TorsionExp != nullptr) {
+    for (unsigned i = 0; i < NrCols; i++) {
       Matrix[i].alloc(1);
-      Matrix[i][0].first = FirstCentral + i;
+      Matrix[i][0].first = Shift + i;
       coeff_set(Matrix[i][0].second, *TorsionExp);
       Matrix[i].truncate(1);
     }
   }
 }
 
-void InitRelMatrix(const pcpresentation &pc, unsigned nrcentralgens) {
-  FirstCentral = pc.NrPcGens + 1;
-  NrCentral = nrcentralgens;
-  Torsion = pc.PAlgebra;
-  TorsionExp = &pc.TorsionExp;
+void InitMatrix(const coeff *torsionexp, unsigned shift, unsigned len) {
+  Shift = shift;
+  NrCols = len;
+  TorsionExp = torsionexp;
 
-  Matrix.resize(NrCentral, sparsecvec(nullptr));
+  Matrix.resize(NrCols, sparsecvec(nullptr));
   InitTorsion();
 }
 
-void FreeRelMatrix() {
+void FreeMatrix() {
   if (!Queue.empty())
     abortprintf(5, "FreeMatrix: row queue not empty");
   
@@ -88,9 +89,9 @@ void PrintMatrix() {
 // try to add currow to the row space spanned by Matrix.
 // return true if currow already belonged to the row space.
 // currow will be damaged (well, reduced) in the process.
-bool AddToRelMatrix(hollowcvec currow) {
+static bool AddRow(hollowcvec currow) {
   bool belongs = true;
-  
+
   coeff a, b, c, d;
   coeff_init(a);
   coeff_init(b);
@@ -98,7 +99,7 @@ bool AddToRelMatrix(hollowcvec currow) {
   coeff_init(d);
 
   for (auto kc : currow) {
-    unsigned row = kc.first - FirstCentral;
+    unsigned row = kc.first - Shift;
       
     if (!Matrix[row].allocated()) { /* Insert v in Matrix at position row */
       belongs = false;
@@ -153,7 +154,15 @@ bool AddToRelMatrix(hollowcvec currow) {
   return belongs;
 }
 
-std::vector<int> colamd(relmatrix &m) {
+bool AddToMatrix(hollowcvec currow) {
+  if (currow.empty())
+    return true;
+  if (currow.front()->first < Shift)
+    abortprintf(5, "AddToMatrix: vector has a term a%d of too low index", currow.front()->first);
+  return AddRow(currow);
+}
+
+  std::vector<int> colamd(sparsecmat &m) {
   std::vector<int> ind;
   int stats[COLAMD_STATS];
   std::vector<int> intmat;
@@ -161,7 +170,7 @@ std::vector<int> colamd(relmatrix &m) {
   for (const sparsecvec v : m) {
     ind.push_back(intmat.size());
     for (auto kc : v)
-      intmat.push_back(kc.first - FirstCentral);
+      intmat.push_back(kc.first - Shift);
   }
   ind.push_back(intmat.size());
 
@@ -169,9 +178,9 @@ std::vector<int> colamd(relmatrix &m) {
     fprintf(LogFile, "# about to collect %ld relations (%ld nnz)\n", m.size(), intmat.size());
   }
 
-  size_t alloc = colamd_recommended(intmat.size(), NrCentral, m.size());
+  size_t alloc = colamd_recommended(intmat.size(), NrCols, m.size());
   intmat.reserve(alloc);
-  int ok = colamd(NrCentral, m.size(), alloc, intmat.data(), ind.data(), NULL, stats);
+  int ok = colamd(NrCols, m.size(), alloc, intmat.data(), ind.data(), NULL, stats);
   if (Debug >= 3) {
     // we capture the output of colamd_report, and pipe it to LogFile.
     // strangely enough, the documentation says that colamd_report writes to
@@ -218,7 +227,7 @@ std::vector<int> colamd(relmatrix &m) {
 }
 
 /* collect the vectors in Queue and Matrix, and combine them back into Matrix */
-void FlushQueue() {
+void FlushMatrixQueue() {
   if (Queue.empty())
     return;
   
@@ -232,7 +241,7 @@ void FlushQueue() {
   /* call colamd to determine optimal insertion ordering */
   std::vector<int> ind = colamd(Matrix);
   
-  std::vector<sparsecvec> oldrels(NrCentral, sparsecvec(nullptr));
+  sparsecmat oldrels(NrCols, sparsecvec(nullptr));
   Matrix.swap(oldrels);
   InitTorsion();
 
@@ -242,23 +251,23 @@ void FlushQueue() {
     hollowcvec currow = vecstack.fresh();
     currow.copysorted(oldrels[ind[i]]);
     oldrels[ind[i]].free();
-    AddToRelMatrix(currow);
+    AddRow(currow);
     vecstack.pop(currow);
   }
 
-  TimeStamp("FlushQueue()");
+  TimeStamp("FlushMatrixQueue()");
 }
 
-relmatrix GetRelMatrix() {
-  FlushQueue();
+sparsecmat GetMatrix() {
+  FlushMatrixQueue();
 
-  relmatrix rels;
-  rels.reserve(NrCentral);
+  sparsecmat rels;
+  rels.reserve(NrCols);
 
   /* reduce all the head columns, to achieve Hermite normal form. */
   coeff q;
   coeff_init(q);
-  for (unsigned j = 0; j < NrCentral; j++) { // @@@ performance: would this be faster looping backwards?
+  for (unsigned j = 0; j < NrCols; j++) { // @@@ performance: would this be faster looping backwards?
     if (!Matrix[j].allocated())
       continue;
 
@@ -267,7 +276,7 @@ relmatrix GetRelMatrix() {
     Matrix[j].free();
 
     for (auto kc : currow) {
-      unsigned row = kc.first - FirstCentral;
+      unsigned row = kc.first - Shift;
       if (row == j || !Matrix[row].allocated())
 	continue;
 
@@ -295,32 +304,25 @@ relmatrix GetRelMatrix() {
 
 /* tries to add a row to the queue; returns true if the row was added.
  empty the queue if it got full. */
-bool QueueInRelMatrix(sparsecvec cv) {
-  if (cv.empty()) // easy case: trivial relation, change nothing
-    return false;
-
-  if (cv[0].first < FirstCentral) // sanity check
-    abortprintf(5, "AddRow: vector has a term a%d not in the centre", cv[0].first);
-
-  auto p = Queue.insert(cv);
-  if (!p.second) // we were already there, insert failed
-    return false;
-
-  /* @@@ optimize for the factor "10". If too small, we'll cause
-     fill-in in the matrix. If too large, we'll use too much
-     memory. */
-  if (Queue.size() >= 10*NrCentral)
-    FlushQueue();
-
-  return true;
-}
-
-void QueueInRelMatrix(hollowcvec hv) {
+void QueueInMatrix(hollowcvec hv) {
   if (hv.empty()) // easy case: trivial relation, change nothing
     return;
 
   // @@@ performance critical: maybe we can avoid making a copy?
   sparsecvec cv = hv.getsparse();
-  if (!QueueInRelMatrix(cv))
+
+  if (cv[0].first < Shift) // sanity check
+    abortprintf(5, "QueueInMatrix: vector has a term a%d of too low index", cv[0].first);
+
+  auto p = Queue.insert(cv);
+  if (!p.second) { // we were already there, insert failed
     cv.free();
+    return;
+  }
+
+  /* @@@ optimize for the factor "10". If too small, we'll cause
+     fill-in in the matrix. If too large, we'll use too much
+     memory. */
+  if (Queue.size() >= 10*NrCols)
+    FlushMatrixQueue();
 }

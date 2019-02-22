@@ -14,23 +14,29 @@
 #endif
 
 FILE *OutputFile = stdout, *LogFile = stdout;
-unsigned Debug = 4; // !!!
+unsigned Debug = 0;
 
-const char USAGE[] = "Usage: nq <options> [<inputfile>]\n"
+#define S(x) #x
+#define S_(x) S(x)
+#define Scoeff_base S_(coeff_base)
+
+const char USAGE[] = "Usage: nq <options> [<inputfile>] [<maximal weight>]\n"
   "(with no input file, presentation is read from STDIN)\n"
-  "\t[-A]\ttoggle GAP output, default false\n"
+  "\t[-A]\ttoggle GAP output, default false (load then object with `ReadAsFunction(filename)()`)\n"
   "\t[-C]\ttoggle printing compact form of multiplication table, default true\n"
   "\t[-D]\tincrease debug level\n"
   "\t[-F <outputfile>]\n"
-  "\t[-G]\ttoggle graded Lie algebra, default false\n"
-  "\t[-J]\ttoggle Jennings series / Jacobson restricted Lie algebra, default false\n"
+  "\t[-G]\tcompute graded Lie algebra, default false\n"
+#if coeff_base != 10
+  "\t[-J]\tcompute " Scoeff_base "-Jennings series, default false\n"
+#endif
   "\t[-L <logfile>]\n"
-  "\t[-M]\ttoggle metabelian, default false\n"
+  "\t[-M]\tcompute metabelian " LIEGPSTRING ", default false\n"
   "\t[-N <nilpotency class>]\n"
   "\t[-P]\ttoggle printing definitions of basic commutators, default false\n"
-  "\t[-W <maximal weight>]\n"
+  "\t[-W <maximal weight>] (can also appear as last argument)\n"
   "\t[-X <exponent>]\tset exponent for p-central series, default 0\n"
-  "\t[-Z]\ttoggle printing zeros in multiplication table, default false";
+  "\t[-Z]\ttoggle printing zeros in multiplication table, default true";
 
 const char EXTENDEDUSAGE[] = "Presentation format:\n"
   "\tpresentation = '<' (';'* gen (',' gen)*)* '|' exprlist? '>'\n"
@@ -82,9 +88,17 @@ template <typename V> static int cvec_print(void *ref)
 }  
 #endif
 
+char *utoa(char *s, unsigned n) {
+  if (n == INFINITY)
+    strcpy(s, "∞");
+  else
+    sprintf(s, "%u", n);
+  return s;
+}
+
 int main(int argc, char **argv) {
   int c;
-  bool PrintZeros = false, PrintCompact = true, PrintDefs = false, Gap = false, Graded = false, PAlgebra = false, Metabelian = false, Jacobson = false;
+  bool PrintZeros = true, PrintCompact = true, PrintDefs = false, Gap = false, Graded = false, PAlgebra = false, Metabelian = false, Jennings = false;
   coeff TorsionExp;
   coeff_init_set_si(TorsionExp, 0);
   unsigned MaxWeight = INFINITY, NilpotencyClass = INFINITY;
@@ -114,25 +128,25 @@ int main(int argc, char **argv) {
 	abortprintf(1, "I can't open output file '%s'", optarg);
       break;
     case 'G':
-      Graded ^= true;
+      Graded = true;
       break;
     case 'h':
       printf("%s\n\n%s", USAGE, EXTENDEDUSAGE);
       return 0;
+#if coeff_base != 10
     case 'J':
-      Jacobson ^= true;
-      PAlgebra ^= true;
-      if (coeff_base == 10)
-	abortprintf(1, "For Jacobson/Jennings, I need a positive characteristic ring");
+      Jennings = true;
+      PAlgebra = true;
       coeff_set_si(TorsionExp, coeff_base);
       break;
+#endif
     case 'L':
       LogFile = fopen(optarg, "w");
       if (LogFile == NULL)
 	abortprintf(1, "I can't open log file '%s'", optarg);
       break;
     case 'M':
-      Metabelian ^= true;
+      Metabelian = true;
       break;
     case 'N':
       NilpotencyClass = atoi(optarg);
@@ -154,12 +168,16 @@ int main(int argc, char **argv) {
       abortprintf(1, "Undefined flag '%c'\n%s", c, USAGE);
     }
   
-  if (optind == argc)
-    InputFileName = "";
-  else if (optind == argc-1)
-    InputFileName = argv[optind];
+  if (optind < argc)
+    InputFileName = argv[optind++];
   else
-    abortprintf(1, "I need precisely at most one argument as input filename\n%s", USAGE);
+    InputFileName = nullptr;
+
+  if (optind < argc)
+    MaxWeight = atoi(argv[optind++]);
+
+  if (optind != argc)
+    abortprintf(1, "I need at most two arguments, as input filename and maximal weight\n%s", USAGE);
 
   {
     char hostname[128];
@@ -171,14 +189,14 @@ int main(int argc, char **argv) {
 
     fprintf(LogFile, "# The %s nilpotent quotient program, by Csaba Schneider & Laurent Bartholdi\n", LIEGPSTRING);
     fprintf(LogFile, "# Version %s, coefficients %s\n", VERSION, COEFF_ID);
-    fprintf(LogFile, "# \"%s\" with input %s started %s on %s\n", argv[0], InputFileName, timestring, hostname);
-    fprintf(LogFile, "# %s%s output %s%swill go to %s\n", PrintCompact ? "compact " : "", Gap ? "GAP" : "NQ", PrintZeros ? "with zeros " : "", PrintDefs ? "with defs" : "", OutputFile == stdout ? "stdout" : "file");
+    fprintf(LogFile, "# \"%s\" with input \"%s\" started %s on %s\n", argv[0], InputFileName ? InputFileName : "<stdin>", timestring, hostname);
+    fprintf(LogFile, "# %s%s output %s%swill go to \"%s\"\n", PrintCompact ? "compact " : "", Gap ? "GAP" : "NQ", PrintZeros ? "with zeros " : "", PrintDefs ? "with defs" : "", OutputFile == stdout ? "<stdout>" : "file");
 
-    char flags[1000] = "";
+    char flags[1000] = "", nstring[20], mstring[20];
     if (Metabelian)
       strcat(flags, "metabelian, ");
-    if (Jacobson)
-      strcat(flags, "restricted, ");
+    if (Jennings)
+      strcat(flags, "Jennings, ");
     if (Graded)
       strcat(flags, "graded, ");
     if (PAlgebra)
@@ -187,7 +205,7 @@ int main(int argc, char **argv) {
       flags[strlen(flags)-2] = 0; // remove ", "
     else
       strcat(flags, "none");
-    fprintf(LogFile, "# flags %s; nilpotency class %u; maximal weight %u\n\n", flags, NilpotencyClass, MaxWeight);
+    fprintf(LogFile, "# flags %s; nilpotency class %s; maximal weight %s\n\n", flags, utoa(nstring, NilpotencyClass), utoa(mstring, MaxWeight));
   }
   
   fppresentation fppres;
@@ -202,7 +220,7 @@ int main(int argc, char **argv) {
   pc.Graded = Graded;
   pc.PAlgebra = PAlgebra;
   pc.Metabelian = Metabelian;
-  pc.Jacobson = Jacobson;
+  pc.Jennings = Jennings;
   pc.NilpotencyClass = NilpotencyClass;
   coeff_set(pc.TorsionExp, TorsionExp);
 
@@ -211,19 +229,19 @@ int main(int argc, char **argv) {
 
     unsigned nrcentralgens = AddTails(pc, fppres); // add fresh tails
 
-    InitRelMatrix(pc, nrcentralgens);
+    InitMatrix(pc.PAlgebra ? &pc.TorsionExp : nullptr, pc.NrPcGens+1, nrcentralgens);
 
     Consistency(pc); // enforce Jacobi and Z-linearity, via queue
 
-    FlushQueue();
+    FlushMatrixQueue();
 
     EvalAllRel(pc, fppres); // evaluate relations
 
-    relmatrix rels = GetRelMatrix();
+    sparsecmat rels = GetMatrix();
     
     ReducePcPres(pc, fppres, rels); // quotient the cover by rels
 
-    FreeRelMatrix();
+    FreeMatrix();
 
     int newgens = pc.NrPcGens-oldnrpcgens;
     fprintf(LogFile, "# The %d%s factor has %d generator%s", pc.Class, ordinal(pc.Class), newgens, plural(newgens));

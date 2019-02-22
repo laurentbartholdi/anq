@@ -1,8 +1,14 @@
-* Accept groups: combinatorial collector, correct tails, correct consistency
+* groups: combinatorial collector
 
-* add "metabelian" and "exponent-p" laws
+* parser: accept a = b = c = ...; convert them automatically to a = b, b = c, ...
 
-* add "Zassenhaus"/"restricted" flag, clarify difference with "PAlgebra"
+* add restricted Lie algebras, with ^p operation
+
+* complete test suite, using code coverage
+
+* Complete arithmetic test suite
+
+* Finish z.h fastint arithmetic
 
 * Improve matrix code: use shorter arrays to improve cache locality, avoid fillin, avoid coefficient explosion, use finite fields, (in local rings) permute basis to get rid of redundant generators
 
@@ -12,10 +18,6 @@
   - AddGen(lpres, string)
   - AddRel(lpres, node)
   - LieNQ(lpres, maxclass)
-
-* Finish z.h fastint arithmetic
-
-* Complete arithmetic test suite
 
 * Use C++ streams rather than fprintf
 

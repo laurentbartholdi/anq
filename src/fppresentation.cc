@@ -74,8 +74,8 @@ static char Ch;           /* Contains the next char on the input. */
 static token Token;       /* Contains the current token. */
 static int Line;          /* Current line number. */
 static int TLine;         /* Line number where token starts. */
-static int Char;          /* Current character number. */
-static int TChar;         /* Character number where token starts. */
+static int Column;          /* Current character number. */
+static int TColumn;         /* Character number where token starts. */
 static const char *InFileName; /* Current input file name. */
 static FILE *InFp;        /* Current input file pointer. */
 static coeff N;           /* Contains the integer just read. */
@@ -136,18 +136,20 @@ static void SyntaxError(const char *format, ...) {
   va_list va;
   va_start (va, format);
   vfprintf(stderr, format, va);
-  fprintf(stderr, " in file %s, line %d, char %d\n", InFileName, TLine, TChar);
+  fprintf(stderr, " in file %s, line %d, char %d\n", InFileName, TLine, TColumn);
   exit(3);
 }
 
 static void ReadCh() {
-  Ch = getc(InFp);
-  Char++;
+  if ((Ch = getc(InFp)) == EOF)
+    SyntaxError("I ran out of characters to read");
+  Column++;
   if (Ch == '\\') {
-    Ch = getc(InFp);
+    if ((Ch = getc(InFp)) == EOF)
+      SyntaxError("I ran out of characters to read");
     if (Ch == '\n') {
       Line++;
-      Char = 0;
+      Column = 0;
       ReadCh();
     } else {
       ungetc(Ch, InFp);
@@ -165,7 +167,7 @@ static void SkipBlanks() {
         ReadCh();
     if (Ch == '\n') {
       Line++;
-      Char = 0;
+      Column = 0;
     }
     ReadCh();
   }
@@ -177,7 +179,7 @@ static void SkipBlanks() {
 */
 static void NextToken() {
   SkipBlanks();
-  TChar = Char;
+  TColumn = Column;
   TLine = Line;
   Token = BADTOKEN;
   bool sign = false;
@@ -248,7 +250,7 @@ static void NextToken() {
   case ':':
     ReadCh();
     if (Ch != '=')
-      SyntaxError("Illegal character '%c'", Ch);
+      SyntaxError("Illegal character '%c' after ':'", Ch);
     Token = DEQUALL;
     ReadCh();
     break;
@@ -311,7 +313,7 @@ static void NextToken() {
   case '8':
   case '9': {
     Token = NUMBER;
-    coeff_set_si(N, 0);
+    coeff_zero(N);
     int base = (Ch == '0' ? coeff_base : 10);
     
     while (isalnum(Ch)) {
@@ -334,7 +336,7 @@ static void NextToken() {
     }
 
     if (GenName.empty())
-      SyntaxError("Illegal character '%c'", Ch);
+      SyntaxError("Illegal character '%c' (ASCII %d) while parsing name", Ch, Ch);
 
     break;
   }
@@ -497,8 +499,6 @@ static void ValidateExpression(const node *n, gen g) {
 #endif
     ValidateExpression(n->cont.u, g);
     break;
-  case TMAP:
-    SyntaxError("Maps must be enclosed in {}");    
   default:
     SyntaxError("Invalid operator %s in %s expression", nodename[n->type], LIEGPSTRING);
   }
@@ -512,25 +512,25 @@ void ValidateMap(const node *n, const fppresentation &pres, std::vector<bool> &s
     SyntaxError("LHS of -> should be generator");
   if (seen[v->cont.g])
     SyntaxError("Generator %s specified twice", pres.GeneratorName[v->cont.g].c_str());
+  ValidateExpression(n->cont.bin.r, INFINITY);
   seen[v->cont.g] = true;
 }
 
 void ReadPresentation(fppresentation &pres, const char *InputFileName) {
-  bool readstdin = (InputFileName[0] == 0);
-  
-  if (readstdin)
+  if (InputFileName == nullptr) {
+    InFileName = "<stdin>";
     InFp = stdin;
-  else {
+  } else {
+    InFileName = InputFileName;
     InFp = fopen(InputFileName, "r");
     if (InFp == NULL)
       abortprintf(1, "Can't open input file '%s'", InputFileName);
   }
-  InFileName = InputFileName;
 
   pres.NrGens = 0;
   
   Ch = '\0';
-  Char = 0;
+  Column = 0;
   Line = 1;
   coeff_init(N);
   
@@ -583,25 +583,38 @@ void ReadPresentation(fppresentation &pres, const char *InputFileName) {
     } else if (n->type == TDREL) {
       if (n->cont.bin.l->type != TGEN)
 	SyntaxError("LHS should be generator, not %s", nodename[n->cont.bin.l->type]);
+
+      for (auto m : pres.Aliases)
+	if (m->cont.bin.l->cont.g == n->cont.bin.l->cont.g)
+	  SyntaxError("(At least) two definitions for generator %s", pres.GeneratorName[n->cont.bin.l->cont.g].c_str());
+      
       ValidateExpression(n->cont.bin.r, n->cont.bin.l->cont.g);
     } else if (n->type == TBRACE || n->type == TMAP) {
       std::vector<bool> seen(pres.NrGens+1,false);
       node *t;
-      for (t = n; t->type == TBRACE; t = t->cont.bin.r)
-	ValidateMap(t->cont.bin.l, pres, seen);
+      for (t = n; t->type == TBRACE; t = t->cont.bin.l)
+	ValidateMap(t->cont.bin.r, pres, seen);
       ValidateMap(t, pres, seen);
+
+      for (auto n : pres.Aliases)
+	seen[n->cont.bin.l->cont.g] = true; // don't force aliases to be defined
+
       for (unsigned i = 1; i <= pres.NrGens; i++)
 	if (!seen[i])
 	  SyntaxError("Map doesn't specify image of generator %s", pres.GeneratorName[i].c_str());
     } else
       ValidateExpression(n, INFINITY);
 
-    if (n->type == TDREL)
+    switch (n->type) {
+    case TDREL:
       pres.Aliases.push_back(n);
-    else if (n->type == TBRACE || n->type == TMAP)
+      break;
+    case TBRACE: case TMAP:
       pres.Endomorphisms.push_back(n);
-    else
+      break;
+    default:
       pres.Relators.push_back(n);
+    }
     
     if (Token == COMMA)
       NextToken();
@@ -612,7 +625,7 @@ void ReadPresentation(fppresentation &pres, const char *InputFileName) {
   if (Token != RANGLE)
     SyntaxError("'>' expected");
 
-  if (!readstdin)
+  if (InputFileName != nullptr)
     fclose(InFp);
 
   if (Debug >= 2) {
@@ -649,10 +662,19 @@ void FreePresentation(fppresentation &pres) {
     FreeNode(n);
 }
 
+static void PrintNodeSequence(FILE *f, const fppresentation &pres, node *n, nodetype t) {
+  if (n->type == t) {
+    PrintNodeSequence(f, pres, n->cont.bin.l, t);
+    fprintf(f, ",");
+    n = n->cont.bin.r;
+  }
+  PrintNode(f, pres, n);
+}
+
 void PrintNode(FILE *f, const fppresentation &pres, node *n) {
   switch (n->type) {
   case TNUM:
-    fprintf(f, "$<%p:>", &n->cont.n);
+    fprintf(f, PRIcoeff, &n->cont.n);
     break;
   case TGEN:
     fprintf(f, "%s", pres.GeneratorName[n->cont.g].c_str());
@@ -697,22 +719,12 @@ void PrintNode(FILE *f, const fppresentation &pres, node *n) {
     break;
   case TBRACK:
     fprintf(f, "[");
-    while (n->type == TBRACK) {
-      PrintNode(f, pres, n->cont.bin.l);
-      fprintf(f, ",");
-      n = n->cont.bin.r;
-    }
-    PrintNode(f, pres, n);
+    PrintNodeSequence(f, pres, n, TBRACK);
     fprintf(f, "]");
     break;
   case TBRACE:
     fprintf(f, "{");
-    while (n->type == TBRACE) {
-      PrintNode(f, pres, n->cont.bin.l);
-      fprintf(f, ",");
-      n = n->cont.bin.r;
-    }
-    PrintNode(f, pres, n);
+    PrintNodeSequence(f, pres, n, TBRACE);
     fprintf(f, "}");
     break;
   case TMAP:

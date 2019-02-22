@@ -91,12 +91,20 @@ void PrintPcPres(FILE *f, const pcpresentation &pc, const fppresentation &pres, 
 	fprintf(f, "a%d^" PRIcoeff " = ", pc.Generator[i].g, &pc.Exponent[i]);
 #endif
 	break;
-      case DGEN:;
+      case DGEN:
+	fprintf(f, "%s^epi = ", pres.GeneratorName[pc.Generator[i].g].c_str());
+	break;
+      default:
+	abortprintf(5, "Generator %d should have been eliminated", i);
       }
 
       gen g = i;
       while (pc.Generator[g].t == DPOW) {
+#ifdef LIEALG
 	fprintf(f,PRIcoeff "*", &pc.Exponent[g]);
+#else
+	fprintf(f,"(");
+#endif
 	g = pc.Generator[g].g;
       }
       std::vector<gen> cv;
@@ -115,8 +123,12 @@ void PrintPcPres(FILE *f, const pcpresentation &pc, const fppresentation &pres, 
 	cv.pop_back();
 	fprintf(f, ",");
       }
-      fprintf(f, "]^epimorphism\n");
-
+      fprintf(f, "]");
+#ifdef GROUP
+      for (g = i; pc.Generator[g].t == DPOW; g = pc.Generator[g].g)
+	fprintf(f,"^" PRIcoeff ")", &pc.Exponent[g]);
+#endif
+      fprintf(f, "^epimorphism\n");
     }
   }
 
@@ -149,13 +161,11 @@ void PrintPcPres(FILE *f, const pcpresentation &pc, const fppresentation &pres, 
   first = true;
   for (unsigned j = 1; j <= pc.NrPcGens; j++)
     for (unsigned i = 1; i < j; i++) {
-      if (PrintCompact) {
-	if (pc.Generator[i].t != DGEN || pc.Generator[j].t == DPOW)
-	  continue;
-      } else {
-	if (!PrintZeros && pc.Comm[j][i].empty())
+      if (PrintCompact && (pc.Generator[i].t != DGEN || pc.Generator[j].t == DPOW))
 	continue;
-      }  
+      if (!PrintZeros && pc.Comm[j][i].empty())
+	continue;
+
       if (!first)
 	fprintf(f, ",\n");
       fprintf(f, "%10s[a%d,a%d]", "", j, i);
@@ -244,6 +254,7 @@ void PrintGAPPres(FILE *f, const pcpresentation &pc, const fppresentation &pres)
 	  "\t\treturn eval(expr.left)*eval(expr.right);\n"
 	  "\t\tfi;\n"
 	  "\tend;\n");
+
   fprintf(f, "\tSetCanonicalProjection(L,function(elm)\n"
 	  "\t\tlocal res, i;\n"
 	  "\t\tif not elm in src then Error(\"Element \",elm,\" does not belong to free Lie algebra \",src); fi;\n"
@@ -254,6 +265,7 @@ void PrintGAPPres(FILE *f, const pcpresentation &pc, const fppresentation &pres)
 	  "\t\tod;\n"
 	  "\t\treturn res;\n"
 	  "\tend);\n");
+
   fprintf(f, "\treturn L;\n"
 	  // "end,[]);\n"
 	  );
@@ -278,12 +290,14 @@ template<typename V> void PrintGAPVec(FILE *f, const V v) {
 void PrintGAPPres(FILE *f, const pcpresentation &pc, const fppresentation &pres) {
   fprintf(f, // "G := CallFuncList(function()\n"
 	  "\tlocal F, P, c, g;\n\n"
-	  "\tLoadPackage(\"nq\");\n\n"
-	  "\tP := FreeGroup(IsSyllableWordsFamily,[");
+	  "\tLoadPackage(\"nq\");\n\n");
+
+  fprintf(f, "\tP := FreeGroup(IsSyllableWordsFamily,[");
   for (unsigned i = 1; i <= pres.NrGens; i++)
     fprintf(f, "%s\"%s\"", i > 1 ? "," : "", pres.GeneratorName[i].c_str());
-  fprintf(f, "]);\n"
-	  "\tF := FreeGroup(IsSyllableWordsFamily,%d,\"a\");\n"
+  fprintf(f, "]);\n");
+	  
+  fprintf(f, "\tF := FreeGroup(IsSyllableWordsFamily,%d,\"a\");\n"
 	  "\tg := GeneratorsOfGroup(F);\n"
 	  "\tc := FromTheLeftCollector(%d);\n", pc.NrPcGens, pc.NrPcGens);
   for (unsigned i = 1; i <= pc.NrPcGens; i++)
@@ -300,14 +314,16 @@ void PrintGAPPres(FILE *f, const pcpresentation &pc, const fppresentation &pres)
 	fprintf(f, ");\n");
       }
   fprintf(f, "\n\tF := PcpGroupByCollector(c);\n"
-	  "\tSetFreeGroupOfFpGroup(F,P);\n");
-  fprintf(f, "\tg := GeneratorsOfGroup(F);\n");
+	  "\tSetFreeGroupOfFpGroup(F,P);\n"
+	  "\tg := GeneratorsOfGroup(F);\n");
+  
   fprintf(f, "\tSetEpimorphismFromFreeGroup(F,GroupHomomorphismByImages(P,F,[");
   for (unsigned i = 1; i <= pres.NrGens; i++) {
     if (i > 1) fprintf(f, ",");
     PrintGAPVec(f, pc.Epimorphism[i]);
   }
   fprintf(f, "]));\n");
+
   fprintf(f, "\treturn F;\n"
 	  // "end,[]);\n"
 	  );

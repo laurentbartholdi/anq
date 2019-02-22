@@ -120,7 +120,7 @@ void SimpleCollect(const pcpresentation &pc, hollowcvec &lhs, const sparsecvec &
 	    s.e = coeff_get_si(p->second);
 	    collectstack.push_back(s);
 
-	    coeff_set_si(p->second, 0);
+	    coeff_zero(p->second);
 	  }
 	coeff_add_si(lhs[kc.first], lhs[kc.first], deltae);
 	if (!coeff_reduced_p(lhs[kc.first], pc.Exponent[kc.first])) {
@@ -146,7 +146,7 @@ void SimpleCollect(const pcpresentation &pc, hollowcvec &lhs, const sparsecvec &
 
 // the basic collector: this *= g^c
 void hollowcvec::mul(const pcpresentation &pc, gen g, const coeff &c) {
-  if (!coeff_cmp_si(c, 0))
+  if (coeff_z_p(c))
     return;
 
   sparsecvec v;
@@ -198,7 +198,7 @@ void hollowcvec::lquo(const pcpresentation &pc, hollowcvec v, const hollowcvec w
       if (pw->first > g) minatw = false;
       if (pw->first < g) g = pw->first, minatv = false;
     }
-    else if (minatv && minatw)
+    if (minatv && minatw)
       coeff_sub(c, (pw++)->second, pv->second);
     else if (minatv)
       coeff_neg(c, pv->second);
@@ -254,7 +254,11 @@ static void pow(hollowcvec &r, const pcpresentation &pc, hollowcvec v, int c) {
     c >>= 1;
     if (!c)
       break;
-    v.mul(pc, v);
+
+    hollowcvec w = vecstack.fresh();
+    w.copy(v);
+    v.mul(pc, w);
+    vecstack.pop(w);
   }
   
 #if 0 // !!! premature optimization
@@ -436,8 +440,8 @@ void hollowcvec::eval(const pcpresentation &pc, node *rel) {
       hollowcvec u = vecstack.fresh();
       t.eval(pc, rel->cont.bin.l);
       u.eval(pc, rel->cont.bin.r);
-      u.mul(pc, t);
-      lquo(pc, t, u);
+      t.mul(pc, u);
+      lquo(pc, u, t);
       vecstack.pop(u);
       vecstack.pop(t);
       break;

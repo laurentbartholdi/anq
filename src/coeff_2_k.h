@@ -7,6 +7,7 @@
 
 #include <inttypes.h>
 #include <ctype.h>
+#include <string.h>
 
 #if MODULUS_EXPONENT > 64
 #error MODULUS_EXPONENT must be <= 64; for larger exponent, use coeff_2_mp.h

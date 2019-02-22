@@ -63,7 +63,7 @@ typedef sparsevec<coeff,coeff_ops> sparsecvec;
 typedef sparsecvec::key gen;
 const sparsecvec badsparsecvec((sparsecvec::slot *)0xff00ff00ff00ffLL);
 
-typedef std::vector<sparsecvec> relmatrix;
+typedef std::vector<sparsecvec> sparsecmat; // compressed rows
 
 /****************************************************************
  * groups and Lie algebras are input in the usual presentation
@@ -121,12 +121,15 @@ void PrintNode(FILE *f, const fppresentation &, node *);
  * - an commutator of pc generators (then x = Comm[g][h])
  * - a power of a pc generator (then x = g^Exponent[g])
  */
+const unsigned TEMPMASK = 0x10;
 enum gendeftype {
   DGEN,  /* g is defined as an image of original generator */
   DCOMM,  /* g is defined as commutator */
   DPOW, /* g is defined as power of a pc generator */
+  TEMPGEN = DGEN | TEMPMASK, // these temporary versions will be eliminated
+  TEMPCOMM = DCOMM | TEMPMASK, // by consistency and relations
+  TEMPPOW = DPOW + TEMPMASK,
 };
-const gendeftype DINVALID = (gendeftype) -1;
   
 struct deftype {
   gendeftype t; // type
@@ -145,7 +148,7 @@ struct pcpresentation {
     NrPcGens; // number of ai in current consistent pc presentation
   bool Graded; // is it a graded Lie algebra?
   bool PAlgebra; // is it a p-Lie algebra/group?
-  bool Jacobson; // is the algebra restricted/the Jennings series?
+  bool Jennings; // is the algebra restricted/the Jennings series?
   bool Metabelian; // is the algebra/group metabelian?
   coeff TorsionExp; // if PAlgebra, enforce TorsionExp*ai in next class
   unsigned NilpotencyClass; // commutators of longer length must die
@@ -155,7 +158,7 @@ void InitPcPres(pcpresentation &, const fppresentation &);
 void FreePcPres(pcpresentation &, const fppresentation &);
 unsigned AddTails(pcpresentation &, const fppresentation &);
 void Consistency(const pcpresentation &);
-void ReducePcPres(pcpresentation &, const fppresentation &, const relmatrix &);
+void ReducePcPres(pcpresentation &, const fppresentation &, const sparsecmat &);
 
 /****************************************************************
  * some global variables dictating the behaviour of nq; in particular,
@@ -219,8 +222,26 @@ struct hollowcvec : hollowvec<coeff,coeff_ops> {
   void mul(const pcpresentation &, gen g); // this *= g
   void mul(const pcpresentation &, gen g, const coeff &c); // this *= g^c
   void pow(const pcpresentation &, hollowcvec, const coeff &); // this *= v^n
-  void lquo(const pcpresentation &, hollowcvec, const hollowcvec); // this = v^-1 w
-  void inv(const pcpresentation &, hollowcvec); // this = v^-1
+  void lquo(const pcpresentation &, hollowcvec, const hollowcvec); // this *= v^-1 w
+  void inv(const pcpresentation &, hollowcvec); // this *= v^-1
+};
+
+template <typename V> struct hashvec {
+  size_t operator()(V const& vec) const {
+    size_t seed = vec.size();
+    
+    // ignore actual coeffs, just keep their indices
+    for(auto kc : vec)
+      seed ^= kc.first + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+    
+    return seed;
+  }
+};
+
+template <typename V> struct equal_tovec {
+  bool operator()(const V &vec1, const V &vec2) const {
+    return !Compare(vec1, vec2);
+  }
 };
 
 /****************************************************************
@@ -284,9 +305,9 @@ void TimeStamp(const char *);
  * best numerical values as pivots, but attempting to avoid too much
  * fill-in using colamd.
  */
-relmatrix GetRelMatrix();
-void QueueInRelMatrix(const hollowcvec);
-bool AddToRelMatrix(const hollowcvec);
-void FlushQueue();
-void InitRelMatrix(const pcpresentation &, unsigned);
-void FreeRelMatrix();
+void InitMatrix(const coeff *, unsigned, unsigned);
+void QueueInMatrix(const hollowcvec);
+void FlushMatrixQueue();
+void FreeMatrix();
+bool AddToMatrix(const hollowcvec);
+sparsecmat GetMatrix();

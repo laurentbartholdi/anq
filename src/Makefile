@@ -8,7 +8,7 @@
 TRIO = trio-1.16
 NQVERSION = -DVERSION='"4.0.0 2019-01-26"'
 OPT = -march=native -O0 #-Ofast
-DEBUG = -g -ggdb # -fsanitize=address -fprofile-arcs -ftest-coverage
+DEBUG = -g -fsanitize=address 
 CFLAGS = -Wall -Werror -I$(TRIO) $(DEBUG) $(OPT)
 CXXFLAGS = -std=gnu++11 $(CFLAGS)
 LDFLAGS = $(DEBUG) -L$(TRIO) -lcolamd -lgmp -ltrio
@@ -22,7 +22,18 @@ NQ_INCL = nq.h coeff.h vectors.hh
 all: trio nql_2_64 nql_2_320 nql_3_39 nql_5_27 nql_5_100 nql_long nql_mpz \
 	nqg_2_64 nqg_2_320 nqg_3_39 nqg_5_27 nqg_5_100 nqg_long nqg_mpz
 
-nql: trio nql_long nql_mpz
+nql: trio nql_long nql_2_64 nql_mpz
+
+nqg: trio nqg_long nqg_2_64 nqg_mpz
+
+coverage_nql:
+	$(MAKE) -B CXX=clang++ DEBUG="-g -fprofile-instr-generate -fcoverage-mapping" nql nqg
+
+# then use as follows:
+# % LLVM_PROFILE_FILE="nq.profraw" ./nql_long ...
+# % llvm-profdata merge -sparse nq.profraw -o nq.profdata
+# % llvm-cov show ./nql_long -instr-profile=nq.profdata
+# % llvm-cov report ./nql_long -instr-profile=nq.profdata
 
 trio: $(TRIO)/libtrio.a
 

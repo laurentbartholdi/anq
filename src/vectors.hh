@@ -29,6 +29,9 @@
 
    sparsevec(slot *): creates a new sparsevec out of a pointer
    sparsevec(s): creates a new sparsevec with given size
+
+   explicit creation/destruction, so sparsevecs are POD, and can be passed
+   in registers (they're just a pointer to the first entry)
    ****************************************************************
    eol == marker for the end of list
    allocated() == (pointer != nullptr)
@@ -76,7 +79,7 @@ private:
   slot *p;
   static const key eol = -1;
 public:
-  sparsevec() = default;
+  sparsevec() : p(nullptr) { }
   explicit sparsevec(slot *newp) : p(newp) { }
   explicit sparsevec(size_t s) { alloc(s); }
   
@@ -136,7 +139,6 @@ public:
   class iterator {
     slot *p;
   public:
-    iterator() = default;
     iterator(slot *newp) : p(newp) { }
     iterator operator++() { p++; return *this; }
     iterator operator++(int) { slot *old = p; p++; return iterator(old); }
@@ -229,13 +231,19 @@ private:
      p[-2] contains half the size of the vector
   */
   slot *p;
-  inline herd leftherd(herd k) const { return k-((k&-k)>>1); } // x10^n -> x010^(n-1)
-  inline herd rightherd(herd k) const { return k+((k&-k)>>1); } // x10^n -> x110^(n-1)
+  inline herd leftherd(herd k) const { // x10^n -> x010^(n-1)
+    return k-((k&-k)>>1);
+  }
+  inline herd rightherd(herd k) const { // x10^n -> x110^(n-1)
+    return k+((k&-k)>>1);
+  }
   inline herd superherd(herd k) const { // xy10^n -> x10^(n+1)
     unsigned b = k&-k;
     return (k-b) | (b << 1);
   }
-
+  inline herd siblingherd(herd k) const { // xy10^n -> x(1-y)10^n
+    return k^((k&-k)<<1);
+  }
   inline herd getmsb(key k) {
     for (key t; (t = k - (k&-k)); k = t);
     return k;
@@ -296,7 +304,6 @@ private:
     inline skey next_key(skey k) { do k = p[k].next; while (k != nil && !U::nz_p(p[k].data)); return k; }
     inline skey prev_key(skey k) { do k = p[k].prev; while (k != nil && !U::nz_p(p[k].data)); return k; }
   public:
-    iterator() = default;
     iterator(slot *const _p, skey _k) : p(_p), k(_k) { }
     void operator=(const iterator &that) {
       if (p != that.p)
@@ -369,8 +376,8 @@ U::setzero(p[k].data); p[k].next = p[k].prev = 0;
 	for (herd h = msb; h != topbit(); h >>= 1)
 	  p[h].herd = 1;
       }
-      topbit() = msb;
     }
+    topbit() = msb;
   }
      
   T &operator[](key k) {
@@ -400,6 +407,26 @@ U::setzero(p[k].data); p[k].next = p[k].prev = 0;
     return true;
   }
   
+  size_t erase(skey k) {    
+    // remove element from linked list
+    if (!p[k].set)
+      return 0;
+    
+    p[p[k].prev].next = p[k].next;
+    p[p[k].next].prev = p[k].prev;
+
+    // clear bit and herds
+    p[k].set = 0;
+    if (!p[k^1].set)
+      for (herd h = k|1;; h = superherd(h)) {
+	p[h].herd = 0;
+	if (h == topbit() || p[siblingherd(h)].herd)
+	  break;
+      }
+
+    return 1;
+  }
+
   void clear() { // empty container
     clear_recur(topbit());
     p[nil].next = p[nil].prev = nil;
@@ -471,16 +498,13 @@ public:
   stack() : pos(0) { };
   ~stack() noexcept(false) {
     if (pos != 0)
-      throw std::logic_error("stack is not empty on free");
+      throw std::logic_error("cannot ~(): stack is not empty");
     for (unsigned i = 0; i < data.size(); i++)
       data[i].free(vecsize);
   }
   void setsize(size_t s) {
-    for (unsigned i = 0; i < data.size(); i++) {
-      //      data[i].free(vecsize);
-      //data[i].alloc(s);
+    for (unsigned i = 0; i < data.size(); i++)
       data[i].resize(vecsize, s);
-    }
     vecsize = s;
   }
   T &fresh() {
@@ -488,18 +512,15 @@ public:
       T v;
       v.alloc(vecsize);
       data.push_back(v);
-    } else
-      data[pos].clear();
+    }
     return data[pos++];
   }
-  void pop() {
-    if (pos-- == 0)
-      throw std::logic_error("stack is already empty");
-  }
 
-  void pop(T &v) {
-    pop();
+  void pop(const T &v) {
+    if (pos-- == 0)
+      throw std::logic_error("cannot pop(): stack is already empty");
     if (data[pos] != v)
       throw std::logic_error("stack is popped out of order");
+    data[pos].clear();
   }
 };
