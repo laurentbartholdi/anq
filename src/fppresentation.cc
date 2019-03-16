@@ -86,23 +86,17 @@ void FreeNode(node *n) {
   case TGEN:
     break;
   case TNUM:
-    coeff_clear(n->cont.n);
+    coeff_clear(n->n);
     break;
   default:
     if (is_unary(n->type))
-      FreeNode(n->cont.u);
+      FreeNode(n->u);
     else {
-      FreeNode(n->cont.bin.l);
-      FreeNode(n->cont.bin.r);
+      FreeNode(n->l);
+      FreeNode(n->r);
     }
   }
   delete n;
-}
-
-static node *NewNode(nodetype type) {
-  node *n = new node;
-  n->type = type;
-  return n;
 }
 
 enum genstatus { NOCREATE, CREATE };
@@ -115,12 +109,12 @@ static gen GenNumber(fppresentation &pres, genstatus status, unsigned weight) {
   for (unsigned i = 1; i <= pres.NrGens; i++) {
     if (GenName == pres.GeneratorName[i]) {
       if (status == CREATE)
-        return (gen) 0;
+        return LASTGEN;
       return (gen) i;
     }
   }
   if (status == NOCREATE)
-    return (gen) 0;
+    return LASTGEN;
 
   pres.NrGens++;
   pres.Weight.resize(pres.NrGens + 1);
@@ -347,18 +341,18 @@ node *Term(fppresentation &pres) {
   node *Expression(fppresentation&, int);
   
   if (is_unary(Token)) {
-    node *n = NewNode(unary_node(Token));
+    node *n = new node{unary_node(Token)};
     int new_precedence = unary_prec(Token);
     NextToken();
     node *u = Expression(pres, new_precedence);
     if (u->type == TNUM) { /* compile-time evaluation */
-      coeff_init(n->cont.n);
+      coeff_init(n->n);
       switch (n->type) {
       case TNEG:
-	coeff_neg(n->cont.n, u->cont.n);
+	coeff_neg(n->n, u->n);
 	break;
       case TINV:
-	coeff_inv(n->cont.n, u->cont.n);
+	coeff_inv(n->n, u->n);
 	break;
       default:
 	abortprintf(3, "I can't evaluate a numerical expression with unary operator %s", nodename[n->type]);
@@ -366,7 +360,7 @@ node *Term(fppresentation &pres) {
       n->type = TNUM;
       FreeNode(u);
     } else
-      n->cont.u = u;
+      n->u = u;
     return n;
   }
   if (Token == LPAREN) {
@@ -385,10 +379,7 @@ node *Term(fppresentation &pres) {
     node *n = Expression(pres, 0);
     while (Token == COMMA) {
       NextToken();
-      node *p = NewNode(oper);
-      p->cont.bin.l = n;
-      p->cont.bin.r = Expression(pres, 0);
-      n = p;
+      n = new node{oper, n, Expression(pres, 0)};
     }
     if (Token != close)
       SyntaxError("'%c' expected", closechar);
@@ -396,15 +387,15 @@ node *Term(fppresentation &pres) {
     return n;
   }
   if (Token == NUMBER) {
-    node *n = NewNode(TNUM);
-    coeff_init_set(n->cont.n, N);
+    node *n = new node{TNUM, N};
     NextToken();
     return n;
   }
   if (Token == GEN) {
-    node *n = NewNode(TGEN);
-    if ((n->cont.g = GenNumber(pres, NOCREATE, 0)) == (gen) 0)
+    const gen g = GenNumber(pres, NOCREATE, 0);
+    if (g == LASTGEN)
       SyntaxError("Unkown generator %s", GenName.c_str());
+    node *n = new node{TGEN, g};
     NextToken();
     return n;
   }
@@ -423,29 +414,36 @@ node *Expression(fppresentation &pres, int precedence) {
 
     node *u = Expression(pres, new_precedence);
 
-    if (t->type == TNUM && u->type == TNUM) { /* compile-time evaluation */
+#if defined(LIEALG) && defined(coeff_prime)
+    if (oper == TPOW && u->type == TNUM) { // p-power mapping
+      if (!coeff_cmp_si(u->n, coeff_prime)) {
+	FreeNode(u);
+	t = new node{TFROB, t};
+	continue;
+      } else
+	abortprintf(3, "I can only accept p-power mapping with exponent %d", coeff_prime);
+    }
+#endif
+    if (t->type == TNUM && u->type == TNUM) { // compile-time evaluation
       switch (oper) {
       case TPROD:
-	coeff_mul(t->cont.n, t->cont.n, u->cont.n);
+	coeff_mul(t->n, t->n, u->n);
 	break;
       case TPOW:
-	coeff_pow(t->cont.n, t->cont.n, u->cont.n);
+	coeff_pow(t->n, t->n, u->n);
 	break;
       case TSUM:
-	coeff_add(t->cont.n, t->cont.n, u->cont.n);
+	coeff_add(t->n, t->n, u->n);
 	break;
       case TDIFF:
-	coeff_sub(t->cont.n, t->cont.n, u->cont.n);
+	coeff_sub(t->n, t->n, u->n);
 	break;
       default:
 	abortprintf(3, "I can't evaluate a numerical expression with binary operator %d", oper);
       }
       FreeNode(u);
-    } else {
-      node *n = NewNode(oper);
-      n->cont.bin = {.l = t, .r = u};
-      t = n;
-    }
+    } else
+      t = new node{oper, t, u};
   }
   return t;
 }
@@ -463,21 +461,21 @@ static void ValidateExpression(const node *n, gen g) {
   case TNUM:
     SyntaxError("Expected a %s expression, not a number", LIEGPSTRING);
   case TGEN:
-    if (n->cont.g >= g)
-      SyntaxError("Generator of rank <= %d expected, not %d", g, n->cont.g);
+    if (n->g >= g)
+      SyntaxError("Generator of rank <= %d expected, not %d", g, n->g);
     break;
 #ifdef LIEALG
   case TPROD:
-    if (n->cont.bin.l->type != TNUM)
-      SyntaxError("LHS of TPROD should be number, not %s", nodename[n->cont.bin.l->type]);
-    ValidateExpression(n->cont.bin.r, g);
+    if (n->l->type != TNUM)
+      SyntaxError("LHS of TPROD should be number, not %s", nodename[n->l->type]);
+    ValidateExpression(n->r, g);
     break;
 #endif
 #ifdef GROUP
   case TPOW: // conjugation or power
-    ValidateExpression(n->cont.bin.l, g);
-    if (n->cont.bin.r->type != TNUM)
-      ValidateExpression(n->cont.bin.r, g);
+    ValidateExpression(n->l, g);
+    if (n->r->type != TNUM)
+      ValidateExpression(n->r, g);
     break;
 #endif
   case TBRACK: // binary
@@ -489,15 +487,16 @@ static void ValidateExpression(const node *n, gen g) {
   case TQUO:
   case TLQUO:
 #endif    
-    ValidateExpression(n->cont.bin.l, g);
-    ValidateExpression(n->cont.bin.r, g);
+    ValidateExpression(n->l, g);
+    ValidateExpression(n->r, g);
     break;
 #ifdef LIEALG // unary
   case TNEG:
+  case TFROB:
 #else
   case TINV:
 #endif
-    ValidateExpression(n->cont.u, g);
+    ValidateExpression(n->u, g);
     break;
   default:
     SyntaxError("Invalid operator %s in %s expression", nodename[n->type], LIEGPSTRING);
@@ -507,16 +506,16 @@ static void ValidateExpression(const node *n, gen g) {
 void ValidateMap(const node *n, const fppresentation &pres, std::vector<bool> &seen) {
   if (n->type != TMAP)
     SyntaxError("Entries in {} should be arrows gen->expr");
-  node *v = n->cont.bin.l;
+  node *v = n->l;
   if (v->type != TGEN)
     SyntaxError("LHS of -> should be generator");
-  if (seen[v->cont.g])
-    SyntaxError("Generator %s specified twice", pres.GeneratorName[v->cont.g].c_str());
-  ValidateExpression(n->cont.bin.r, INFINITY);
-  seen[v->cont.g] = true;
+  if (seen[v->g])
+    SyntaxError("Generator %s specified twice", pres.GeneratorName[v->g].c_str());
+  ValidateExpression(n->r, LASTGEN);
+  seen[v->g] = true;
 }
 
-void ReadPresentation(fppresentation &pres, const char *InputFileName) {
+fppresentation::fppresentation(const char *InputFileName) {
   if (InputFileName == nullptr) {
     InFileName = "<stdin>";
     InFp = stdin;
@@ -527,7 +526,7 @@ void ReadPresentation(fppresentation &pres, const char *InputFileName) {
       abortprintf(1, "Can't open input file '%s'", InputFileName);
   }
 
-  pres.NrGens = 0;
+  NrGens = 0;
   
   Ch = '\0';
   Column = 0;
@@ -553,8 +552,8 @@ void ReadPresentation(fppresentation &pres, const char *InputFileName) {
   read_gen:
     if (Token != GEN)
       SyntaxError("Generator expected");
-    gen g = GenNumber(pres, CREATE, weight);
-    if (g == (gen) 0)
+    gen g = GenNumber(*this, CREATE, weight);
+    if (g == LASTGEN)
       SyntaxError("Duplicate generator %s", GenName.c_str());
     NextToken();
 
@@ -571,49 +570,50 @@ void ReadPresentation(fppresentation &pres, const char *InputFileName) {
 
   /* get relators */
   while (is_relation(Token)) {
-    node *n = Expression(pres, 0);
+    node *n = Expression(*this, 0);
 
-    if (n->type == TDRELR) { /* switch sides */
-      n->type = TDREL;
-      n->cont.bin = {.l = n->cont.bin.r, .r = n->cont.bin.l};
-    }
-    if (n->type == TREL) {
-      ValidateExpression(n->cont.bin.l, INFINITY);
-      ValidateExpression(n->cont.bin.r, INFINITY);
-    } else if (n->type == TDREL) {
-      if (n->cont.bin.l->type != TGEN)
-	SyntaxError("LHS should be generator, not %s", nodename[n->cont.bin.l->type]);
+    if (n->type == TDRELR) /* switch sides */
+      *n = node{TDREL, n->r, n->l};
 
-      for (auto m : pres.Aliases)
-	if (m->cont.bin.l->cont.g == n->cont.bin.l->cont.g)
-	  SyntaxError("(At least) two definitions for generator %s", pres.GeneratorName[n->cont.bin.l->cont.g].c_str());
-      
-      ValidateExpression(n->cont.bin.r, n->cont.bin.l->cont.g);
-    } else if (n->type == TBRACE || n->type == TMAP) {
-      std::vector<bool> seen(pres.NrGens+1,false);
+    if (n->type == TREL) { /* chains of equalities */
       node *t;
-      for (t = n; t->type == TBRACE; t = t->cont.bin.l)
-	ValidateMap(t->cont.bin.r, pres, seen);
-      ValidateMap(t, pres, seen);
+      for (t = n; t->type == TREL; t = t->l)
+	ValidateExpression(t->r, LASTGEN);
+      ValidateExpression(t, LASTGEN);
+    } else if (n->type == TDREL) {
+      if (n->l->type != TGEN)
+	SyntaxError("LHS should be generator, not %s", nodename[n->l->type]);
 
-      for (auto n : pres.Aliases)
-	seen[n->cont.bin.l->cont.g] = true; // don't force aliases to be defined
+      for (const auto &m : Aliases)
+	if (m->l->g == n->l->g)
+	  SyntaxError("(At least) two definitions for generator %s", GeneratorName[n->l->g].c_str());
+      
+      ValidateExpression(n->r, n->l->g);
+    } else if (n->type == TBRACE || n->type == TMAP) {
+      std::vector<bool> seen(NrGens+1,false);
+      node *t;
+      for (t = n; t->type == TBRACE; t = t->l)
+	ValidateMap(t->r, *this, seen);
+      ValidateMap(t, *this, seen);
 
-      for (unsigned i = 1; i <= pres.NrGens; i++)
+      for (const auto &n : Aliases)
+	seen[n->l->g] = true; // don't force aliases to be defined
+
+      for (unsigned i = 1; i <= NrGens; i++)
 	if (!seen[i])
-	  SyntaxError("Map doesn't specify image of generator %s", pres.GeneratorName[i].c_str());
+	  SyntaxError("Map doesn't specify image of generator %s", GeneratorName[i].c_str());
     } else
-      ValidateExpression(n, INFINITY);
+      ValidateExpression(n, LASTGEN);
 
     switch (n->type) {
     case TDREL:
-      pres.Aliases.push_back(n);
+      Aliases.push_back(n);
       break;
     case TBRACE: case TMAP:
-      pres.Endomorphisms.push_back(n);
+      Endomorphisms.push_back(n);
       break;
     default:
-      pres.Relators.push_back(n);
+      Relators.push_back(n);
     }
     
     if (Token == COMMA)
@@ -630,22 +630,22 @@ void ReadPresentation(fppresentation &pres, const char *InputFileName) {
 
   if (Debug >= 2) {
     fprintf(LogFile, "# generators:");
-    for (unsigned i = 1; i <= pres.NrGens; i++)
-      fprintf(LogFile, " %s", pres.GeneratorName[i].c_str());
+    for (unsigned i = 1; i <= NrGens; i++)
+      fprintf(LogFile, " %s", GeneratorName[i].c_str());
     fprintf(LogFile, "\n# aliases:");
-    for (auto n : pres.Aliases) {
+    for (const auto &n : Aliases) {
       fprintf(LogFile, "\n#\t");
-      PrintNode(LogFile, pres, n);
+      printnode(LogFile, n);
     }
     fprintf(LogFile, "\n# relators:");
-    for (auto n : pres.Relators) {
+    for (const auto &n : Relators) {
       fprintf(LogFile, "\n#\t");
-      PrintNode(LogFile, pres, n);
+      printnode(LogFile, n);
     }
     fprintf(LogFile, "\n# endomorphisms:");
-    for (auto n : pres.Endomorphisms) {
+    for (const auto &n : Endomorphisms) {
       fprintf(LogFile, "\n#\t");
-      PrintNode(LogFile, pres, n);
+      printnode(LogFile, n);
     }
     fprintf(LogFile, "\n");
   }
@@ -653,101 +653,118 @@ void ReadPresentation(fppresentation &pres, const char *InputFileName) {
   coeff_clear(N);
 }
 
-void FreePresentation(fppresentation &pres) {
-  for (auto n : pres.Relators)
+fppresentation::~fppresentation() {
+  for (const auto &n : Relators)
     FreeNode(n);
-  for (auto n : pres.Aliases)
+  for (const auto &n : Aliases)
     FreeNode(n);
-  for (auto n : pres.Endomorphisms)
+  for (const auto &n : Endomorphisms)
     FreeNode(n);
 }
 
-static void PrintNodeSequence(FILE *f, const fppresentation &pres, node *n, nodetype t) {
+void fppresentation::printnodes(FILE *f, const node *n, nodetype t) const {
   if (n->type == t) {
-    PrintNodeSequence(f, pres, n->cont.bin.l, t);
+    printnodes(f, n->l, t);
     fprintf(f, ",");
-    n = n->cont.bin.r;
+    n = n->r;
   }
-  PrintNode(f, pres, n);
+  printnode(f, n);
 }
 
-void PrintNode(FILE *f, const fppresentation &pres, node *n) {
+void fppresentation::printnode(FILE *f, const node *n) const {
   switch (n->type) {
   case TNUM:
-    fprintf(f, PRIcoeff, &n->cont.n);
+    fprintf(f, PRIcoeff, &n->n);
     break;
   case TGEN:
-    fprintf(f, "%s", pres.GeneratorName[n->cont.g].c_str());
+    fprintf(f, "%s", GeneratorName[n->g].c_str());
     break;
   case TNEG:
-    fprintf(f, "-");
-    PrintNode(f, pres, n->cont.u);
+    fprintf(f, "-(");
+    printnode(f, n->u);
+    fprintf(f, ")");
     break;
   case TINV:
-    fprintf(f, "~");
-    PrintNode(f, pres, n->cont.u);
+    fprintf(f, "~(");
+    printnode(f, n->u);
+    fprintf(f, ")");
     break;
+#ifdef coeff_prime
+  case TFROB:
+    fprintf(f, "(");
+    printnode(f, n->u);
+    fprintf(f, ")^%d", coeff_prime);
+    break;
+#endif
   case TSUM:
-    PrintNode(f, pres, n->cont.bin.l);
+    printnode(f, n->l);
     fprintf(f, " + ");
-    PrintNode(f, pres, n->cont.bin.r);
+    printnode(f, n->r);
     break;
   case TDIFF:
-    PrintNode(f, pres, n->cont.bin.l);
+    printnode(f, n->l);
     fprintf(f, " - ");
-    PrintNode(f, pres, n->cont.bin.r);
+    printnode(f, n->r);
     break;
   case TPROD:
-    PrintNode(f, pres, n->cont.bin.l);
-    fprintf(f, "*");
-    PrintNode(f, pres, n->cont.bin.r);
+    fprintf(f, "(");
+    printnode(f, n->l);
+    fprintf(f, ")*(");
+    printnode(f, n->r);
+    fprintf(f, ")");
     break;
   case TQUO:
-    PrintNode(f, pres, n->cont.bin.l);
-    fprintf(f, "/");
-    PrintNode(f, pres, n->cont.bin.r);
+    fprintf(f, "(");
+    printnode(f, n->l);
+    fprintf(f, ")/(");
+    printnode(f, n->r);
+    fprintf(f, ")");
     break;
   case TLQUO:
-    PrintNode(f, pres, n->cont.bin.l);
-    fprintf(f, "\\");
-    PrintNode(f, pres, n->cont.bin.r);
+    fprintf(f, "(");
+    printnode(f, n->l);
+    fprintf(f, ")\\(");
+    printnode(f, n->r);
+    fprintf(f, ")");
     break;
   case TPOW:
-    PrintNode(f, pres, n->cont.bin.l);
-    fprintf(f, "^");
-    PrintNode(f, pres, n->cont.bin.r);
+    fprintf(f, "(");
+    printnode(f, n->l);
+    fprintf(f, ")^(");
+    printnode(f, n->r);
+    fprintf(f, ")");
     break;
   case TBRACK:
     fprintf(f, "[");
-    PrintNodeSequence(f, pres, n, TBRACK);
+    printnodes(f, n, TBRACK);
     fprintf(f, "]");
     break;
   case TBRACE:
     fprintf(f, "{");
-    PrintNodeSequence(f, pres, n, TBRACE);
+    printnodes(f, n, TBRACE);
     fprintf(f, "}");
     break;
   case TMAP:
-    PrintNode(f, pres, n->cont.bin.l);
+    printnode(f, n->l);
     fprintf(f, "→");
-    PrintNode(f, pres, n->cont.bin.r);
-    break;    
+    printnode(f, n->r);
+    break;
   case TREL:
-    PrintNode(f, pres, n->cont.bin.l);
+    printnode(f, n->l);
     fprintf(f, " = ");
-    PrintNode(f, pres, n->cont.bin.r);
+    printnode(f, n->r);
     break;
   case TDREL:
-    PrintNode(f, pres, n->cont.bin.l);
+    printnode(f, n->l);
     fprintf(f, " := ");
-    PrintNode(f, pres, n->cont.bin.r);
+    printnode(f, n->r);
     break;
   case TDRELR:
-    PrintNode(f, pres, n->cont.bin.l);
+    printnode(f, n->l);
     fprintf(f, " =: ");
-    PrintNode(f, pres, n->cont.bin.r);
+    printnode(f, n->r);
     break;
   default:
-    abortprintf(3, "PrintNode: Illegal node of type %s", nodename[n->type]);
+    abortprintf(3, "printnode: Illegal node of type %s", nodename[n->type]);
   }
 }

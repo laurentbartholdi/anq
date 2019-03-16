@@ -45,9 +45,7 @@ and "Queue.insert(cv);" should become
 }
 #endif
 
-std::unordered_set<sparsecvec,hashvec<sparsecvec>,equal_tovec<sparsecvec>> Queue;
-
-//std::set<sparsecvec,bool(*)(sparsecvec,sparsecvec)> Queue([](sparsecvec v1, sparsecvec v2){ return Compare(v1,v2) < 0; });
+std::unordered_set<sparsecvec> Queue;
 
 static void InitTorsion() {  
   if (TorsionExp != nullptr) {
@@ -65,7 +63,7 @@ void InitMatrix(const coeff *torsionexp, unsigned shift, unsigned len) {
   NrCols = len;
   TorsionExp = torsionexp;
 
-  Matrix.resize(NrCols, sparsecvec(nullptr));
+  Matrix.resize(NrCols, sparsecvec::null());
   InitTorsion();
 }
 
@@ -82,8 +80,24 @@ void FreeMatrix() {
 void PrintMatrix() {
   for (const sparsecvec v : Matrix)
     if (v.allocated())
-      PrintVec(stdout, v);
+      printf(PRIsparsecvec "\n", &v);
   printf("\n");
+}
+
+// put v in normal form by subtracting rows of Matrix
+void ReduceRow(hollowcvec &v) {
+  coeff q;
+  coeff_init(q);
+  
+  for (const auto &kc : v) {
+    unsigned row = kc.first - Shift;
+      
+    if (Matrix[row].allocated() && !coeff_reduced_p(kc.second, Matrix[row][0].second)) { // found a pivot
+	coeff_fdiv_q(q, kc.second, Matrix[row][0].second);
+	v.submul(q, Matrix[row]);
+    }
+  }
+  coeff_clear(q);
 }
 
 // try to add currow to the row space spanned by Matrix.
@@ -98,7 +112,7 @@ static bool AddRow(hollowcvec currow) {
   coeff_init(c);
   coeff_init(d);
 
-  for (auto kc : currow) {
+  for (const auto &kc : currow) {
     unsigned row = kc.first - Shift;
       
     if (!Matrix[row].allocated()) { /* Insert v in Matrix at position row */
@@ -109,9 +123,8 @@ static bool AddRow(hollowcvec currow) {
       currow.clear();
       currow.addmul(a, Matrix[row]);
       
-      if (Debug >= 3) {
-	fprintf(LogFile, "# Adding row %d: ",row); PrintVec(LogFile, Matrix[row]); fprintf(LogFile, "\n");
-      }
+      if (Debug >= 3)
+	fprintf(LogFile, "# Adding row %d: " PRIsparsecvec "\n", row, &Matrix[row]);
     } else { /* two rows with same pivot. Merge them */
       coeff_gcdext(d, a, b, kc.second, Matrix[row][0].second); /* d = a*v[head]+b*Matrix[row][head] */
       if (!coeff_cmp(d, Matrix[row][0].second)) { /* likely case: Matrix[row][head]=d, b=1, a=0. We're just reducing currow. */
@@ -120,7 +133,7 @@ static bool AddRow(hollowcvec currow) {
 #ifdef COEFF_IS_MPZ // check coefficient explosion
 	if (Debug >= 1) {
 	  long maxsize = 0;
-	  for (auto kc : currow)
+	  for (const auto &kc : currow)
 	    maxsize = std::max(maxsize, labs(kc.second->_mp_size));
 	  fprintf(LogFile, "# Changed currow: max coeff size %ld\n", maxsize);
 	}
@@ -137,11 +150,10 @@ static bool AddRow(hollowcvec currow) {
 	currow.addmul(c, Matrix[row]);
 	Matrix[row].free();
 	Matrix[row] = vab.getsparse();
-	vecstack.pop(vab);
+	vecstack.release(vab);
 	  
-	if (Debug >= 3) {
-	  fprintf(LogFile, "# Change row %d: ",row); PrintVec(LogFile, Matrix[row]); fprintf(LogFile, "\n");
-	}
+	if (Debug >= 3)
+	  fprintf(LogFile, "# Change row %d: " PRIsparsecvec "\n", row, &Matrix[row]);
       }
     }
   }
@@ -157,8 +169,8 @@ static bool AddRow(hollowcvec currow) {
 bool AddToMatrix(hollowcvec currow) {
   if (currow.empty())
     return true;
-  if (currow.front()->first < Shift)
-    abortprintf(5, "AddToMatrix: vector has a term a%d of too low index", currow.front()->first);
+  if (currow.begin()->first < Shift)
+    abortprintf(5, "AddToMatrix: vector has a term a%d of too low index", currow.begin()->first);
   return AddRow(currow);
 }
 
@@ -169,7 +181,7 @@ bool AddToMatrix(hollowcvec currow) {
 
   for (const sparsecvec v : m) {
     ind.push_back(intmat.size());
-    for (auto kc : v)
+    for (const auto &kc : v)
       intmat.push_back(kc.first - Shift);
   }
   ind.push_back(intmat.size());
@@ -232,7 +244,7 @@ void FlushMatrixQueue() {
     return;
   
   /* remove unbound entries in Matrix */
-  Matrix.erase(std::remove(Matrix.begin(), Matrix.end(), sparsecvec(nullptr)), Matrix.end());
+  Matrix.erase(std::remove(Matrix.begin(), Matrix.end(), sparsecvec::null()), Matrix.end());
 
   /* put queue at bottom of matrix */
   Matrix.insert(Matrix.end(), Queue.begin(), Queue.end());  
@@ -241,7 +253,7 @@ void FlushMatrixQueue() {
   /* call colamd to determine optimal insertion ordering */
   std::vector<int> ind = colamd(Matrix);
   
-  sparsecmat oldrels(NrCols, sparsecvec(nullptr));
+  sparsecmat oldrels(NrCols, sparsecvec::null());
   Matrix.swap(oldrels);
   InitTorsion();
 
@@ -249,21 +261,17 @@ void FlushMatrixQueue() {
      the order specified by the permutation ind */
   for (unsigned i = 0; i < oldrels.size(); i++) {
     hollowcvec currow = vecstack.fresh();
-    currow.copysorted(oldrels[ind[i]]);
+    currow.copy(oldrels[ind[i]]);
     oldrels[ind[i]].free();
     AddRow(currow);
-    vecstack.pop(currow);
+    vecstack.release(currow);
   }
-
-  TimeStamp("FlushMatrixQueue()");
 }
 
-sparsecmat GetMatrix() {
-  FlushMatrixQueue();
+// @@@ find tricks to avoid arithmetic overflow
 
-  sparsecmat rels;
-  rels.reserve(NrCols);
-
+// complete the Hermite normal form
+void Hermite() {
   /* reduce all the head columns, to achieve Hermite normal form. */
   coeff q;
   coeff_init(q);
@@ -272,10 +280,10 @@ sparsecmat GetMatrix() {
       continue;
 
     hollowcvec currow = vecstack.fresh();
-    currow.copysorted(Matrix[j]);
+    currow.copy(Matrix[j]);
     Matrix[j].free();
 
-    for (auto kc : currow) {
+    for (const auto &kc : currow) {
       unsigned row = kc.first - Shift;
       if (row == j || !Matrix[row].allocated())
 	continue;
@@ -286,8 +294,7 @@ sparsecmat GetMatrix() {
       }
     }
     Matrix[j] = currow.getsparse();
-    rels.push_back(Matrix[j]);
-    vecstack.pop(currow);
+    vecstack.release(currow);
   }
 
   /* @@@ We could improve this code by eliminating redundant
@@ -298,7 +305,19 @@ sparsecmat GetMatrix() {
 
   coeff_clear(q);
 
-  TimeStamp("Hermite()");
+  TimeStamp("Hermite()");  
+}
+
+// return list of relators
+sparsecmat GetMatrix() {
+  sparsecmat rels;
+  rels.reserve(NrCols);
+
+  for (unsigned j = 0; j < NrCols; j++) {
+    if (Matrix[j].allocated())
+      rels.push_back(Matrix[j]);
+  }
+  
   return rels;
 }
 

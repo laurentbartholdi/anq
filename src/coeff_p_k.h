@@ -39,22 +39,19 @@ typedef signed __int128 int128_t; // for intermediate results
 #define TO_STRING(x)    STRINGIZER(x)
 
 /* unused, for debugging purposes */
-static int print_u128_t(uint128_t u128)
+static inline int print_u128_t(uint128_t u128)
 {
-    int rc;
-    if (u128 > UINT64_MAX)
-    {
-        uint128_t leading  = u128 / P10_UINT64;
-        uint64_t  trailing = u128 % P10_UINT64;
-        rc = print_u128_t(leading);
-        rc += printf("%." TO_STRING(E10_UINT64) PRIu64, trailing);
-    }
-    else
-    {
-        uint64_t u64 = u128;
-        rc = printf("%" PRIu64, u64);
-    }
-    return rc;
+  int rc;
+  if (u128 > UINT64_MAX) {
+    uint128_t leading  = u128 / P10_UINT64;
+    uint64_t  trailing = u128 % P10_UINT64;
+    rc = print_u128_t(leading);
+    rc += printf("%." TO_STRING(E10_UINT64) PRIu64, trailing);
+  } else {
+    uint64_t u64 = u128;
+    rc = printf("%" PRIu64, u64);
+  }
+  return rc;
 }
 
 constexpr inline uint64_t powint(uint64_t x, uint64_t p) {
@@ -127,7 +124,7 @@ inline void coeff_zero(coeff &result) {
   coeff_set_si(result, 0);
 }
 
-inline long coeff_get_si(const coeff &a) {
+inline int64_t coeff_get_si(const coeff &a) {
   uint64_t r = montgomery_redc(a.data);
   if (r > MONTGOMERY_N/2)
     return r-MONTGOMERY_N;
@@ -191,6 +188,12 @@ inline void coeff_fdiv_qr(coeff &q, coeff &r, const coeff &a, const coeff &b) {
   uint64_t xa = coeff2uint64_t(a), xb = coeff2uint64_t(b);
   q = uint64_t2coeff(xa / xb);
   r = uint64_t2coeff(xa % xb);
+}
+
+inline unsigned long coeff_fdiv_q_ui(coeff &q, const coeff &a, unsigned long b) {
+  uint64_t xa = coeff2uint64_t(a), r = xa % b;
+  q = uint64_t2coeff(xa / b);
+  return r;
 }
 
 inline void coeff_mul(coeff &result, const coeff &a, const coeff &b) {
@@ -348,39 +351,41 @@ const inline void coeff_unit_annihilator(coeff &unit, coeff &annihilator, const 
 
 inline int coeff_out_str(FILE *f, const coeff &a)
 {
-  return fprintf(f, "%ld", coeff_get_si(a)); /* maybe we should print in base MODULUS_PRIME? */
+  return fprintf(f, "%" PRId64, coeff_get_si(a));
 }
 
-inline char *coeff_get_str(char *s, int base, const coeff &a)
+inline unsigned char *coeff_get_str(unsigned char *s, int base, const coeff &a)
 {
   char *p;
   if (s == NULL)
     p = (char *) malloc(25);
   else
-    p = s;
+    p = (char *) s;
 #ifdef TRIO_TRIO_H
 #ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wall"
 #else
 #pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wall"
+#pragma GCC diagnostic ignored "-Wformat="
+#pragma GCC diagnostic ignored "-Wformat-extra-args"
 #endif
-  trio_sprintf(p, "%..*" PRIu64, base, a.data);
+  trio_sprintf(p, "%..*" PRId64, base, coeff_get_si(a));
 #ifdef __clang__
 #pragma clang diagnostic pop
 #elif defined(__GNUC__)
 #pragma GCC diagnostic pop
 #endif
 #else
-  sprintf(p, "%" PRIu64, a.data);
+  sprintf(p, "%" PRId64, coeff_get_si(a));
 #endif
   if (s == NULL)
     p = (char *) realloc(p, strlen(p)+1);
 
-  return p;
+  return (unsigned char *) p;
 }
 
+#define coeff_prime MODULUS_PRIME
 #define coeff_base MODULUS_PRIME
 
 inline void coeff_set_str(coeff &a, const char *s, int base)
@@ -395,3 +400,5 @@ inline void coeff_set_str(coeff &a, const char *s, int base)
     s++;
   }
 }
+
+inline size_t coeff_hash(const coeff &c) { return c.data; }

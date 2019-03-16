@@ -68,7 +68,8 @@ $(TARGETLIB): $(OBJS)
 	$(RANLIB) $(TARGETLIB)
 
 $(TARGETSHLIB): $(TARGETLIB)
-	$(CC) -lm -shared -Wl,-soname,$(patsubst %.so.2.0.0,%.so.2,$@) -Wl,--whole-archive,$< -Wl,--no-whole-archive -o $@
+	$(CC) -lm -dynamiclib $(OBJS) -o $@
+#	$(CC) -lm -shared -Wl,-soname,$(patsubst %.so.2.0.0,%.so.2,$@) -Wl,--whole-archive,$< -Wl,--no-whole-archive -o $@
 
 doc::
 	(cd $(srcdir) && $(GENDOC) doc/trio.cfg)

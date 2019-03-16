@@ -245,6 +245,10 @@ inline void coeff_fdiv_qr(coeff &q, coeff &r, const coeff &a, const coeff &b) {
   mpn_tdiv_qr(q.data, r.data, 0, a.data, COEFF_WORDS, b.data, nzlimbs);
 }
 
+inline unsigned long coeff_fdiv_q_ui(coeff &q, const coeff &a, unsigned long b) {
+  return mpn_divrem_1(q.data, 0, a.data, COEFF_WORDS, b);
+}
+
 inline void coeff_mul(coeff &result, const coeff &a, const coeff &b) {
   doublecoeff temp;
   mpn_mul_n(temp.data, a.data, b.data, COEFF_WORDS);
@@ -397,7 +401,7 @@ const inline void coeff_unit_annihilator(coeff &unit, coeff &annihilator, const 
   annihilator = __mpn_pow_ui(__mpn_ui(MODULUS_PRIME), MODULUS_EXPONENT-vala);
 }
 
-inline char *coeff_get_str(char *s, int base, const coeff &a)
+inline unsigned char *coeff_get_str(unsigned char *s, int base, const coeff &a)
 {
   char *p;
 
@@ -407,24 +411,24 @@ inline char *coeff_get_str(char *s, int base, const coeff &a)
   size_t digits = mpn_sizeinbase(temp, nzlimbs, 10);
 
   if (s == NULL)
-    p = malloc(digits+1);
+    p = (char *) malloc(digits+1);
   else
-    p = s;
+    p = (char *) s;
 
-  digits = mpn_get_str(p, base, temp, nzlimbs);
+  digits = mpn_get_str((unsigned char *) p, base, temp, nzlimbs);
   for (unsigned i = 0; i < digits; i++)
     p[i] += '0';
   p[digits] = 0;
 
   if (s == NULL)
-    p = realloc(p, digits+1);
+    p = (char *) realloc(p, digits+1);
 
-  return p;
+  return (unsigned char *) p;
 }
 
 inline int coeff_out_str(FILE *f, const coeff &a)
 {
-  char *s = coeff_get_str(NULL, 10, a);
+  char *s = (char *) coeff_get_str(NULL, 10, a);
   fprintf(f, "%s", s); /* maybe we should print in base MODULUS_PRIME? */
   int digits = strlen(s);
   free(s);
@@ -432,6 +436,7 @@ inline int coeff_out_str(FILE *f, const coeff &a)
   return digits;
 }
 
+#define coeff_prime MODULUS_PRIME
 #define coeff_base MODULUS_PRIME
 
 inline void coeff_set_str(coeff &a, const char *s, int base)
@@ -445,4 +450,11 @@ inline void coeff_set_str(coeff &a, const char *s, int base)
     coeff_add_si(a, a, isdigit(*s) ? *s - '0' : *s + 10 - (isupper(*s) ? 'A' : 'a'));
     s++;
   }
+}
+
+inline size_t coeff_hash(const coeff &c) {
+  size_t seed = COEFF_WORDS;
+  for (unsigned i = 0; i < COEFF_WORDS; i++)
+    seed ^= c.data[i] + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+  return seed;
 }

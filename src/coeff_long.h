@@ -135,6 +135,16 @@ inline void coeff_fdiv_qr(coeff &q, coeff &r, const coeff &a, const coeff &b) {
     r.data = t.data;
 }
 
+inline unsigned long coeff_fdiv_q_ui(coeff &q, const coeff &a, unsigned long b) {
+  signed long r = a.data % b;
+  q.data = a.data / b;
+  if (r < 0) {
+    r += b;
+    q.data--; /* C rounds quotient to 0, not down */
+  }
+  return r;
+}
+
 inline void coeff_mul(coeff &result, const coeff &a, const coeff &b) {
 #ifdef COEFF_UNSAFE
   result.data = a.data * b.data;
@@ -224,7 +234,7 @@ inline void coeff_gcdext(coeff &gcd, coeff &s, coeff &t, const coeff &a, const c
 }
 
 /* addition, returns true if a in [0,b) or b=0 */
-inline bool coeff_reduced_p(coeff &a, coeff &b) {
+inline bool coeff_reduced_p(const coeff &a, const coeff &b) {
   return b.data == 0 || (a.data >= 0 && a.data < b.data);
 }
 
@@ -240,20 +250,21 @@ inline int coeff_out_str(FILE *f, const coeff &a)
   return fprintf(f, "%" PRId64, a.data);
 }
 
-inline char *coeff_get_str(char *s, int base, const coeff &a)
+inline unsigned char *coeff_get_str(unsigned char *s, int base, const coeff &a)
 {
   char *p;
   if (s == NULL)
     p = (char *) malloc(25);
   else
-    p = s;
+    p = (char *) s;
 #ifdef TRIO_TRIO_H
 #ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wall"
 #else
 #pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wall"
+#pragma GCC diagnostic ignored "-Wformat="
+#pragma GCC diagnostic ignored "-Wformat-extra-args"
 #endif
   trio_sprintf(p, "%..*" PRId64, base, a.data);
 #ifdef __clang__
@@ -267,7 +278,7 @@ inline char *coeff_get_str(char *s, int base, const coeff &a)
   if (s == NULL)
     p = (char *) realloc(p, strlen(p)+1);
 
-  return p;
+  return (unsigned char *) p;
 }
 
 inline void coeff_set_str(coeff &a, const char *s, int base)
@@ -279,3 +290,5 @@ inline void coeff_set_str(coeff &a, const char *s, int base)
     s++;
   }
 }
+
+inline size_t coeff_hash(const coeff &c) { return c.data; }

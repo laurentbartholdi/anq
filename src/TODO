@@ -1,8 +1,6 @@
-* groups: combinatorial collector
-
-* parser: accept a = b = c = ...; convert them automatically to a = b, b = c, ...
-
 * add restricted Lie algebras, with ^p operation
+
+* separate coeff's used for fp presentation, pc presentation and matrix
 
 * complete test suite, using code coverage
 
@@ -10,7 +8,13 @@
 
 * Finish z.h fastint arithmetic
 
-* Improve matrix code: use shorter arrays to improve cache locality, avoid fillin, avoid coefficient explosion, use finite fields, (in local rings) permute basis to get rid of redundant generators
+* Improve matrix code:
+  -  make matrix a class with cleaner interface, so one can substitute linbox or other fast implementation
+  - use shorter arrays to improve cache locality,
+  - avoid fillin,
+  - avoid coefficient explosion,
+  - use finite fields,
+  - (in local rings) permute basis to get rid of redundant generators
 
 * Make LieNQ a library: accept calls to
   - NewLiePresentation

@@ -6,17 +6,17 @@
 ##
 
 TRIO = trio-1.16
-NQVERSION = -DVERSION='"4.0.0 2019-01-26"'
+NQVERSION = -DVERSION='"4.0.0 2019-02-26"'
 OPT = -march=native -O0 #-Ofast
 DEBUG = -g -fsanitize=address 
 CFLAGS = -Wall -Werror -I$(TRIO) $(DEBUG) $(OPT)
 CXXFLAGS = -std=gnu++11 $(CFLAGS)
-LDFLAGS = $(DEBUG) -L$(TRIO) -lcolamd -lgmp -ltrio
+LDFLAGS = $(DEBUG) -L$(TRIO) -lcolamd -lgmp -ltrio -Wl,-no_pie
 
 CXX=g++
 CC=$(CXX)
 
-NQ_OBJ = fppresentation.o pcpresentation.o print.o operations.o matrix.o nq.o
+NQ_OBJ = fppresentation.o pcpresentation.o operations.o matrix.o nq.o
 NQ_INCL = nq.h coeff.h vectors.hh
 
 all: trio nql_2_64 nql_2_320 nql_3_39 nql_5_27 nql_5_100 nql_long nql_mpz \
@@ -27,12 +27,12 @@ nql: trio nql_long nql_2_64 nql_mpz
 nqg: trio nqg_long nqg_2_64 nqg_mpz
 
 coverage_nql:
-	$(MAKE) -B CXX=clang++ DEBUG="-g -fprofile-instr-generate -fcoverage-mapping" nql nqg
+	$(MAKE) -B OPT=-march=native CXX=clang++ DEBUG="-g -fprofile-instr-generate -fcoverage-mapping" nql nqg
 
 # then use as follows:
 # % LLVM_PROFILE_FILE="nq.profraw" ./nql_long ...
 # % llvm-profdata merge -sparse nq.profraw -o nq.profdata
-# % llvm-cov show ./nql_long -instr-profile=nq.profdata
+# % llvm-cov show -format=html ./nql_long -instr-profile=nq.profdata > coverage.html
 # % llvm-cov report ./nql_long -instr-profile=nq.profdata
 
 trio: $(TRIO)/libtrio.a
@@ -41,12 +41,21 @@ $(TRIO)/libtrio.a:
 	(cd $(TRIO); ./configure)
 	make -C $(TRIO) libtrio.a
 
-profile: clean
+coverage: clean
 	$(MAKE) CXX=g++ DEBUG="-g -fprofile-instr-generate -fcoverage-mapping"
 
-viewprofile:
+runcoverage:
+
+viewcoverage:
 	llvm-profdata merge -o default.profdata default.profraw
 	llvm-cov show ./nql_long -instr-profile=default.profdata $(NAME)
+
+profile: clean
+	$(MAKE) CXX=g++ DEBUG="-g" OPT="-Ofast" LDFLAGS+="-lprofiler" nqg_2_64
+
+runprofile:
+	CPUPROFILE=nqg_2_64.prof CPUPROFILE_FREQUENCY=10000 ./nqg_2_64 -W40 p/gg
+	pprof --pdf --nodecount=20 ./nqg_2_64 ./nqg_2_64.prof > profile.pdf
 
 clean:
 	rm -fr *.o *.gc?? nq[lg]_[0-9]*_[0-9]* nq[lg]_mpz nq[lg]_long nq[lg]_z *.dSYM

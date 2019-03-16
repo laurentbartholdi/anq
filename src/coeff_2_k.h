@@ -106,6 +106,12 @@ inline void coeff_fdiv_qr(coeff &q, coeff &r, const coeff &a, const coeff &b) {
   q.data = t.data;
 }
 
+inline unsigned long coeff_fdiv_q_ui(coeff &q, const coeff &a, unsigned long b) {
+  unsigned long r = a.data % b;
+  q.data = a.data / b;
+  return r;
+}
+
 inline void coeff_mul(coeff &result, const coeff &a, const coeff &b) {
   result.data = (a.data * b.data) & COEFF_MASK;
 }
@@ -193,20 +199,21 @@ inline int coeff_out_str(FILE *f, const coeff &a)
   return fprintf(f, "%" PRIu64, a.data); /* maybe we should print in binary or hex? */
 }
 
-inline char *coeff_get_str(char *s, int base, const coeff &a)
+inline unsigned char *coeff_get_str(unsigned char *s, int base, const coeff &a)
 {
   char *p;
   if (s == NULL)
     p = (char *) malloc(25);
   else
-    p = s;
+    p = (char *) s;
 #ifdef TRIO_TRIO_H
 #ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wall"
 #else
 #pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wall"
+#pragma GCC diagnostic ignored "-Wformat="
+#pragma GCC diagnostic ignored "-Wformat-extra-args"
 #endif
   trio_sprintf(p, "%..*" PRIu64, base, a.data);
 #ifdef __clang__
@@ -220,9 +227,10 @@ inline char *coeff_get_str(char *s, int base, const coeff &a)
   if (s == NULL)
     p = (char *) realloc(p, strlen(p)+1);
 
-  return p;
+  return (unsigned char *) p;
 }
 
+#define coeff_prime 2
 #define coeff_base 2
 
 inline void coeff_set_str(coeff &a, const char *s, int base)
@@ -237,3 +245,5 @@ inline void coeff_set_str(coeff &a, const char *s, int base)
     s++;
   }
 }
+
+inline size_t coeff_hash(const coeff &c) { return c.data; }

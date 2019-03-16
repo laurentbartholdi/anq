@@ -45,6 +45,7 @@ inline void coeff_add_si(coeff &result, coeff &a, long l) {
 #define coeff_fdiv_q mpz_fdiv_q
 #define coeff_fdiv_r mpz_fdiv_r
 #define coeff_fdiv_qr mpz_fdiv_qr
+#define coeff_fdiv_q_ui mpz_fdiv_q_ui
 #define coeff_gcdext mpz_gcdext
 #define coeff_mul mpz_mul
 #define coeff_mul_si mpz_mul_si
@@ -64,7 +65,7 @@ inline void coeff_inv(coeff &result, const coeff &a) {
 }
 
 /* addition, returns true if a in [0,b) or b=0 */
-inline bool coeff_reduced_p(coeff &a, coeff &b) {
+inline bool coeff_reduced_p(const coeff &a, const coeff &b) {
   return !mpz_sgn(b) || (mpz_sgn(a) >= 0 && mpz_cmp(a, b) < 0);
 }
 
@@ -87,4 +88,11 @@ inline void coeff_swap(coeff &a, coeff &b) {
 inline int coeff_out_str(FILE *f, const coeff &a)
 {
   return mpz_out_str(f, 10, a);
+}
+
+inline size_t coeff_hash(const coeff &c) {
+  size_t seed = c->_mp_size;
+  for (unsigned i = 0; i < abs(c->_mp_size); i++)
+    seed ^= c->_mp_d[i] + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+  return seed;
 }
