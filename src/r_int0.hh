@@ -1,4 +1,4 @@
-template<> class __ring0<UINT_MAX> {
+template<> class __ring0<0> {
   mpz_t data;
 public:
   static const char *COEFF_ID() { return "ℤ as mpz_t"; }

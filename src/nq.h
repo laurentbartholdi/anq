@@ -21,9 +21,10 @@
 #include <vector>
 #include <string>
 #include <unordered_map>
-#define COEFF_CXX
-#include "coeff.h"
+#include "ring.hh"
 #include "vectors.hh"
+
+typedef integer<0,1> coeff;
 
 /****************************************************************
  * the code will work for groups and Lie algebras, with different
@@ -62,12 +63,13 @@ void TimeStamp(const char *);
  * Used to store structure constants and sparse matrix rows;
  * never used for calculations.
  */
+
 struct coeff_ops {
-  static void init(coeff &c) { coeff_init(c); }
-  static void clear(coeff &c) { coeff_clear(c); }
-  static bool nz_p(const coeff &c) { return coeff_nz_p(c); }
-  static void set(coeff &c, const coeff &d) { coeff_set(c,d); }
-  static void setzero(coeff &c) { coeff_set_si(c,0); }
+  static void init(coeff &c) { c.init(); }
+  static void clear(coeff &c) { c.clear(); }
+  static bool nz_p(const coeff &c) { return c.nz_p(); }
+  static void set(coeff &c, const coeff &d) { c.set(d); }
+  static void setzero(coeff &c) { c.zero(); }
 };
 typedef sparsevec<coeff,coeff_ops> sparsecvec;
 typedef sparsecvec::key gen;
@@ -110,7 +112,7 @@ struct node {
     node *u;
   };
   node(nodetype _type) : type(_type) { }
-  node(nodetype _type, coeff _n) : type(_type) { coeff_init_set(n, _n); }  
+  node(nodetype _type, coeff _n) : type(_type) { n.init_set(_n); }  
   node(nodetype _type, gen _g) : type(_type), g(_g) { }
   node(nodetype _type, node *_l, node *_r) : type(_type), l(_l), r(_r) { }
   node(nodetype _type, node *_u) : type(_type), u(_u) { }
@@ -208,27 +210,27 @@ private:
 struct hollowcvec : hollowvec<coeff,coeff_ops> {
   template <typename V> inline void add(const V v) { // this += v
     for (const auto &kc : v)
-      coeff_add((*this)[kc.first], (*this)[kc.first], kc.second);
+      ::add((*this)[kc.first], (*this)[kc.first], kc.second);
   }
   template <typename V> inline void sub(const V v) { // this -= v
     for (const auto &kc : v)
-      coeff_sub((*this)[kc.first], (*this)[kc.first], kc.second);
+      ::sub((*this)[kc.first], (*this)[kc.first], kc.second);
   }
   template <typename V> inline void addmul(const coeff &c, const V v) { // this += c*v
     for (const auto &kc : v)
-      coeff_addmul((*this)[kc.first], c, kc.second);
+      ::addmul((*this)[kc.first], c, kc.second);
   }
   template <typename V> inline void submul(const coeff &c, const V v) { // this -= c*v
     for (const auto &kc : v)
-      coeff_submul((*this)[kc.first], c, kc.second);
+      ::submul((*this)[kc.first], c, kc.second);
   }
   inline void neg() {
     for (const auto &kc : *this)
-      coeff_neg((*this)[kc.first], kc.second);
+      ::neg((*this)[kc.first], kc.second);
   }
   inline void mul(const coeff &c) {
     for (const auto &kc : *this)
-      coeff_mul((*this)[kc.first], kc.second, c);
+      ::mul((*this)[kc.first], kc.second, c);
   }
     
   void eval(const pcpresentation &, node *);
@@ -243,7 +245,7 @@ struct hollowcvec : hollowvec<coeff,coeff_ops> {
   void collect(const pcpresentation &, gen, const coeff *c = nullptr); // collect one; last==nullptr means "1"
 
   void mul(const pcpresentation &pc, gen g, const coeff &c) { // this *= g^c
-    if (coeff_z_p(c)) // easy peasy, but should not happen
+    if (c.z_p()) // easy peasy, but should not happen
       return;
 
     collect(pc, g, &c);
@@ -264,12 +266,12 @@ struct hollowcvec : hollowvec<coeff,coeff_ops> {
 };
 
 template<> struct std::hash<coeff> {
-  size_t operator()(const coeff &c) const { return coeff_hash(c); }
+  size_t operator()(const coeff &c) const { return c.hash(); }
 };
 
 template<> struct std::equal_to<coeff> {
   bool operator()(const coeff &c1, const coeff &c2) const {
-    return !coeff_cmp(c1, c2);
+    return !cmp(c1, c2);
   }   
 };
 
@@ -297,7 +299,7 @@ template <typename V, typename W> bool vec_equal(const V &vec1, const W &vec2) {
       return p1end == p2end;
     if (p1->first != p2->first)
       return false;
-    if (coeff_cmp(p1->second, p2->second))
+    if (cmp(p1->second, p2->second))
       return false;
     p1++; p2++;
   }
@@ -320,7 +322,7 @@ template <typename V, typename W> inline int vec_cmp(const V vec1, const W vec2)
       return p1end - p2end;
     if (p1->first != p2->first)
       return p1->first > p2->first ? 1 : -1;
-    int c = coeff_cmp(p1->second, p2->second);
+    int c = cmp(p1->second, p2->second);
     if (c)
       return c;
     p1++; p2++;

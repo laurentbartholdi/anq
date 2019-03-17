@@ -20,18 +20,18 @@ vec_supply<hollowcvec> vecstack;
 // this += [v,w]
 void hollowcvec::liebracket(const pcpresentation &pc, const hollowcvec v, const hollowcvec w) {
   coeff c;
-  coeff_init(c);
+  ::init(c);
 
   for (const auto &kcv : v)
     for (const auto &kcw : w)
       if (kcv.first <= pc.NrPcGens && kcw.first <= pc.NrPcGens && pc.Generator[kcv.first].w + pc.Generator[kcw.first].w <= pc.Class) {
-	coeff_mul(c, kcv.second, kcw.second);
+	::mul(c, kcv.second, kcw.second);
         if (kcv.first > kcw.first)
 	  addmul(c, pc.Comm[kcv.first][kcw.first]);
 	else if (kcw.first > kcv.first)
 	  submul(c, pc.Comm[kcw.first][kcv.first]);
       }
-  coeff_clear(c);
+  ::clear(c);
 }
 
 // add/subtract [[a,b],c]. sign == add, ~sign == subtract.
@@ -53,13 +53,13 @@ void hollowcvec::lie3bracket(const pcpresentation &pc, gen a, gen b, gen c, bool
   }
 }
 
-#ifdef coeff_prime
-static void frobenius_brackets(hollowcvec &r, const pcpresentation &pc, hollowcvec s[coeff_prime+1], coeff tempc[2], int c, unsigned i) {
+#ifdef prime
+static void frobenius_brackets(hollowcvec &r, const pcpresentation &pc, hollowcvec s[prime+1], coeff tempc[2], int c, unsigned i) {
   if (s[i].empty())
     return;
-  if (i == coeff_prime) {
-    coeff_set_si(tempc[0], c);
-    coeff_inv(tempc[1], tempc[0]);
+  if (i == prime) {
+    set_si(tempc[0], c);
+    inv(tempc[1], tempc[0]);
     r.addmul(tempc[1], s[i]);
   } else {
     s[i+1].liebracket(pc, s[i], s[0]);
@@ -76,27 +76,27 @@ void hollowcvec::frobenius(const pcpresentation &pc, const hollowcvec v) {
   for (const auto &kc : v)
     addmul(kc.second, pc.Power[kc.first]); // formally, add kc.second^p * ...
 
-  hollowcvec z[coeff_prime+1];
-  for (unsigned i = 0; i <= coeff_prime; i++)
+  hollowcvec z[prime+1];
+  for (unsigned i = 0; i <= prime; i++)
     z[i] = vecstack.fresh();
   z[1].copy(v);
 
   coeff c[2];
-  coeff_init(c[0]);
-  coeff_init(c[1]);
+  init(c[0]);
+  init(c[1]);
   
   for (const auto &kc : v) {
-    coeff_zero(z[1][kc.first]);
-    coeff_set(z[0][kc.first], kc.second);
+    zero(z[1][kc.first]);
+    set(z[0][kc.first], kc.second);
     z[2].liebracket(pc, z[0], z[1]);
     frobenius_brackets(*this, pc, z, c, 1, 2);
     z[0].clear();
     z[2].clear();
   }
 
-  coeff_clear(c[1]);
-  coeff_clear(c[0]);
-  for (int i = coeff_prime; i >= 0; i--)
+  clear(c[1]);
+  clear(c[0]);
+  for (int i = prime; i >= 0; i--)
     vecstack.release(z[i]);
 }
 #endif
@@ -106,20 +106,20 @@ void hollowcvec::liecollect(const pcpresentation &pc) {
     /* special case: here there is no torsion, but the pc.Power field is
        used for the p-mapping */
     for (const auto &kc : *this)
-      if (!coeff_reduced_p(kc.second, pc.Exponent[kc.first]))
-	coeff_fdiv_r((*this)[kc.first], kc.second, pc.Exponent[kc.first]);
+      if (!reduced_p(kc.second, pc.Exponent[kc.first]))
+	fdiv_r((*this)[kc.first], kc.second, pc.Exponent[kc.first]);
     return;
   }
   
   coeff q;
-  coeff_init(q);
+  ::init(q);
   
   for (const auto &kc : *this)
-    if (!coeff_reduced_p(kc.second, pc.Exponent[kc.first])) {
-      coeff_fdiv_qr(q, (*this)[kc.first], kc.second, pc.Exponent[kc.first]);
+    if (!reduced_p(kc.second, pc.Exponent[kc.first])) {
+      fdiv_qr(q, (*this)[kc.first], kc.second, pc.Exponent[kc.first]);
       addmul(q, pc.Power[kc.first]);
     }
-  coeff_clear(q);
+  ::clear(q);
 }
 
 /* group operations */
@@ -127,8 +127,8 @@ void hollowcvec::liecollect(const pcpresentation &pc) {
 /****************************************************************
  * a simple stack for the collector
  */
-typedef T_stack<coeff> coeff_stack;
-coeff_stack collectstack;
+typedef T_stack<coeff> stack;
+stack collectstack;
 
 /****************************************************************
  * a cache for conjugates. we throw away the cache after every single
@@ -160,8 +160,8 @@ template<> struct std::equal_to<conjdict_entry> {
   }   
 };
 
-#ifdef coeff_prime
-#define pow_base coeff_prime
+#ifdef prime
+#define pow_base prime
 #else
 #define pow_base 2
 #endif
@@ -179,15 +179,15 @@ static sparsecvec conj_lookup(const pcpresentation &pc, gen h, const coeff &c, c
 
   if (k.two_pow == TOP_POW && k.p_pow == TOP_POW) { // return g^(h^|c|)
     coeff d;
-    coeff_init(d);
-    if (coeff_cmp_si(c, 0) < 0)
-      coeff_neg(d, c);
+    init(d);
+    if (cmp_si(c, 0) < 0)
+      neg(d, c);
     else
-      coeff_set(d, c);
+      set(d, c);
 
-    coeff_set_si(v[k.g], 1);
-    for (unsigned k = 0; coeff_nz_p(d); k++) {
-      unsigned long r = coeff_fdiv_q_ui(d, d, pow_base);
+    set_si(v[k.g], 1);
+    for (unsigned k = 0; nz_p(d); k++) {
+      unsigned long r = fdiv_q_ui(d, d, pow_base);
       for (unsigned l = 0; r != 0; l++, r >>= 1)
 	if (r & 1) {
 	  hollowcvec x = vecstack.fresh();
@@ -197,14 +197,14 @@ static sparsecvec conj_lookup(const pcpresentation &pc, gen h, const coeff &c, c
 	  vecstack.release(x);
 	}
     }
-    coeff_clear(d);
+    clear(d);
   } else if (k.two_pow > 0) { // return g^(h^(2m)) = (g^(h^m))^(h^m)
     // conj[g,k,l+1] = conj[g,k,l]@conj[*,k,l]    
     for (const auto &kc : conj_lookup(pc, h, c, {.g = k.g, .two_pow = k.two_pow-1, .p_pow = k.p_pow}, conjdict))
       v.pow(pc, conj_lookup(pc, h, c, {.g = kc.first, .two_pow = k.two_pow-1, .p_pow = k.p_pow}, conjdict), kc.second);
   } else if (k.p_pow > 0) { // return g^(h^(p^m))
     // conj[g,k+1,0] = g @ conj[g,k,0]^a0 @ ... @ conj[g,k,l]^al
-    coeff_set_si(v[k.g], 1);
+    set_si(v[k.g], 1);
     unsigned long p = pow_base;
     for (unsigned l = 0; p != 0; l++, p >>= 1)
       if (p & 1) {
@@ -217,7 +217,7 @@ static sparsecvec conj_lookup(const pcpresentation &pc, gen h, const coeff &c, c
   } else { // two_pow = p_pow = 0. return g^h = g*[g,h]
     if (pc.Generator[k.g].w < pc.Class)
       v.copy(pc.Comm[k.g][h]);
-    coeff_set_si(v[k.g], 1);
+    set_si(v[k.g], 1);
   }
 
   sparsecvec &result = conjdict[k];
@@ -235,11 +235,11 @@ hollowcvec Conjugate(const pcpresentation &pc, gen g, gen h, const coeff *c, con
   if (c == nullptr) { // speedup, c==nullptr means "1"
     if (pc.Generator[g].w < pc.Class)
       v.copy(pc.Comm[g][h]);
-    coeff_set_si(v[g], 1);
+    set_si(v[g], 1);
     return v;
   }
   
-  if (coeff_cmp_si(*c, 0) > 0) {
+  if (cmp_si(*c, 0) > 0) {
     v.copy(conj_lookup(pc, h, *c, top_conj_entry(g), conjdict));
   } else {
     /* Let us write h^c = x. Then we know all g_i^x, but we want
@@ -250,12 +250,12 @@ hollowcvec Conjugate(const pcpresentation &pc, gen g, gen h, const coeff *c, con
     */
     hollowcvec w = vecstack.fresh();
     w.copy(conj_lookup(pc, h, *c, top_conj_entry(g), conjdict));
-    coeff_set_si(v[g], 1);
+    set_si(v[g], 1);
 
     for (auto p = w.upper_bound(g); p != w.end(); p++) {
-      coeff_neg(v[p->first], p->second);
-      if (!coeff_reduced_p(v[p->first], pc.Exponent[p->first]))
-	coeff_add(v[p->first], v[p->first], pc.Exponent[p->first]);
+      neg(v[p->first], p->second);
+      if (!reduced_p(v[p->first], pc.Exponent[p->first]))
+	add(v[p->first], v[p->first], pc.Exponent[p->first]);
       w.pow(pc, conj_lookup(pc, h, *c, top_conj_entry(p->first), conjdict), v[p->first]);
     }
     
@@ -287,22 +287,22 @@ void hollowcvec::collect(const pcpresentation &pc, gen g, const coeff *c) {
     }
 
   if (c == nullptr)
-    coeff_add_si((*this)[g], (*this)[g], 1);
+    ::add_si((*this)[g], (*this)[g], 1);
   else
-    coeff_add((*this)[g], (*this)[g], *c);
-  bool reducepower = !coeff_reduced_p((*this)[g], pc.Exponent[g]);
+    ::add((*this)[g], (*this)[g], *c);
+  bool reducepower = !reduced_p((*this)[g], pc.Exponent[g]);
 
   if (reducecomm || reducepower) {
     // find the generators that we have to skip over, put them in storage
     hollowcvec storage = vecstack.fresh(); // @@@ could be faster with sparsecvec
 
     for (auto p = lastnoncommuting; p != end() && p->first > g; p--) {
-      coeff_set(storage[p->first], p->second);
-      coeff_zero(p->second);
+      set(storage[p->first], p->second);
+      zero(p->second);
     }
 
     if (reducepower) {
-      coeff_sub((*this)[g], (*this)[g], pc.Exponent[g]);
+      ::sub((*this)[g], (*this)[g], pc.Exponent[g]);
       mul(pc, pc.Power[g]);
     }
   
@@ -353,7 +353,7 @@ void SimpleCollect(const pcpresentation &pc, hollowcvec &lhs, const sparsecvec &
 
   while (e--)
     for (const auto &kc : rhs) {
-      int e = coeff_get_si(kc.second);
+      int e = get_si(kc.second);
       int deltae = (e > 0) - (e < 0);
 
       for (; e != 0; e -= deltae) {
@@ -367,38 +367,38 @@ void SimpleCollect(const pcpresentation &pc, hollowcvec &lhs, const sparsecvec &
 	    if (deltae == 1) {
 	      s.v.alloc(pc.Comm[p->first][kc.first].size()+1);
 	      s.v.front().first = p->first;
-	      coeff_set_si(s.v.front().second, 1);
+	      set_si(s.v.front().second, 1);
 	      s.v.window(1).copy(pc.Comm[p->first][kc.first]);
 	    } else {
 	      unsigned len = pc.Comm[p->first][kc.first].size()+3;
 	      s.v.alloc(len);
 	      s.v[0].first = p->first;
-	      coeff_set_si(s.v[0].second, 1);
+	      set_si(s.v[0].second, 1);
 	      s.v[1].first = kc.first;
-	      coeff_set_si(s.v[1].second, 1);
+	      set_si(s.v[1].second, 1);
 	      for (unsigned i = 0; i < len; i++) {
 		s.v[i+2].first = pc.Comm[p->first][kc.first][len-1-i].first;
-		coeff_neg(s.v[i+2].second, pc.Comm[p->first][kc.first][len-1-i].second);
+		neg(s.v[i+2].second, pc.Comm[p->first][kc.first][len-1-i].second);
 	      }
 	      s.v[len+2].first = kc.first;
-	      coeff_set_si(s.v[len+2].second, -1);
+	      set_si(s.v[len+2].second, -1);
 	      s.v.truncate(len+3);
 	    }
-	    s.e = coeff_get_si(p->second);
+	    s.e = get_si(p->second);
 	    collectstack.push_back(s);
 
-	    coeff_zero(p->second);
+	    zero(p->second);
 	  }
-	coeff_add_si(lhs[kc.first], lhs[kc.first], deltae);
-	if (!coeff_reduced_p(lhs[kc.first], pc.Exponent[kc.first])) {
+	add_si(lhs[kc.first], lhs[kc.first], deltae);
+	if (!reduced_p(lhs[kc.first], pc.Exponent[kc.first])) {
 	  coeff q;
-	  coeff_init(q);
-	  coeff_fdiv_qr(q, lhs[kc.first], lhs[kc.first], pc.Exponent[kc.first]);
+	  init(q);
+	  fdiv_qr(q, lhs[kc.first], lhs[kc.first], pc.Exponent[kc.first]);
 	  simplestackslot s;
 	  s.v.alloc(pc.Power[kc.first].size());
 	  s.v.copy(pc.Power[kc.first]);
-	  s.e = coeff_get_si(q);
-	  coeff_clear(q);
+	  s.e = get_si(q);
+	  clear(q);
 	  collectstack.push_back(s);
 	}
 	while (!collectstack.empty()) {
@@ -422,7 +422,7 @@ void hollowcvec::lquo(const pcpresentation &pc, hollowcvec v, const hollowcvec w
   auto pv = v.begin();
   auto pw = w.begin();
   coeff c;
-  coeff_init(c);
+  init(c);
 
   for (;;) {
     gen g = LASTGEN;
@@ -433,21 +433,21 @@ void hollowcvec::lquo(const pcpresentation &pc, hollowcvec v, const hollowcvec w
       if (pw->first < g) g = pw->first, minatv = false;
     }
     if (minatv && minatw)
-      coeff_sub(c, (pw++)->second, pv->second);
+      ::sub(c, (pw++)->second, pv->second);
     else if (minatv)
-      coeff_neg(c, pv->second);
+      ::neg(c, pv->second);
     else if (minatw)
-      coeff_set(c, (pw++)->second);
+      ::set(c, (pw++)->second);
     else
       break;
-    if (!coeff_reduced_p(c, pc.Exponent[g]))
-      coeff_add(c, c, pc.Exponent[g]);
+    if (!reduced_p(c, pc.Exponent[g]))
+      ::add(c, c, pc.Exponent[g]);
     mul(pc, g, c);
     v.mul(pc, g, c);
     pv = v.upper_bound(g);
   }
 
-  coeff_clear(c);
+  ::clear(c);
 }
 
 // this *= v^-1.
@@ -458,44 +458,44 @@ template <typename V> void hollowcvec::div(const pcpresentation &pc, const V v) 
      (v g^d) starts with a monomial >g.
   */
   coeff c;
-  coeff_init(c);
+  ::init(c);
   hollowcvec w = vecstack.fresh();
   w.copy(v);
   
   for (const auto &kc : w) {
     gen g = kc.first;
-    coeff_neg (c, kc.second);
-    if (!coeff_reduced_p(c, pc.Exponent[g]))
-      coeff_add(c, c, pc.Exponent[g]);
+    ::neg (c, kc.second);
+    if (!reduced_p(c, pc.Exponent[g]))
+      ::add(c, c, pc.Exponent[g]);
     mul(pc, g, c);
     w.mul(pc, g, c);
   }
   vecstack.release(w);
-  coeff_clear(c);
+  ::clear(c);
 }
 
 // this *= v^c
 template <typename V> void hollowcvec::pow(const pcpresentation &pc, const V v, const coeff &c) {
-  if (coeff_z_p(c)) // easy peasy
+  if (z_p(c)) // easy peasy
     return;
   
   coeff d;
-  coeff_init(d);
+  ::init(d);
   hollowcvec x = vecstack.fresh();
 
-  if (coeff_sgn(c) < 0) {
-    coeff_neg(d, c);
+  if (sgn(c) < 0) {
+    ::neg(d, c);
     x.div(pc, v);
   } else {
-    coeff_set(d, c);
+    ::set(d, c);
     x.copy(v);
   }
 
   bool next_nonzero = true;
   while (next_nonzero) {
-    unsigned long r = coeff_fdiv_q_ui(d, d, pow_base), l = 1;
+    unsigned long r = fdiv_q_ui(d, d, pow_base), l = 1;
     hollowcvec w = vecstack.fresh();
-    next_nonzero = coeff_nz_p(d);
+    next_nonzero = nz_p(d);
     for (;;) {
       // throughout this loop, l is a power of 2; x = v^(p^i*l); and
       // at the end w = x = v^(p^(i+1))
@@ -517,7 +517,7 @@ template <typename V> void hollowcvec::pow(const pcpresentation &pc, const V v, 
     vecstack.release(w);
   }
 
-  coeff_clear(d);
+  ::clear(d);
   vecstack.release(x);
 }
 
@@ -600,7 +600,7 @@ void hollowcvec::eval(const pcpresentation &pc, node *rel) {
       vecstack.release(t);
     }
     break;
-#ifdef coeff_prime
+#ifdef prime
   case TFROB:
     {
       hollowcvec t = vecstack.fresh();

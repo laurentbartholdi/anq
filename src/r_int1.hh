@@ -25,7 +25,7 @@ public:
 
   inline void clear() { }
 
-  inline size_t hash() { return data; }
+  inline size_t hash() const { return data; }
 
   inline bool nz_p() const { return data != 0; }
 

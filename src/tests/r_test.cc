@@ -1,4 +1,4 @@
-#include "ring.hh"
+#include "../ring.hh"
 #include <stdio.h>
 
 template<uint64_t P, unsigned K> void testP() {

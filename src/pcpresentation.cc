@@ -15,7 +15,7 @@ pcpresentation::pcpresentation(const fppresentation &pres) : fp(pres) {
   Class = 0;
   LastGen = {0};
   
-  coeff_init(TorsionExp);
+  init(TorsionExp);
 
   Epimorphism.resize(pres.NrGens + 1);
   Epimorphism[0] = sparsecvec::bad(); // guard
@@ -41,14 +41,14 @@ pcpresentation::~pcpresentation() {
   for (unsigned i = 1; i <= NrPcGens; i++) {
     if (Power[i].allocated())
       Power[i].free();
-    coeff_clear(Exponent[i]);
-    coeff_clear(Annihilator[i]);
+    clear(Exponent[i]);
+    clear(Annihilator[i]);
     for (unsigned j = 1; j < i; j++)
       Comm[i][j].free();
   }
   for (unsigned i = 1; i <= fp.NrGens; i++)
     Epimorphism[i].free();
-  coeff_clear(TorsionExp);
+  clear(TorsionExp);
 }
 
 #ifdef GROUP
@@ -57,12 +57,12 @@ static hollowcvec tail_assoc(const pcpresentation &pc, gen f, gen g, gen h) {
   hollowcvec rhs = vecstack.fresh();
   hollowcvec lhs = vecstack.fresh();
   
-  coeff_set_si(lhs[f], 1);
+  set_si(lhs[f], 1);
   lhs.mul(pc, h);
   lhs.mul(pc, g);
   lhs.mul(pc, pc.Comm[g][h]); // lhs = f*(g*h) = f*h*g*[g,h]
   
-  coeff_set_si(rhs[f], 1);
+  set_si(rhs[f], 1);
   rhs.mul(pc, g);
   rhs.mul(pc, h); // rhs = (f*g)*h
 
@@ -81,19 +81,19 @@ static hollowcvec tail_pow(const pcpresentation &pc, gen f, gen g) {
   hollowcvec lhs = vecstack.fresh();
   
   if (f > g) { /* f*g*g^(N-1) = f*g^N */
-    coeff_set_si(lhs[f], 1);
+    set_si(lhs[f], 1);
     lhs.mul(pc, g);
-    coeff_add_si(rhs[g], pc.Exponent[g], -1);
+    add_si(rhs[g], pc.Exponent[g], -1);
     lhs.mul(pc, rhs);
     rhs.clear();
     
-    coeff_set_si(rhs[f], 1);
+    set_si(rhs[f], 1);
     rhs.mul(pc, pc.Power[g]);
   } else if (f < g) { /* g^N*f = g^(N-1)*f*g*[g,f] */
     lhs.copy(pc.Power[g]);
     lhs.mul(pc, f);
 
-    coeff_add_si(rhs[g], pc.Exponent[g], -1);
+    add_si(rhs[g], pc.Exponent[g], -1);
     rhs.mul(pc, f);
     rhs.mul(pc, g);
     rhs.mul(pc, pc.Comm[g][f]);
@@ -101,7 +101,7 @@ static hollowcvec tail_pow(const pcpresentation &pc, gen f, gen g) {
     lhs.copy(pc.Power[f]);
     lhs.mul(pc, f);
 
-    coeff_set_si(rhs[f], 1);
+    set_si(rhs[f], 1);
     rhs.mul(pc, pc.Power[f]);
   }
   rhs.sub(lhs);
@@ -137,7 +137,7 @@ void pcpresentation::add1generator(sparsecvec &v, deftype def) {
   unsigned len = v.size();
   v.resize(len+1);
   v[len].first = ++NrTotalGens;
-  coeff_set_si(v[len].second, 1);
+  set_si(v[len].second, 1);
   v.truncate(len+1);
 
   Generator.resize(NrTotalGens + 1);
@@ -191,10 +191,10 @@ unsigned pcpresentation::addtails() {
        (Z/TorsionExp)[t]-algebra) and g has degree < Class-1
     */
     for (unsigned i = 1; i <= NrPcGens; i++) {
-      if (is_dpow[i] || !coeff_nz_p(Exponent[i]))
+      if (is_dpow[i] || !nz_p(Exponent[i]))
 	  continue;
-#ifdef coeff_prime
-      if (Jennings && Generator[i].w*coeff_prime != weight)
+#ifdef prime
+      if (Jennings && Generator[i].w*prime != weight)
 	continue;
 #endif
       if (!Jennings && Generator[i].w+1 != weight)
@@ -263,11 +263,11 @@ unsigned pcpresentation::addtails() {
    */
   Exponent.resize(NrTotalGens + 1);
   for (unsigned i = NrPcGens + 1; i <= NrTotalGens; i++)
-    coeff_init_set(Exponent[i], TorsionExp);
+    init_set(Exponent[i], TorsionExp);
 
   Annihilator.resize(NrTotalGens + 1);
   for (unsigned i = NrPcGens + 1; i <= NrTotalGens; i++)
-    coeff_init_set_si(Annihilator[i], 0);
+    init_set_si(Annihilator[i], 0);
 
   Power.resize(NrTotalGens + 1);
   for (unsigned i = NrPcGens + 1; i <= NrTotalGens; i++)
@@ -338,7 +338,7 @@ unsigned pcpresentation::addtails() {
       unsigned len = 0;
       auto tp = tail.begin();
       for (const auto &kc : Comm[j][i]) {
-	if (kc.first != (*tp).first || coeff_cmp(kc.second,(*tp).second))
+	if (kc.first != (*tp).first || cmp(kc.second,(*tp).second))
 	  abortprintf(5, "AddTails: adjustment to tail of [a%d,a%d] doesn't lie in centre", j, i);
 	len++;
 	tp++;
@@ -440,12 +440,12 @@ void pcpresentation::consistency() const {
   }
   
   coeff annihilator, unit;
-  coeff_init(annihilator);
-  coeff_init(unit); // unused
+  init(annihilator);
+  init(unit); // unused
 
   // check torsion relations
   for (unsigned i = 1; i <= NrPcGens; i++)
-    if (coeff_nz_p(Exponent[i])) {
+    if (nz_p(Exponent[i])) {
       /* if N*v = 0 in our ring, and we have a power relation A*g = w,
        * enforce (N/A)*w = 0.
        * if the group's exponent is given (by the torsion in the
@@ -453,7 +453,7 @@ void pcpresentation::consistency() const {
        */
       hollowcvec t = vecstack.fresh();
   
-      coeff_unit_annihilator(unit, annihilator, Exponent[i]);
+      unit_annihilator(unit, annihilator, Exponent[i]);
 #ifdef LIEALG
       t.addmul(annihilator, Power[i]);
       t.liecollect(*this);
@@ -512,8 +512,8 @@ void pcpresentation::consistency() const {
       }
     }
 
-  coeff_clear(unit);
-  coeff_clear(annihilator);
+  clear(unit);
+  clear(annihilator);
 
   TimeStamp("pcpresentation::consistency()");
 }
@@ -727,10 +727,10 @@ void pcpresentation::collecttail(const sparsecmat &rels, sparsecvec &v, std::vec
   for (writepos = readpos; v[readpos].first != sparsecvec::eol; readpos++) {
     int newg = renumber[v[readpos].first];
 
-    if (newg >= 1 && coeff_reduced_p(v[readpos].second, Exponent[newg])) {
+    if (newg >= 1 && reduced_p(v[readpos].second, Exponent[newg])) {
       v[writepos].first = newg; // renumber in-place
       if (writepos != readpos)
-	coeff_set(v[writepos].second, v[readpos].second);
+	set(v[writepos].second, v[readpos].second);
       writepos++;
       continue;
     }
@@ -752,7 +752,7 @@ void pcpresentation::collecttail(const sparsecmat &rels, sparsecvec &v, std::vec
     v.resize(writepos+t.size());
     for (const auto &kc : t) {
       v[writepos].first = renumber[kc.first];
-      coeff_set(v[writepos].second, kc.second);
+      set(v[writepos].second, kc.second);
       writepos++;
     }
     v[writepos].first = sparsecvec::eol;
@@ -785,8 +785,8 @@ void pcpresentation::reduce(const sparsecmat &rels) {
     if (i == rels.size() || k != rels[i][0].first) /* no relation for k, remains */
       continue;
 
-    if (coeff_cmp_si(rels[i][0].second, 1)) { /* k is torsion, nontrivial */
-      coeff_set(Exponent[newk], rels[i][0].second);
+    if (cmp_si(rels[i][0].second, 1)) { /* k is torsion, nontrivial */
+      set(Exponent[newk], rels[i][0].second);
       hollowcvec tail = vecstack.fresh();
       tail.sub(rels[i].window(1)); // negate N*ai+... = 0 to N*ai = -(...)
       Power[newk] = tail.getsparse();
@@ -835,8 +835,8 @@ void pcpresentation::reduce(const sparsecmat &rels) {
       abortprintf(5, "Generator %d should have been eliminated", i);
   
   for (unsigned i = newnrpcgens+1; i <= NrTotalGens; i++) {
-    coeff_clear(Exponent[i]);
-    coeff_clear(Annihilator[i]);
+    clear(Exponent[i]);
+    clear(Annihilator[i]);
   }
 
   /* we could shrink the arrays Generator, Exponent, Annihilator,
@@ -953,7 +953,7 @@ void pcpresentation::print(FILE *f, bool PrintCompact, bool PrintDefs, bool Prin
   first = true;
   fprintf(f, "# The torsion relations:\n");
   for (unsigned i = 1; i <= NrPcGens; i++) {
-    if (coeff_nz_p(Exponent[i])) {
+    if (nz_p(Exponent[i])) {
       if (!first)
 	  fprintf(f, ",\n");
       fprintf(f, "%10s", "");
@@ -1044,7 +1044,7 @@ void pcpresentation::printGAP(FILE *f) const {
 	  "\tepi := NaturalHomomorphismByIdeal(L,LieRingIdeal(L,[");
   bool first = true;
   for (unsigned i = 1; i <= NrPcGens; i++) {
-    if (coeff_nz_p(Exponent[i])) {
+    if (nz_p(Exponent[i])) {
       fprintf(f, "%s-" PRIcoeff "*bas[%d]", first ? "" : ",\n\t\t", &Exponent[i], i);
       if (Power[i].allocated())
 	PrintGAPVec(f, Power[i], false);
@@ -1119,7 +1119,7 @@ void pcpresentation::printGAP(FILE *f) const {
 	  "\tg := GeneratorsOfGroup(F);\n"
 	  "\tc := FromTheLeftCollector(%d);\n", NrPcGens, NrPcGens);
   for (unsigned i = 1; i <= NrPcGens; i++)
-    if (coeff_nz_p(Exponent[i])) {
+    if (nz_p(Exponent[i])) {
       fprintf(f, "\tSetRelativeOrder(c,%u," PRIcoeff ");\n", i, &Exponent[i]);
       fprintf(f, "\tSetPower(c,%u,", i); PrintGAPVec(f, Power[i]);
       fprintf(f, ");\n");

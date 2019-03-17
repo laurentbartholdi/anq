@@ -4,8 +4,8 @@ src/nq[lg]_*
 *.dSYM
 OLD/
 roman/
-trio-1.16/Makefile
-trio-1.16/autom4te.cache/
-trio-1.16/config.log
-trio-1.16/config.status
-trio-1.16/libtrio.*
+src/trio-1.16/Makefile
+src/trio-1.16/autom4te.cache/
+src/trio-1.16/config.log
+src/trio-1.16/config.status
+src/trio-1.16/libtrio.*

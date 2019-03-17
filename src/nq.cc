@@ -82,7 +82,7 @@ static int coeff_print(void *ref)
   coeff *data = (coeff *) trio_get_argument(ref);
   if (data == nullptr)
     return -1;
-  char *buffer = (char *) coeff_get_str(nullptr, 10, *data);
+  char *buffer = (char *) get_str(nullptr, 10, *data);
   trio_print_string(ref, buffer);
   int len = strlen(buffer);
   free(buffer);
@@ -97,7 +97,7 @@ template <typename V> static int cvec_print(void *ref)
 
   bool first = true;
   for (const auto &kc : *data) {
-    char *buffer = (char *) coeff_get_str(nullptr, 10, kc.second);
+    char *buffer = (char *) get_str(nullptr, 10, kc.second);
 #ifdef LIEALG
     if (first) first = false; else trio_print_string(ref, " + ");
     trio_print_string(ref, buffer);
@@ -128,7 +128,7 @@ int main(int argc, char **argv) {
   int c;
   bool PrintZeros = true, PrintCompact = true, PrintDefs = false, Gap = false, Graded = false, PAlgebra = false, Metabelian = false, Jennings = false;
   coeff TorsionExp;
-  coeff_init_set_si(TorsionExp, 0);
+  init_set_si(TorsionExp, 0);
   unsigned MaxWeight = -1, NilpotencyClass = -1;
   const char *InputFileName;
 
@@ -165,7 +165,7 @@ int main(int argc, char **argv) {
     case 'J':
       Jennings = true;
       PAlgebra = true;
-      coeff_set_si(TorsionExp, coeff_prime);
+      set_si(TorsionExp, coeff_prime);
       break;
 #endif
     case 'L':
@@ -184,7 +184,7 @@ int main(int argc, char **argv) {
       break;
     case 'X':
       PAlgebra = true;
-      coeff_set_str(TorsionExp, optarg, 10);
+      set_str(TorsionExp, optarg, 10);
       break;
     case 'W':
       MaxWeight = atoi(optarg);
@@ -216,7 +216,7 @@ int main(int argc, char **argv) {
     strftime(timestring, 128, "%c", localtime(&t));
 
     fprintf(LogFile, "# The %s nilpotent quotient program, by Laurent Bartholdi (from Wernel Nickel and Csaba Schneider code)\n", LIEGPSTRING);
-    fprintf(LogFile, "# Version %s, coefficients %s\n", VERSION, COEFF_ID);
+    fprintf(LogFile, "# Version %s, coefficients %s\n", VERSION, coeff::COEFF_ID());
     fprintf(LogFile, "# \"%s\" with input \"%s\" started %s on %s\n", argv[0], InputFileName ? InputFileName : "<stdin>", timestring, hostname);
     fprintf(LogFile, "# %s%s output %s%swill go to \"%s\"\n", PrintCompact ? "compact " : "", Gap ? "GAP" : "NQ", PrintZeros ? "with zeros " : "", PrintDefs ? "with defs" : "", OutputFile == stdout ? "<stdout>" : "file");
 
@@ -248,8 +248,8 @@ int main(int argc, char **argv) {
   pc.Metabelian = Metabelian;
   pc.Jennings = Jennings;
   pc.NilpotencyClass = NilpotencyClass;
-  coeff_set(pc.TorsionExp, TorsionExp);
-  coeff_clear(TorsionExp);
+  set(pc.TorsionExp, TorsionExp);
+  clear(TorsionExp);
 
   for (pc.Class = 1; pc.Class <= MaxWeight; pc.Class++) {
     unsigned oldnrpcgens = pc.NrPcGens;

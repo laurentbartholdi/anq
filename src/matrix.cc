@@ -52,7 +52,7 @@ static void InitTorsion() {
     for (unsigned i = 0; i < NrCols; i++) {
       Matrix[i].alloc(1);
       Matrix[i][0].first = Shift + i;
-      coeff_set(Matrix[i][0].second, *TorsionExp);
+      set(Matrix[i][0].second, *TorsionExp);
       Matrix[i].truncate(1);
     }
   }
@@ -87,17 +87,17 @@ void PrintMatrix() {
 // put v in normal form by subtracting rows of Matrix
 void ReduceRow(hollowcvec &v) {
   coeff q;
-  coeff_init(q);
+  init(q);
   
   for (const auto &kc : v) {
     unsigned row = kc.first - Shift;
       
-    if (Matrix[row].allocated() && !coeff_reduced_p(kc.second, Matrix[row][0].second)) { // found a pivot
-	coeff_fdiv_q(q, kc.second, Matrix[row][0].second);
+    if (Matrix[row].allocated() && !reduced_p(kc.second, Matrix[row][0].second)) { // found a pivot
+	fdiv_q(q, kc.second, Matrix[row][0].second);
 	v.submul(q, Matrix[row]);
     }
   }
-  coeff_clear(q);
+  clear(q);
 }
 
 // try to add currow to the row space spanned by Matrix.
@@ -107,17 +107,17 @@ static bool AddRow(hollowcvec currow) {
   bool belongs = true;
 
   coeff a, b, c, d;
-  coeff_init(a);
-  coeff_init(b);
-  coeff_init(c);
-  coeff_init(d);
+  init(a);
+  init(b);
+  init(c);
+  init(d);
 
   for (const auto &kc : currow) {
     unsigned row = kc.first - Shift;
       
     if (!Matrix[row].allocated()) { /* Insert v in Matrix at position row */
       belongs = false;
-      coeff_unit_annihilator(b, a, kc.second);
+      unit_annihilator(b, a, kc.second);
       currow.mul(b);
       Matrix[row] = currow.getsparse();
       currow.clear();
@@ -126,11 +126,11 @@ static bool AddRow(hollowcvec currow) {
       if (Debug >= 3)
 	fprintf(LogFile, "# Adding row %d: " PRIsparsecvec "\n", row, &Matrix[row]);
     } else { /* two rows with same pivot. Merge them */
-      coeff_gcdext(d, a, b, kc.second, Matrix[row][0].second); /* d = a*v[head]+b*Matrix[row][head] */
-      if (!coeff_cmp(d, Matrix[row][0].second)) { /* likely case: Matrix[row][head]=d, b=1, a=0. We're just reducing currow. */
-	coeff_divexact(d, kc.second, d);
+      gcdext(d, a, b, kc.second, Matrix[row][0].second); /* d = a*v[head]+b*Matrix[row][head] */
+      if (!cmp(d, Matrix[row][0].second)) { /* likely case: Matrix[row][head]=d, b=1, a=0. We're just reducing currow. */
+	divexact(d, kc.second, d);
 	currow.submul(d, Matrix[row]);
-#ifdef COEFF_IS_MPZ // check coefficient explosion
+#ifdef IS_MPZ // check coefficient explosion
 	if (Debug >= 1) {
 	  long maxsize = 0;
 	  for (const auto &kc : currow)
@@ -140,12 +140,12 @@ static bool AddRow(hollowcvec currow) {
 #endif
       } else {
 	belongs = false;
-	coeff_divexact(c, kc.second, d);
-	coeff_divexact(d, Matrix[row][0].second, d);
+	divexact(c, kc.second, d);
+	divexact(d, Matrix[row][0].second, d);
 	hollowcvec vab = vecstack.fresh();
 	vab.addmul(a, currow);
 	vab.addmul(b, Matrix[row]);
-	coeff_neg(d, d);
+	neg(d, d);
 	currow.mul(d);
 	currow.addmul(c, Matrix[row]);
 	Matrix[row].free();
@@ -158,10 +158,10 @@ static bool AddRow(hollowcvec currow) {
     }
   }
 
-  coeff_clear(a);
-  coeff_clear(b);
-  coeff_clear(c);
-  coeff_clear(d);
+  clear(a);
+  clear(b);
+  clear(c);
+  clear(d);
 
   return belongs;
 }
@@ -274,7 +274,7 @@ void FlushMatrixQueue() {
 void Hermite() {
   /* reduce all the head columns, to achieve Hermite normal form. */
   coeff q;
-  coeff_init(q);
+  init(q);
   for (unsigned j = 0; j < NrCols; j++) { // @@@ performance: would this be faster looping backwards?
     if (!Matrix[j].allocated())
       continue;
@@ -288,8 +288,8 @@ void Hermite() {
       if (row == j || !Matrix[row].allocated())
 	continue;
 
-      if (!coeff_reduced_p(kc.second, Matrix[row][0].second)) {
-	coeff_fdiv_q(q, kc.second, Matrix[row][0].second);
+      if (!reduced_p(kc.second, Matrix[row][0].second)) {
+	fdiv_q(q, kc.second, Matrix[row][0].second);
 	currow.submul(q, Matrix[row]);
       }
     }
@@ -303,7 +303,7 @@ void Hermite() {
    second columns. This requires a different format, and is perhaps
    best done outside this matrix code. */
 
-  coeff_clear(q);
+  clear(q);
 
   TimeStamp("Hermite()");  
 }

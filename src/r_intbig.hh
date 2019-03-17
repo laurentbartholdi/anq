@@ -262,6 +262,7 @@ public:
     fprintf(f, "%s", s);
     int digits = strlen(s);
     free(s);
+    return digits;
   }
 
   inline char *get_str(char *s, int base) const {

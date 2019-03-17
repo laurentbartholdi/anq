@@ -86,7 +86,7 @@ void FreeNode(node *n) {
   case TGEN:
     break;
   case TNUM:
-    coeff_clear(n->n);
+    clear(n->n);
     break;
   default:
     if (is_unary(n->type))
@@ -307,16 +307,16 @@ static void NextToken() {
   case '8':
   case '9': {
     Token = NUMBER;
-    coeff_zero(N);
-    int base = (Ch == '0' ? coeff_base : 10);
+    zero(N);
+    int base = (Ch == '0' ? coeff::characteristic : 10);
     
     while (isalnum(Ch)) {
-      coeff_mul_si(N, N, base);
-      coeff_add_si(N, N, isdigit(Ch) ? Ch - '0' : Ch + 10 - (isupper(Ch) ? 'A' : 'a'));
+      mul_si(N, N, base);
+      add_si(N, N, isdigit(Ch) ? Ch - '0' : Ch + 10 - (isupper(Ch) ? 'A' : 'a'));
       ReadCh();
     }
     if (sign)
-      coeff_neg(N, N);
+      neg(N, N);
     break;
   }
 
@@ -346,13 +346,13 @@ node *Term(fppresentation &pres) {
     NextToken();
     node *u = Expression(pres, new_precedence);
     if (u->type == TNUM) { /* compile-time evaluation */
-      coeff_init(n->n);
+      init(n->n);
       switch (n->type) {
       case TNEG:
-	coeff_neg(n->n, u->n);
+	neg(n->n, u->n);
 	break;
       case TINV:
-	coeff_inv(n->n, u->n);
+	inv(n->n, u->n);
 	break;
       default:
 	abortprintf(3, "I can't evaluate a numerical expression with unary operator %s", nodename[n->type]);
@@ -414,29 +414,29 @@ node *Expression(fppresentation &pres, int precedence) {
 
     node *u = Expression(pres, new_precedence);
 
-#if defined(LIEALG) && defined(coeff_prime)
+#if defined(LIEALG) && defined(prime)
     if (oper == TPOW && u->type == TNUM) { // p-power mapping
-      if (!coeff_cmp_si(u->n, coeff_prime)) {
+      if (!cmp_si(u->n, prime)) {
 	FreeNode(u);
 	t = new node{TFROB, t};
 	continue;
       } else
-	abortprintf(3, "I can only accept p-power mapping with exponent %d", coeff_prime);
+	abortprintf(3, "I can only accept p-power mapping with exponent %d", prime);
     }
 #endif
     if (t->type == TNUM && u->type == TNUM) { // compile-time evaluation
       switch (oper) {
       case TPROD:
-	coeff_mul(t->n, t->n, u->n);
+	mul(t->n, t->n, u->n);
 	break;
       case TPOW:
-	coeff_pow(t->n, t->n, u->n);
+	pow(t->n, t->n, u->n);
 	break;
       case TSUM:
-	coeff_add(t->n, t->n, u->n);
+	add(t->n, t->n, u->n);
 	break;
       case TDIFF:
-	coeff_sub(t->n, t->n, u->n);
+	sub(t->n, t->n, u->n);
 	break;
       default:
 	abortprintf(3, "I can't evaluate a numerical expression with binary operator %d", oper);
@@ -531,7 +531,7 @@ fppresentation::fppresentation(const char *InputFileName) {
   Ch = '\0';
   Column = 0;
   Line = 1;
-  coeff_init(N);
+  init(N);
   
   NextToken(); // start parsing
 
@@ -650,7 +650,7 @@ fppresentation::fppresentation(const char *InputFileName) {
     fprintf(LogFile, "\n");
   }
   
-  coeff_clear(N);
+  clear(N);
 }
 
 fppresentation::~fppresentation() {
@@ -689,11 +689,11 @@ void fppresentation::printnode(FILE *f, const node *n) const {
     printnode(f, n->u);
     fprintf(f, ")");
     break;
-#ifdef coeff_prime
+#ifdef prime
   case TFROB:
     fprintf(f, "(");
     printnode(f, n->u);
-    fprintf(f, ")^%d", coeff_prime);
+    fprintf(f, ")^%d", prime);
     break;
 #endif
   case TSUM:

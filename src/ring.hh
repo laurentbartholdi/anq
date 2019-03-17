@@ -112,33 +112,18 @@ template<uint64_t P, unsigned K> struct intlocal : std::conditional<P==2,__local
     intlocal q;
     return shdiv_qr_ui(q, *this, a, b);
   }
-  
-  inline void pow(intlocal &result, const intlocal &a, const intlocal &b) {
-    /* kludge: coerce b to an integer */
-    int exp = get_si(b);
-    intlocal r, base;
-    set_si(r, 1);
-    set(base, a);
-    for(;;) {
-      if (exp & 1)
-	mul(r, r, base);
-      exp >>= 1;
-      if (!exp) break;
-      mul(base, base, base);
-    }
-    set(result, r);
-  }
 };
 
 #include "r_intbig.hh"
 #include "r_int0.hh"
 #include "r_int1.hh"
+#include "r_intmax.hh"
 template<unsigned K=1> struct intglobal : __ring0<K> {
   /* returns unit and generator of annihilator ideal:
      a*unit is canonical (>0 or power of P) and a*annihilator=0 */
   inline void inv(const intglobal &a) {
     if (!a.cmp_si(1) || !a.cmp_si(-1))
-      set(a);
+      this->set(a);
     else
       throw std::runtime_error("inv() of non-invertible element");
   }
@@ -190,7 +175,7 @@ template<unsigned K=1> struct intglobal : __ring0<K> {
   }
 };
 
-template<uint64_t P=0, unsigned K=UINT_MAX> struct integer : std::conditional<P==0,intglobal<K>,intlocal<P,K>>::type {
+template<uint64_t P=0, unsigned K=0> struct integer : std::conditional<P==0,intglobal<K>,intlocal<P,K>>::type {
   static const uint64_t characteristic = P;
   
   inline void set_str(const char *s, int base) {
@@ -199,13 +184,29 @@ template<uint64_t P=0, unsigned K=UINT_MAX> struct integer : std::conditional<P=
     if (*s == '0' && characteristic != 0) base = characteristic;
   
     while (isalnum(*s)) {
-      mul_si(*this, base);
-      add_si(*this, isdigit(*s) ? *s - '0' : *s + 10 - (isupper(*s) ? 'A' : 'a'));
+      this->mul_si(*this, base);
+      this->add_si(*this, isdigit(*s) ? *s - '0' : *s + 10 - (isupper(*s) ? 'A' : 'a'));
       s++;
     }
   }
+  
+  inline void pow(const integer &a, const integer &b) {
+    /* kludge: coerce b to an integer */
+    int exp = get_si(b);
+    integer r, base;
+    set_si(r, 1);
+    set(base, a);
+    for(;;) {
+      if (exp & 1)
+	mul(r, r, base);
+      exp >>= 1;
+      if (!exp) break;
+      mul(base, base, base);
+    }
+    this->set(r);
+  }
 
-  template<unsigned L> inline operator intlocal<P,L>() { intlocal<2,L> result; result.map(*this); return result; } // !!! think about this
+  template<unsigned L> inline operator integer<P,L>() { integer<P,L> result; result.map(*this); return result; } // !!! think about this
   
   explicit inline operator int64_t() const { return this->get_si(); }
 
@@ -238,6 +239,14 @@ template<uint64_t P=0, unsigned K=UINT_MAX> struct integer : std::conditional<P=
   integer &operator /=(int64_t a) { this->fdiv_ui(*this, a); return *this; }
 };
 
+template<uint64_t P, unsigned K> inline void init(integer<P,K> &a) { a.init(); }
+
+template<uint64_t P, unsigned K> inline void init_set(integer<P,K> &a, const integer<P,K> &b) { return a.init_set(b); }
+
+template<uint64_t P, unsigned K> inline void init_set_si(integer<P,K> &a, int64_t b) { return a.init_set_si(b); }
+
+template<uint64_t P, unsigned K> inline void clear(integer<P,K> &a) { a.clear(); }
+
 template<uint64_t P, unsigned K> inline bool z_p(const integer<P,K> &a) { return a.z_p(); }
 
 template<uint64_t P, unsigned K> inline bool nz_p(const integer<P,K> &a) { return a.nz_p(); }
@@ -245,6 +254,10 @@ template<uint64_t P, unsigned K> inline bool nz_p(const integer<P,K> &a) { retur
 template<uint64_t P, unsigned K> inline bool reduced_p(const integer<P,K> &a, const integer<P,K> &b) { return a.reduced_p(b); }
 
 template<uint64_t P, unsigned K> inline void set(integer<P,K> &result, const integer<P,K> &a) { result.set(a); }
+
+template<uint64_t P, unsigned K> inline void set_si(integer<P,K> &result, int64_t a) { result.set_si(a); }
+
+template<uint64_t P, unsigned K> inline int64_t get_si(const integer<P,K> &a) { return a.get_si(); }
 
 template<uint64_t P, unsigned K> inline void zero(integer<P,K> &result) { result.zero(); }
 
@@ -287,3 +300,5 @@ template<uint64_t P, unsigned K> inline int out_str(FILE *f, const integer<P,K> 
 template<uint64_t P, unsigned K> inline char *get_str(char *s, int base, const integer<P,K> &a) { return a.get_str(s, base); }
 
 template<uint64_t P, unsigned K> inline void set_str(integer<P,K> &a, const char *s, int base) { a.set_str(s, base); }
+
+template<uint64_t P, unsigned K> inline void pow(integer<P,K> &result, const integer<P,K> &a, const integer<P,K> &b) { result.pow(a, b); }
