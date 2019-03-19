@@ -1,7 +1,7 @@
-template<unsigned K> class local2_small {
+template<unsigned K> class __local2_small {
   static const uint64_t COEFF_MASK = K == 64 ? ~0LL : ((1ULL << K) - 1);
 
-  static inline local2_small inverse_mod_2_k(uint64_t a, unsigned shift) {
+  static inline __local2_small inverse_mod_2_k(uint64_t a, unsigned shift) {
     a >>= shift;
     uint64_t inverse = a; // already 3 correct bits
     for (unsigned i = 0; i < 5; i++)
@@ -25,11 +25,11 @@ public:
 
   inline bool z_p() const { return data == 0; }
 
-  inline bool reduced_p(const local2_small &b) const {
+  inline bool reduced_p(const __local2_small &b) const {
     return b.data == 0 || data < b.data;
   }
 
-  inline void set(const local2_small &a) { data = a.data; }
+  inline void set(const __local2_small &a) { data = a.data; }
 
   inline void set_si(int64_t a) { data = a & COEFF_MASK; }
 
@@ -42,19 +42,19 @@ public:
 
   void zero() { data = 0; }
   
-  inline void add(const local2_small &a, const local2_small &b) {
+  inline void add(const __local2_small &a, const __local2_small &b) {
     data = (a.data+b.data) & COEFF_MASK;
   }
 
-  inline void add_si(const local2_small &a, int64_t b) {
+  inline void add_si(const __local2_small &a, int64_t b) {
     data = (a.data+b) & COEFF_MASK;
   }
 
-  inline void addmul(const local2_small &a, const local2_small &b) {
+  inline void addmul(const __local2_small &a, const __local2_small &b) {
     data = (data + a.data * b.data) & COEFF_MASK;
   }
 
-  inline int cmp(const local2_small &b) const {
+  inline int cmp(const __local2_small &b) const {
     return (data > b.data) - (data < b.data);
   }
 
@@ -63,11 +63,11 @@ public:
     return data != (uint64_t) (b & COEFF_MASK);
   }
 
-  inline friend void fdiv_qr(local2_small &q, local2_small &r, const local2_small &a, const local2_small &b) {
+  inline friend void fdiv_qr(__local2_small &q, __local2_small &r, const __local2_small &a, const __local2_small &b) {
     fdiv_qr_ui(q, r, a, b.data);
   }
 
-  inline friend uint64_t fdiv_qr_ui(local2_small &q, local2_small &r, const local2_small &a, uint64_t b) {
+  inline friend uint64_t fdiv_qr_ui(__local2_small &q, __local2_small &r, const __local2_small &a, uint64_t b) {
     uint64_t __r = a.data & ((b & -b) - 1);
     unsigned bval = __builtin_ctzll(b);
     q.mul_si(inverse_mod_2_k(b, bval), a.data >> bval);
@@ -75,33 +75,33 @@ public:
     return __r;
   }
 
-  inline friend void shdiv_qr(local2_small &q, local2_small &r, const local2_small &a, const local2_small &b) {
+  inline friend void shdiv_qr(__local2_small &q, __local2_small &r, const __local2_small &a, const __local2_small &b) {
     shdiv_qr_ui(q, r, a, b.data);
   }    
 
-  inline friend uint64_t shdiv_qr_ui(local2_small &q, local2_small &r, const local2_small &a, uint64_t b) {
+  inline friend uint64_t shdiv_qr_ui(__local2_small &q, __local2_small &r, const __local2_small &a, uint64_t b) {
     uint64_t __r = a.data & (b-1);
     q.data = a.data >> __builtin_ctzll(b);
     r.data = __r;
     return __r;
   }
 
-  inline void inv(const local2_small &a) {
+  inline void inv(const __local2_small &a) {
     if (a.data & 1)
       *this = inverse_mod_2_k(a.data, 0);
     else
       throw std::runtime_error("inv() of non-invertible element");
   }
 
-  inline void mul(const local2_small &a, const local2_small &b) {
+  inline void mul(const __local2_small &a, const __local2_small &b) {
     data = (a.data * b.data) & COEFF_MASK;
   }
 
-  inline void mul_si(const local2_small &a, int64_t b) {
+  inline void mul_si(const __local2_small &a, int64_t b) {
     data = (a.data * b) & COEFF_MASK;
   }
 
-  inline void neg(const local2_small &a) {
+  inline void neg(const __local2_small &a) {
     data = (-a.data) & COEFF_MASK;
   }
 
@@ -109,15 +109,15 @@ public:
     return data != 0;
   }
 
-  inline void sub(const local2_small &a, const local2_small &b) {
+  inline void sub(const __local2_small &a, const __local2_small &b) {
     data = (a.data - b.data) & COEFF_MASK;
   }
 
-  inline void submul(const local2_small &a, const local2_small &b) {
+  inline void submul(const __local2_small &a, const __local2_small &b) {
     data = (data - a.data * b.data) & COEFF_MASK;
   }
 
-  inline unsigned val(const local2_small &a) {
+  inline unsigned val(const __local2_small &a) {
     if (a.z_p()) {
       zero();
       return UINT_MAX;
@@ -128,7 +128,7 @@ public:
     return aval;
   }
   
-  inline friend void gcdext(local2_small &gcd, local2_small &s, local2_small &t, const local2_small &a, const local2_small &b) {
+  inline friend void gcdext(__local2_small &gcd, __local2_small &s, __local2_small &t, const __local2_small &a, const __local2_small &b) {
     uint64_t alowbit = a.data & -a.data, blowbit = b.data & -b.data;
     if (a.data == 0 || alowbit >= blowbit) {
       gcd.data = blowbit;
@@ -143,7 +143,7 @@ public:
 
   /* returns unit and generator of annihilator ideal:
      a*unit is canonical (2^n) and a*annihilator=0 */
-  inline friend void unit_annihilator(local2_small &unit, local2_small &annihilator, const local2_small &a) {
+  inline friend void unit_annihilator(__local2_small &unit, __local2_small &annihilator, const __local2_small &a) {
     if (a.data == 0) {
       unit.data = 0;
       annihilator.data = 1;
@@ -191,6 +191,36 @@ public:
     return p;
   }
 
-  /* conversions */
-  //  template<unsigned L> inline void map(const localint<2,L> &a) { printf("yyy\n"); set_si(a.get_si()); } // !!! and kernel
+  // conversions
+  template<unsigned L> friend class __ring0;
+  //template<uint64_t Q, unsigned L> friend class __localp_small;
+  //template<uint64_t Q, unsigned L> friend class __localp_big;
+  template<unsigned L> friend class __local2_small;
+  template<unsigned L> friend class __local2_big;
+
+  template<unsigned L> inline void map(const __ring0<L> &a) {
+    data = a.data[0] & COEFF_MASK;
+  }
+
+  inline void map(const __ring0_mpz &a) {
+    mp_size_t L = a.data[0]._mp_size;
+    if (L == 0)
+      data = 0;
+    else if (L > 0)
+      data = a.data[0]._mp_d[0] & COEFF_MASK;
+    else
+      data = -a.data[0]._mp_d[0] & COEFF_MASK;
+  }
+
+  inline void map(const __ring0_64 &a) {
+    data = a.data & COEFF_MASK;
+  }
+
+  template<unsigned L> inline void map(const __local2_big<L> &a) {
+    data = a.data[0] & COEFF_MASK;
+  }
+
+  template<unsigned L> inline void map(const __local2_small<L> &a) {
+    data = a.data & COEFF_MASK;
+  }  
 };

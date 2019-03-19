@@ -20,18 +20,18 @@ vec_supply<hollowcvec> vecstack;
 // this += [v,w]
 void hollowcvec::liebracket(const pcpresentation &pc, const hollowcvec v, const hollowcvec w) {
   coeff c;
-  ::init(c);
+  c.init();
 
   for (const auto &kcv : v)
     for (const auto &kcw : w)
       if (kcv.first <= pc.NrPcGens && kcw.first <= pc.NrPcGens && pc.Generator[kcv.first].w + pc.Generator[kcw.first].w <= pc.Class) {
-	::mul(c, kcv.second, kcw.second);
+	c.mul(kcv.second, kcw.second);
         if (kcv.first > kcw.first)
 	  addmul(c, pc.Comm[kcv.first][kcw.first]);
 	else if (kcw.first > kcv.first)
 	  submul(c, pc.Comm[kcw.first][kcv.first]);
       }
-  ::clear(c);
+  c.clear();
 }
 
 // add/subtract [[a,b],c]. sign == add, ~sign == subtract.
@@ -82,8 +82,8 @@ void hollowcvec::frobenius(const pcpresentation &pc, const hollowcvec v) {
   z[1].copy(v);
 
   coeff c[2];
-  init(c[0]);
-  init(c[1]);
+  c[0].init();
+  c[1].init();
   
   for (const auto &kc : v) {
     zero(z[1][kc.first]);
@@ -94,8 +94,8 @@ void hollowcvec::frobenius(const pcpresentation &pc, const hollowcvec v) {
     z[2].clear();
   }
 
-  clear(c[1]);
-  clear(c[0]);
+  c[1].clear();
+  c[0].clear();
   for (int i = prime; i >= 0; i--)
     vecstack.release(z[i]);
 }
@@ -112,14 +112,14 @@ void hollowcvec::liecollect(const pcpresentation &pc) {
   }
   
   coeff q;
-  ::init(q);
+  q.init();
   
   for (const auto &kc : *this)
     if (!reduced_p(kc.second, pc.Exponent[kc.first])) {
       fdiv_qr(q, (*this)[kc.first], kc.second, pc.Exponent[kc.first]);
       addmul(q, pc.Power[kc.first]);
     }
-  ::clear(q);
+  q.clear();
 }
 
 /* group operations */
@@ -179,7 +179,7 @@ static sparsecvec conj_lookup(const pcpresentation &pc, gen h, const coeff &c, c
 
   if (k.two_pow == TOP_POW && k.p_pow == TOP_POW) { // return g^(h^|c|)
     coeff d;
-    init(d);
+    d.init();
     if (cmp_si(c, 0) < 0)
       neg(d, c);
     else
@@ -197,7 +197,7 @@ static sparsecvec conj_lookup(const pcpresentation &pc, gen h, const coeff &c, c
 	  vecstack.release(x);
 	}
     }
-    clear(d);
+    d.clear();
   } else if (k.two_pow > 0) { // return g^(h^(2m)) = (g^(h^m))^(h^m)
     // conj[g,k,l+1] = conj[g,k,l]@conj[*,k,l]    
     for (const auto &kc : conj_lookup(pc, h, c, {.g = k.g, .two_pow = k.two_pow-1, .p_pow = k.p_pow}, conjdict))
@@ -287,9 +287,9 @@ void hollowcvec::collect(const pcpresentation &pc, gen g, const coeff *c) {
     }
 
   if (c == nullptr)
-    ::add_si((*this)[g], (*this)[g], 1);
+    (*this)[g] += 1;
   else
-    ::add((*this)[g], (*this)[g], *c);
+    (*this)[g] += *c;
   bool reducepower = !reduced_p((*this)[g], pc.Exponent[g]);
 
   if (reducecomm || reducepower) {
@@ -302,7 +302,7 @@ void hollowcvec::collect(const pcpresentation &pc, gen g, const coeff *c) {
     }
 
     if (reducepower) {
-      ::sub((*this)[g], (*this)[g], pc.Exponent[g]);
+      (*this)[g] -= pc.Exponent[g];
       mul(pc, pc.Power[g]);
     }
   
@@ -392,13 +392,13 @@ void SimpleCollect(const pcpresentation &pc, hollowcvec &lhs, const sparsecvec &
 	add_si(lhs[kc.first], lhs[kc.first], deltae);
 	if (!reduced_p(lhs[kc.first], pc.Exponent[kc.first])) {
 	  coeff q;
-	  init(q);
+	  q.init();
 	  fdiv_qr(q, lhs[kc.first], lhs[kc.first], pc.Exponent[kc.first]);
 	  simplestackslot s;
 	  s.v.alloc(pc.Power[kc.first].size());
 	  s.v.copy(pc.Power[kc.first]);
 	  s.e = get_si(q);
-	  clear(q);
+	  q.clear();
 	  collectstack.push_back(s);
 	}
 	while (!collectstack.empty()) {
@@ -422,7 +422,7 @@ void hollowcvec::lquo(const pcpresentation &pc, hollowcvec v, const hollowcvec w
   auto pv = v.begin();
   auto pw = w.begin();
   coeff c;
-  init(c);
+  c.init();
 
   for (;;) {
     gen g = LASTGEN;
@@ -441,13 +441,13 @@ void hollowcvec::lquo(const pcpresentation &pc, hollowcvec v, const hollowcvec w
     else
       break;
     if (!reduced_p(c, pc.Exponent[g]))
-      ::add(c, c, pc.Exponent[g]);
+      c += pc.Exponent[g];
     mul(pc, g, c);
     v.mul(pc, g, c);
     pv = v.upper_bound(g);
   }
 
-  ::clear(c);
+  c.clear();
 }
 
 // this *= v^-1.
@@ -458,20 +458,20 @@ template <typename V> void hollowcvec::div(const pcpresentation &pc, const V v) 
      (v g^d) starts with a monomial >g.
   */
   coeff c;
-  ::init(c);
+  c.init();
   hollowcvec w = vecstack.fresh();
   w.copy(v);
   
   for (const auto &kc : w) {
     gen g = kc.first;
-    ::neg (c, kc.second);
+    ::neg(c, kc.second);
     if (!reduced_p(c, pc.Exponent[g]))
-      ::add(c, c, pc.Exponent[g]);
+      c += pc.Exponent[g];
     mul(pc, g, c);
     w.mul(pc, g, c);
   }
   vecstack.release(w);
-  ::clear(c);
+  c.clear();
 }
 
 // this *= v^c
@@ -480,7 +480,7 @@ template <typename V> void hollowcvec::pow(const pcpresentation &pc, const V v, 
     return;
   
   coeff d;
-  ::init(d);
+  d.init();
   hollowcvec x = vecstack.fresh();
 
   if (sgn(c) < 0) {
@@ -517,7 +517,7 @@ template <typename V> void hollowcvec::pow(const pcpresentation &pc, const V v, 
     vecstack.release(w);
   }
 
-  ::clear(d);
+  d.clear();
   vecstack.release(x);
 }
 

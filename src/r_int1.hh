@@ -32,7 +32,7 @@ public:
   inline bool z_p() const { return data == 0; }
 
   inline bool reduced_p(const __ring0 &b) const {
-    return b.data == 0 || data < b.data;
+    return b.data == 0 || (data >= 0 && data < b.data);
   }
 
   inline void set(const __ring0 &a) { data = a.data; }
@@ -240,7 +240,49 @@ public:
     set(b);
     b.set(tmp);
   }
-
   
-  /* conversions */
+  // conversions
+  template<unsigned L> friend class __ring0;
+  template<uint64_t Q, unsigned L> friend class __localp_small;
+  template<uint64_t Q, unsigned L> friend class __localp_big;
+  template<unsigned L> friend class __local2_small;
+  template<unsigned L> friend class __local2_big;
+
+  template<unsigned L> inline void map(const __ring0<L> &a) {
+    set_si(a.get_si());
+  }
+
+  inline void map(const __ring0_mpz &a) {
+    set_si(a.get_si());
+  }
+
+  inline void map(const __ring0_64 &a) {
+    set(a);
+  }
+  
+  template<unsigned L> inline void map(const __local2_big<L> &a) {
+    data = a.data[0];
+    for (unsigned i = 1; i < a.COEFF_WORDS; i++)
+      if (a.data[i] != 0 || data < 0)
+	throw std::runtime_error("map(): data cannot fit in an int64_t");
+  }
+
+  template<unsigned L> inline void map(const __local2_small<L> &a) {
+    data = a.data;
+    if (data < 0)
+      throw std::runtime_error("map(): cannot fit in an int64_t");
+  }
+
+  template<uint64_t P, unsigned L> inline void map(const __localp_big<P,L> &a) {
+    set_si(a.get_si());
+  }
+
+  template<uint64_t P, unsigned L> inline void map(const __localp_small<P,L> &a) {
+    set_si(a.get_si());
+  }
 };
+
+// moved from r_int0.hh, because then template was not yet specialized
+inline void __ring0<0>::map(const __ring0_64 &a) {
+  mpz_set_si(data, a.data);
+}

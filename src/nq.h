@@ -24,7 +24,11 @@
 #include "ring.hh"
 #include "vectors.hh"
 
+#ifdef COEFF
+typedef COEFF coeff;
+#else
 typedef integer<0,1> coeff;
+#endif
 
 /****************************************************************
  * the code will work for groups and Lie algebras, with different
@@ -116,6 +120,23 @@ struct node {
   node(nodetype _type, gen _g) : type(_type), g(_g) { }
   node(nodetype _type, node *_l, node *_r) : type(_type), l(_l), r(_r) { }
   node(nodetype _type, node *_u) : type(_type), u(_u) { }
+
+  ~node() {
+    switch (type) {
+    case TGEN:
+      break;
+    case TNUM:
+      n.clear();
+      break;
+    default:
+      if (is_unary(type))
+	delete u;
+      else {
+	delete l;
+	delete r;
+      }
+    }
+  }
 };
 
 struct fppresentation {
@@ -210,27 +231,27 @@ private:
 struct hollowcvec : hollowvec<coeff,coeff_ops> {
   template <typename V> inline void add(const V v) { // this += v
     for (const auto &kc : v)
-      ::add((*this)[kc.first], (*this)[kc.first], kc.second);
+      (*this)[kc.first] += kc.second;
   }
   template <typename V> inline void sub(const V v) { // this -= v
     for (const auto &kc : v)
-      ::sub((*this)[kc.first], (*this)[kc.first], kc.second);
+      (*this)[kc.first] -= kc.second;
   }
   template <typename V> inline void addmul(const coeff &c, const V v) { // this += c*v
     for (const auto &kc : v)
-      ::addmul((*this)[kc.first], c, kc.second);
+      (*this)[kc.first] += {c, kc.second};
   }
   template <typename V> inline void submul(const coeff &c, const V v) { // this -= c*v
     for (const auto &kc : v)
-      ::submul((*this)[kc.first], c, kc.second);
+      (*this)[kc.first] -= {c, kc.second};
   }
   inline void neg() {
     for (const auto &kc : *this)
-      ::neg((*this)[kc.first], kc.second);
+      (*this)[kc.first].neg(kc.second);
   }
   inline void mul(const coeff &c) {
     for (const auto &kc : *this)
-      ::mul((*this)[kc.first], kc.second, c);
+      (*this)[kc.first] *= c;
   }
     
   void eval(const pcpresentation &, node *);

@@ -23,7 +23,7 @@ public:
 
   inline void clear() { }
 
-  size_t hash() {
+  size_t hash() const {
     size_t seed = K;
     for (unsigned i = 0; i < K; i++)
       seed ^= data[i] + 0x9e3779b9 + (seed << 6) + (seed >> 2);
@@ -258,7 +258,7 @@ public:
   }
 
   inline int out_str(FILE *f) const {
-    char *s = (char *) get_str(nullptr, 10, *this);
+    char *s = (char *) get_str(nullptr, 10);
     fprintf(f, "%s", s);
     int digits = strlen(s);
     free(s);
@@ -301,5 +301,74 @@ public:
     tmp.set(*this);
     set(b);
     b.set(tmp);
+  }
+
+  // conversions
+  template<unsigned L> friend class __ring0;
+  template<uint64_t Q, unsigned L> friend class __localp_small;
+  template<uint64_t Q, unsigned L> friend class __localp_big;
+  template<unsigned L> friend class __local2_small;
+  template<unsigned L> friend class __local2_big;
+  
+  template<unsigned L> inline void map(const __ring0<L> &a) {
+    if (a.period()) {
+      __ring0<L> b;
+      b.neg(a);
+      map(b);
+      neg(*this);
+    } else {
+      unsigned nzlimbs = __nzlimbs(a.data, L);
+      if (K < nzlimbs)
+	throw std::runtime_error("map(): data doesn't fit in a fixed-int");
+
+      zero();
+      mpn_copyi(data, a.data, nzlimbs);
+    }
+  }
+
+  inline void map(const __ring0_mpz &a) {
+    int nzlimbs = a.data[0]._mp_size;
+    bool sign = nzlimbs < 0;
+    if (sign) nzlimbs = -nzlimbs;
+
+    if (K < nzlimbs || (K == nzlimbs && 0 > (uint64_t) a.data[0]._mp_d[nzlimbs-1]))
+      throw std::runtime_error("map(): data doesn't fit in a fixed-int");
+
+    zero();
+    mpn_copyi(data, a.data[0]._mp_d, nzlimbs);
+    if (sign)
+      neg(*this);
+  }
+
+  inline void map(const __ring0_64 &a) {
+    set_si(a.data);
+  }
+  
+  template<unsigned L> inline void map(const __local2_big<L> &a) {
+    unsigned nzlimbs = __local2_big<L>::__nzlimbs(a.data, a.COEFF_WORDS);
+    if (K < nzlimbs || (K == nzlimbs && 0 > (uint64_t) a.data[nzlimbs-1]))
+      throw std::runtime_error("map(): data doesn't fit in a fixed-int");
+
+    zero();
+    mpn_copyi(data, a.data, nzlimbs);
+  }
+
+  template<unsigned L> inline void map(const __local2_small<L> &a) {
+    zero();
+    data[0] = a.data;
+  }
+
+  template<uint64_t Q, unsigned L> inline void map(const __localp_big<Q,L> &a) {
+    unsigned nzlimbs = __localp_big<Q,L>::__nzlimbs(a.data, a.COEFF_WORDS);
+    if (K < nzlimbs || (K == nzlimbs && 0 > (uint64_t) a.data[nzlimbs-1]))
+      throw std::runtime_error("map(): data doesn't fit in a fixed-int");
+
+    zero();
+    mpn_copyi(data, a.data, nzlimbs);
+  }
+
+  template<uint64_t Q, unsigned L> inline void map(const __localp_small<Q,L> &a) {
+    zero();
+    data[0] = __localp_small<Q,L>::c2uint64_t(a);
   }
 };

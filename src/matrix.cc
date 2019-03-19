@@ -87,7 +87,7 @@ void PrintMatrix() {
 // put v in normal form by subtracting rows of Matrix
 void ReduceRow(hollowcvec &v) {
   coeff q;
-  init(q);
+  q.init();
   
   for (const auto &kc : v) {
     unsigned row = kc.first - Shift;
@@ -97,7 +97,7 @@ void ReduceRow(hollowcvec &v) {
 	v.submul(q, Matrix[row]);
     }
   }
-  clear(q);
+  q.clear();
 }
 
 // try to add currow to the row space spanned by Matrix.
@@ -107,10 +107,10 @@ static bool AddRow(hollowcvec currow) {
   bool belongs = true;
 
   coeff a, b, c, d;
-  init(a);
-  init(b);
-  init(c);
-  init(d);
+  a.init();
+  b.init();
+  c.init();
+  d.init();
 
   for (const auto &kc : currow) {
     unsigned row = kc.first - Shift;
@@ -158,10 +158,10 @@ static bool AddRow(hollowcvec currow) {
     }
   }
 
-  clear(a);
-  clear(b);
-  clear(c);
-  clear(d);
+  d.clear();
+  c.clear();
+  b.clear();
+  a.clear();
 
   return belongs;
 }
@@ -174,7 +174,7 @@ bool AddToMatrix(hollowcvec currow) {
   return AddRow(currow);
 }
 
-  std::vector<int> colamd(sparsecmat &m) {
+std::vector<int> colamd(sparsecmat &m) {
   std::vector<int> ind;
   int stats[COLAMD_STATS];
   std::vector<int> intmat;
@@ -188,6 +188,11 @@ bool AddToMatrix(hollowcvec currow) {
 
   if (Debug >= 2) {
     fprintf(LogFile, "# about to collect %ld relations (%ld nnz)\n", m.size(), intmat.size());
+    fprintf(LogFile, "# ind:");
+    for (int i = 0; i < ind.size(); i++) fprintf(LogFile, " %d", ind[i]);
+    fprintf(LogFile, "\n# intmat:");
+    for (int i = 0; i < intmat.size(); i++) fprintf(LogFile, " %d", intmat[i]);
+    fprintf(LogFile, "\n");
   }
 
   size_t alloc = colamd_recommended(intmat.size(), NrCols, m.size());
@@ -274,7 +279,7 @@ void FlushMatrixQueue() {
 void Hermite() {
   /* reduce all the head columns, to achieve Hermite normal form. */
   coeff q;
-  init(q);
+  q.init();
   for (unsigned j = 0; j < NrCols; j++) { // @@@ performance: would this be faster looping backwards?
     if (!Matrix[j].allocated())
       continue;
@@ -303,7 +308,7 @@ void Hermite() {
    second columns. This requires a different format, and is perhaps
    best done outside this matrix code. */
 
-  clear(q);
+  q.clear();
 
   TimeStamp("Hermite()");  
 }

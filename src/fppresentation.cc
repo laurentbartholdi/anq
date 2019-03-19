@@ -86,7 +86,7 @@ void FreeNode(node *n) {
   case TGEN:
     break;
   case TNUM:
-    clear(n->n);
+    n->n.clear();
     break;
   default:
     if (is_unary(n->type))
@@ -346,7 +346,7 @@ node *Term(fppresentation &pres) {
     NextToken();
     node *u = Expression(pres, new_precedence);
     if (u->type == TNUM) { /* compile-time evaluation */
-      init(n->n);
+      n->n.init();
       switch (n->type) {
       case TNEG:
 	neg(n->n, u->n);
@@ -430,7 +430,7 @@ node *Expression(fppresentation &pres, int precedence) {
 	mul(t->n, t->n, u->n);
 	break;
       case TPOW:
-	pow(t->n, t->n, u->n);
+	pow(t->n, t->n, u->n.get_si());
 	break;
       case TSUM:
 	add(t->n, t->n, u->n);
@@ -531,7 +531,7 @@ fppresentation::fppresentation(const char *InputFileName) {
   Ch = '\0';
   Column = 0;
   Line = 1;
-  init(N);
+  N.init();
   
   NextToken(); // start parsing
 
@@ -650,16 +650,16 @@ fppresentation::fppresentation(const char *InputFileName) {
     fprintf(LogFile, "\n");
   }
   
-  clear(N);
+  N.clear();
 }
 
 fppresentation::~fppresentation() {
   for (const auto &n : Relators)
-    FreeNode(n);
+    delete n;
   for (const auto &n : Aliases)
-    FreeNode(n);
+    delete n;
   for (const auto &n : Endomorphisms)
-    FreeNode(n);
+    delete n;
 }
 
 void fppresentation::printnodes(FILE *f, const node *n, nodetype t) const {

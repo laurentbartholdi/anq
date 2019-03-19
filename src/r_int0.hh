@@ -11,7 +11,7 @@ public:
 
   inline void clear() { mpz_clear(data); }
 
-  size_t hash() {
+  size_t hash() const {
     size_t seed = data->_mp_size;
     for (unsigned i = 0; i < abs(data->_mp_size); i++)
       seed ^= data->_mp_d[i] + 0x9e3779b9 + (seed << 6) + (seed >> 2);
@@ -129,5 +129,52 @@ public:
     mpz_swap(data, b.data);
   }
 
-  /* conversions */
+  // conversions
+  template<unsigned L> friend class __ring0;
+  template<uint64_t Q, unsigned L> friend class __localp_small;
+  template<uint64_t Q, unsigned L> friend class __localp_big;
+  template<unsigned L> friend class __local2_small;
+  template<unsigned L> friend class __local2_big;
+
+  template<unsigned L> inline void map(const __ring0<L> &a) {
+    if (a.period()) {
+      __ring0<L> b;
+      b.neg(a);
+      map(b);
+      neg(*this);
+    } else {
+      unsigned nzlimbs = __ring0<L>::__nzlimbs(a.data, L);
+      mpz_realloc2(data, GMP_NUMB_BITS*nzlimbs);
+      mpn_copyi(data[0]._mp_d, a.data, nzlimbs);
+      data[0]._mp_size = nzlimbs;
+    }
+  }
+
+  inline void map(const __ring0_mpz &a) {
+    mpz_set(data, a.data);
+  }
+
+  inline void map(const __ring0_64 &a); // will come later, when __ring0_64 is specialized
+  
+  template<unsigned L> inline void map(const __local2_big<L> &a) {
+    unsigned nzlimbs = __local2_big<L>::__nzlimbs(a.data, a.COEFF_WORDS);
+    mpz_realloc2(data, GMP_NUMB_BITS*nzlimbs);
+    mpn_copyi(data[0]._mp_d, a.data, nzlimbs);
+    data[0]._mp_size = nzlimbs;
+  }
+
+  template<unsigned L> inline void map(const __local2_small<L> &a) {
+    mpz_set_ui(data, a.data);
+  }
+
+  template<uint64_t P, unsigned L> inline void map(const __localp_big<P,L> &a) {
+    unsigned nzlimbs = __localp_big<P,L>::__nzlimbs(a.data, a.COEFF_WORDS);
+    mpz_realloc2(data, GMP_NUMB_BITS*nzlimbs);
+    mpn_copyi(data[0]._mp_d, a.data, nzlimbs);
+    data[0]._mp_size = nzlimbs;
+  }
+
+  template<uint64_t P, unsigned L> inline void map(const __localp_small<P,L> &a) {
+    mpz_set_ui(data, __localp_small<P,L>::c2uint64_t(a));
+  }
 };

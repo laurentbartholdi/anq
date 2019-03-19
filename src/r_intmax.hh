@@ -405,4 +405,16 @@ inline std::ostream& operator<< (std::ostream &, const z_t &);
 inline std::istream& operator>> (std::istream &, z_t &);
 
 #endif
+
+  // conversions
+  template<unsigned L> friend class __ring0;
+  template<uint64_t Q, unsigned L> friend class __localp_small;
+  template<uint64_t Q, unsigned L> friend class __localp_big;
+  template<unsigned L> friend class __local2_small;
+  template<unsigned L> friend class __local2_big;
+  
+  template<uint64_t Q, unsigned L> void map(const __localp_big<Q,L> &a) {
+    set_si(a.data[0]);
+  }
+
 };

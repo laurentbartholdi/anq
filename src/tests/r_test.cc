@@ -222,6 +222,37 @@ template<unsigned K> void test0() {
   printf("\n");  
 }
 
+template<uint64_t P, unsigned K, uint64_t Q, unsigned L> void testC() {
+  integer<P,K> a;
+  integer<Q,L> b;
+
+  a.init_set_si(1);
+  b.init_set_si(1);
+  printf("%llu^%u ← %llu^%u conversion: kernel=", P, K, Q, L);
+  try {
+    auto k = a.kernel(b);
+    k.out_str(stdout);
+    k.clear();
+  } catch (...) { printf("?"); }
+  printf("...");
+
+  try {
+    b.set_si(17);
+    a.map(b);
+    if (a.cmp_si(17))
+      printf(" (17) error");
+    b.set_si(-17);
+    a.map(b);
+    if (b.cmp_si(-17))
+      printf(" (-17) error");
+    } catch (...) { printf(" data could not fit"); }
+  printf("\n");
+}
+
+#define DOCONVTESTP(P,K) { testC<P,K,P,10>(); testC<P,K,P,100>(); testC<P,K,0,0>(); testC<P,K,0,1>(); testC<P,K,0,10>(); }
+
+#define DOCONVTEST0(K) { testC<0,K,2,10>(); testC<0,K,2,100>(); testC<0,K,3,10>(); testC<0,K,3,100>(); testC<0,K,0,0>(); testC<0,K,0,1>(); testC<0,K,0,10>(); }
+
 int main(int argc, char *argv[]) {
 #if 1
   testP<2,1>();
@@ -236,6 +267,7 @@ int main(int argc, char *argv[]) {
   testP<3,5>();
   testP<3,40>();
   testP<3,1000>();
+  testP<3,5000>();
 #endif
 #if 1
   testP<5,1>();
@@ -248,9 +280,27 @@ int main(int argc, char *argv[]) {
   testP<65521,100>();
 #endif
 
-  test0<UINT_MAX>();
+  test0<0>();
   test0<1>();
   test0<10>();
+
+  DOCONVTESTP(2,8);
+  DOCONVTESTP(2,10);
+  DOCONVTESTP(2,12);
+  DOCONVTESTP(2,90);
+  DOCONVTESTP(2,100);
+  DOCONVTESTP(2,110);
+  DOCONVTESTP(3,8);
+  DOCONVTESTP(3,10);
+  DOCONVTESTP(3,12);
+  DOCONVTESTP(3,90);
+  DOCONVTESTP(3,100);
+  DOCONVTESTP(3,110);
+  DOCONVTEST0(0);
+  DOCONVTEST0(1);
+  DOCONVTEST0(8);
+  DOCONVTEST0(10);
+  DOCONVTEST0(12);
 
   return 0;
 }

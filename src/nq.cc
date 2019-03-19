@@ -54,7 +54,9 @@ const char USAGE[] = "Usage: nq <options> [<inputfile>] [<maximal weight>]\n"
   "\t[-C]\ttoggle printing compact form of multiplication table, default true\n"
   "\t[-D]\tincrease debug level\n"
   "\t[-F <outputfile>]\n"
+#ifdef LIEALG
   "\t[-G]\tcompute graded Lie algebra, default false\n"
+#endif
 #ifdef coeff_prime
   "\t[-J]\tcompute " Scoeff_prime "-Jennings series, default false\n"
 #endif
@@ -155,9 +157,11 @@ int main(int argc, char **argv) {
       if (OutputFile == NULL)
 	abortprintf(1, "I can't open output file '%s'", optarg);
       break;
+#ifdef LIEALG
     case 'G':
       Graded = true;
       break;
+#endif
     case 'h':
       printf("%s\n\n%s", USAGE, EXTENDEDUSAGE);
       return 0;

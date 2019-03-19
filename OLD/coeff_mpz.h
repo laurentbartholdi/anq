@@ -35,7 +35,7 @@ inline void coeff_zero(coeff &result) {
 }
 
 #define coeff_add mpz_add
-inline void coeff_add_si(coeff &result, coeff &a, long l) {
+inline void coeff_add_si(coeff &result, const coeff &a, long l) {
   if (l >= 0) mpz_add_ui(result, a, l); else mpz_sub_ui(result, a, -l);
 }
 #define coeff_addmul mpz_addmul

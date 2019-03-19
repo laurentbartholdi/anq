@@ -1,4 +1,4 @@
-template<uint64_t P, unsigned K> class localp_small {
+template<uint64_t P, unsigned K> class __localp_small {
   static constexpr uint64_t powint64(uint64_t x, uint64_t p) {
     return p ? ((p & 1) ? x : 1)*powint64(x*x, p>>1) : 1;
   }
@@ -57,16 +57,16 @@ template<uint64_t P, unsigned K> class localp_small {
     return u;
   }
 
-  static inline localp_small int64_t2c(int64_t l) {
+  static inline __localp_small int64_t2c(int64_t l) {
     uint64_t v = montgomery_redc((uint128_t) MONTGOMERY_RR * (l >= 0 ? l : -l));
     return { .data = (l < 0 && v != 0) ? MONTGOMERY_N - v : v };
   }
 
-  static const inline localp_small uint64_t2c(uint64_t l) {
+  static const inline __localp_small uint64_t2c(uint64_t l) {
     return { .data = montgomery_redc((uint128_t) MONTGOMERY_RR * l) };
   }
 
-  static const inline uint64_t c2uint64_t(const localp_small c) {
+  static const inline uint64_t c2uint64_t(const __localp_small c) {
     return montgomery_redc(c.data);
   }
 
@@ -109,11 +109,11 @@ public:
   inline bool z_p() const { return data == 0; }
 
   /* returns true if a in [0,b) or b=0 */
-  inline bool reduced_p(const localp_small &b) const {
+  inline bool reduced_p(const __localp_small &b) const {
     return b.data == 0 || c2uint64_t(*this) < c2uint64_t(b);
   }
 
-  inline void set(const localp_small &a) { data = a.data; }
+  inline void set(const __localp_small &a) { data = a.data; }
 
   inline void set_si(const int64_t a) { *this = int64_t2c(a); }
 
@@ -127,7 +127,7 @@ public:
       return r;
   }
 
-  inline void add(const localp_small &a, const localp_small &b) {
+  inline void add(const __localp_small &a, const __localp_small &b) {
     uint128_t sum = (uint128_t) a.data + b.data;
     if (sum >= MONTGOMERY_N)
       data = sum - MONTGOMERY_N;
@@ -135,17 +135,17 @@ public:
       data = sum;
   }
 
-  inline void add_si(const localp_small &a, int64_t b) {
+  inline void add_si(const __localp_small &a, int64_t b) {
     add(a, int64_t2c(b));
   }
 
-  inline void addmul(const localp_small &a, const localp_small &b) {
-    localp_small c;
+  inline void addmul(const __localp_small &a, const __localp_small &b) {
+    __localp_small c;
     c.mul(a, b);
     add(*this, c);
   }
 
-  inline int cmp(const localp_small &b) const {
+  inline int cmp(const __localp_small &b) const {
     return (data > b.data) - (data < b.data);
   }
 
@@ -153,11 +153,11 @@ public:
     return cmp(int64_t2c(b));
   }
 
-  inline friend void fdiv_qr(localp_small &q, localp_small &r, const localp_small &a, const localp_small &b) {
+  inline friend void fdiv_qr(__localp_small &q, __localp_small &r, const __localp_small &a, const __localp_small &b) {
     fdiv_qr_ui(q, r, a, c2uint64_t(b));
   }
 
-  inline friend uint64_t fdiv_qr_ui(localp_small &q, localp_small &r, const localp_small &a, uint64_t b) {
+  inline friend uint64_t fdiv_qr_ui(__localp_small &q, __localp_small &r, const __localp_small &a, uint64_t b) {
     uint64_t __a = c2uint64_t(a), __c = 1;
     for (int i = logK; i >= 0; i--) {
       if (b % P_POWERS2[i] == 0) {
@@ -165,7 +165,7 @@ public:
 	__c *= P_POWERS2[i];
       }
     }
-    localp_small binv;
+    __localp_small binv;
     binv.inv(uint64_t2c(b));
     uint64_t __r = __a % __c;
     q = uint64_t2c(__a / __c); q.mul(q, binv);
@@ -173,11 +173,11 @@ public:
     return __r;
   }
 
-  inline friend void shdiv_qr(localp_small &q, localp_small &r, const localp_small &a, const localp_small &b) {
+  inline friend void shdiv_qr(__localp_small &q, __localp_small &r, const __localp_small &a, const __localp_small &b) {
     shdiv_qr_ui(q, r, a, c2uint64_t(b));
   }
 
-  inline friend uint64_t shdiv_qr_ui(localp_small &q, localp_small &r, const localp_small &a, uint64_t b) {
+  inline friend uint64_t shdiv_qr_ui(__localp_small &q, __localp_small &r, const __localp_small &a, uint64_t b) {
     uint64_t __a = c2uint64_t(a), __r = __a % b;
     q = uint64_t2c(__a / b);
     r = uint64_t2c(__r);
@@ -185,11 +185,11 @@ public:
   }
 
   /* modular inverse. result*a == 1 */
-  const inline void inv(const localp_small &a) {
+  const inline void inv(const __localp_small &a) {
     if (a.data % P == 0)
       throw std::runtime_error("inv() of non-invertible element");
     
-    localp_small ainv;
+    __localp_small ainv;
 
     if (P == 3) // a == a^-1 mod 3
       ainv = a;
@@ -204,7 +204,7 @@ public:
       ainv = uint64_t2c(inverse_mod_p(c2uint64_t(a)));
 
     for (unsigned i = 1; i < K; i <<= 1) {
-      localp_small temp;
+      __localp_small temp;
       temp.set_si(2);
       temp.submul(a, ainv);
       ainv.mul(ainv, temp);
@@ -213,15 +213,15 @@ public:
     set(ainv);
   }
 
-  inline void mul(const localp_small &a, const localp_small &b) {
+  inline void mul(const __localp_small &a, const __localp_small &b) {
     data = montgomery_redc((uint128_t) a.data * b.data);
   }
 
-  inline void mul_si(const localp_small &a, int64_t b) {
+  inline void mul_si(const __localp_small &a, int64_t b) {
     mul(a, int64_t2c(b));
   }
 
-  inline void neg(const localp_small &a) {
+  inline void neg(const __localp_small &a) {
     if (a.data == 0)
       data = 0;
     else
@@ -232,21 +232,21 @@ public:
     return data != 0;
   }
 
-  inline void sub(const localp_small &a, const localp_small &b) {
-    localp_small temp;
+  inline void sub(const __localp_small &a, const __localp_small &b) {
+    __localp_small temp;
     temp.data = MONTGOMERY_N - b.data;
     add(a, temp);
   }
 
-  inline void submul(const localp_small &a, const localp_small &b) {
-    localp_small c;
+  inline void submul(const __localp_small &a, const __localp_small &b) {
+    __localp_small c;
     c.mul(a, b);
     sub(*this, c);
   }
 
   /* P-valuation of a.
      Set result to a / largest power of P dividing it */
-  const inline unsigned val(const localp_small &a) {
+  const inline unsigned val(const __localp_small &a) {
     if (a.z_p()) {
       zero();
       return UINT_MAX;
@@ -264,7 +264,7 @@ public:
     return val;
   }
 
-  inline friend void gcdext(localp_small &gcd, localp_small &s, localp_small &t, const localp_small &a, const localp_small &b) {
+  inline friend void gcdext(__localp_small &gcd, __localp_small &s, __localp_small &t, const __localp_small &a, const __localp_small &b) {
 #if 0 // 0 has valuation 2^(logK+1)-1, everything fine
     if (z_p(a)) {
       set(gcd, b);
@@ -280,7 +280,7 @@ public:
     }
 #endif
 
-    localp_small va, vb;
+    __localp_small va, vb;
     unsigned vala = va.val(a), valb = vb.val(b);
 
     if (vala > valb) {
@@ -296,14 +296,14 @@ public:
 
   /* returns unit and generator of annihilator ideal:
      a*unit is canonical (P^n) and a*annihilator=0 */
-  inline friend void unit_annihilator(localp_small &unit, localp_small &annihilator, const localp_small &a) {
+  inline friend void unit_annihilator(__localp_small &unit, __localp_small &annihilator, const __localp_small &a) {
     if (a.data == 0) {
       unit = uint64_t2c(0);
       annihilator = uint64_t2c(1);
       return;
     }
 
-    localp_small va;
+    __localp_small va;
     unsigned vala = va.val(a);
     unit.inv(va);
     annihilator = uint64_t2c(powP(K-vala));
@@ -343,7 +343,47 @@ public:
     return p;
   }
 
-  /* conversions */
+  // conversions
+  template<unsigned L> friend class __ring0;
+  template<uint64_t Q, unsigned L> friend class __localp_small;
+  template<uint64_t Q, unsigned L> friend class __localp_big;
+  //template<unsigned L> friend class __local2_small;
+  //template<unsigned L> friend class __local2_big;
+
+  template<unsigned L> inline void map(const __ring0<L> &a) {
+    if (a.period()) {
+      __ring0<L> b;
+      b.neg(a);
+      map(b);
+      neg(*this);
+    } else
+      *this = uint64_t2c(mpn_mod_1(a.data, L, MONTGOMERY_N));
+  }
+
+  inline void map(const __ring0_mpz &a) {
+    mp_size_t L = a.data[0]._mp_size;
+    bool sign = L < 0;
+    if (sign) L = -L;
+    *this = uint64_t2c(mpn_mod_1(a.data[0]._mp_d, L, MONTGOMERY_N));
+    if (sign)
+      neg(*this);
+  }
+
+  inline void map(const __ring0_64 &a) {
+    zero();
+    if (a.data >= 0)
+      *this = uint64_t2c(a.data);
+    else
+      neg(uint64_t2c(-a.data));
+  }
+
+  template<unsigned L> inline void map(const __localp_big<P,L> &a) {
+    *this = uint64_t2c(mpn_mod_1(a.data, a.COEFF_WORDS, MONTGOMERY_N));
+  }
+
+  template<unsigned L> inline void map(const __localp_small<P,L> &a) {
+    *this = uint64_t2c(a.c2uint64_t(a));
+  }  
 };
 
-template<uint64_t P, unsigned K> constexpr uint64_t localp_small<P,K>::P_POWERS2[];
+template<uint64_t P, unsigned K> constexpr uint64_t __localp_small<P,K>::P_POWERS2[];

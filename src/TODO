@@ -1,12 +1,12 @@
 * add restricted Lie algebras, with ^p operation
 
-* separate coeff's used for fp presentation, pc presentation and matrix
+* separate coeff's used for fp presentation, pc presentation and matrix. Have operator "map" to convert between types, and "kernel" as substitute for TorsionExp
 
 * complete test suite, using code coverage
 
-* Complete arithmetic test suite
+* Finish z.h fastint arithmetic (localint<-1U>).
 
-* Finish z.h fastint arithmetic
+* Implement rationals (mpq or double) for torsion-free part
 
 * Improve matrix code:
   -  make matrix a class with cleaner interface, so one can substitute linbox or other fast implementation
@@ -24,5 +24,3 @@
   - LieNQ(lpres, maxclass)
 
 * Use C++ streams rather than fprintf
-
-* Introduce mpq or real(double) coeff, for torsion-free part

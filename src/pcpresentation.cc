@@ -41,8 +41,8 @@ pcpresentation::~pcpresentation() {
   for (unsigned i = 1; i <= NrPcGens; i++) {
     if (Power[i].allocated())
       Power[i].free();
-    clear(Exponent[i]);
-    clear(Annihilator[i]);
+    Exponent[i].clear();
+    Annihilator[i].clear();
     for (unsigned j = 1; j < i; j++)
       Comm[i][j].free();
   }
@@ -267,7 +267,7 @@ unsigned pcpresentation::addtails() {
 
   Annihilator.resize(NrTotalGens + 1);
   for (unsigned i = NrPcGens + 1; i <= NrTotalGens; i++)
-    init_set_si(Annihilator[i], 0);
+    Annihilator[i].init_set_si(0);
 
   Power.resize(NrTotalGens + 1);
   for (unsigned i = NrPcGens + 1; i <= NrTotalGens; i++)
@@ -440,8 +440,8 @@ void pcpresentation::consistency() const {
   }
   
   coeff annihilator, unit;
-  init(annihilator);
-  init(unit); // unused
+  annihilator.init();
+  unit.init(); // unused
 
   // check torsion relations
   for (unsigned i = 1; i <= NrPcGens; i++)
@@ -512,8 +512,8 @@ void pcpresentation::consistency() const {
       }
     }
 
-  clear(unit);
-  clear(annihilator);
+  unit.clear();
+  annihilator.clear();
 
   TimeStamp("pcpresentation::consistency()");
 }
@@ -835,8 +835,8 @@ void pcpresentation::reduce(const sparsecmat &rels) {
       abortprintf(5, "Generator %d should have been eliminated", i);
   
   for (unsigned i = newnrpcgens+1; i <= NrTotalGens; i++) {
-    clear(Exponent[i]);
-    clear(Annihilator[i]);
+    Exponent[i].clear();
+    Annihilator[i].clear();
   }
 
   /* we could shrink the arrays Generator, Exponent, Annihilator,

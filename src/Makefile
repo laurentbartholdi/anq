@@ -17,14 +17,9 @@ CXX=g++
 CC=$(CXX)
 
 NQ_OBJ = fppresentation.o pcpresentation.o operations.o matrix.o nq.o
-NQ_INCL = nq.h ring.hh vectors.hh
+NQ_INCL = nq.h ring.hh r_*.hh vectors.hh
 
-all: trio nql_2_64 nql_2_320 nql_3_39 nql_5_27 nql_5_100 nql_long nql_mpz \
-	nqg_2_64 nqg_2_320 nqg_3_39 nqg_5_27 nqg_5_100 nqg_long nqg_mpz
-
-nql: trio nql_long nql_2_64 nql_mpz
-
-nqg: trio nqg_long nqg_2_64 nqg_mpz
+all: trio nql nqg
 
 coverage_nql:
 	$(MAKE) -B OPT=-march=native CXX=clang++ DEBUG="-g -fprofile-instr-generate -fcoverage-mapping" nql nqg
@@ -60,138 +55,45 @@ runprofile:
 clean:
 	rm -fr *.o *.gc?? nq[lg]_[0-9]*_[0-9]* nq[lg]_mpz nq[lg]_long nq[lg]_z *.dSYM
 
+nql: $(subst .o,l.o,$(NQ_OBJ))
+
+%l.o: %.cc $(NQ_INCL)
+	$(CXX) -c -DCOEFF="$(COEFF)" -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
+
+nqg: $(subst .o,g.o,$(NQ_OBJ))
+
+%g.o: %.cc $(NQ_INCL)
+	$(CXX) -c -DCOEFF="$(COEFF)" -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
+
+nql_64: $(subst .o,l_64.o,$(NQ_OBJ))
+
+%l_64.o: %.cc $(NQ_INCL)
+	$(CXX) -c -DCOEFF="integer<0,1>" -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
+
+nqg_64: $(subst .o,g_64.o,$(NQ_OBJ))
+
+%g_64.o: %.cc $(NQ_INCL)
+	$(CXX) -c -DCOEFF="integer<0,1>" -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
+
 nql_mpz: $(subst .o,l_mpz.o,$(NQ_OBJ))
 
 %l_mpz.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DCOEFF_IS_MPZ -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
-
-nql_z: $(subst .o,l_z.o,$(NQ_OBJ))
-
-%l_z.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DCOEFF_IS_Z -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
-
-nql_long: $(subst .o,l_long.o,$(NQ_OBJ))
-
-%l_long.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DCOEFF_IS_LONG -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
-
-nql_2_3: $(subst .o,l_2_3.o,$(NQ_OBJ))
-
-%l_2_3.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=2 -DMODULUS_EXPONENT=3 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
-
-nql_2_63: $(subst .o,l_2_63.o,$(NQ_OBJ))
-
-%l_2_63.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=2 -DMODULUS_EXPONENT=63 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
-
-nql_2_64: $(subst .o,l_2_64.o,$(NQ_OBJ))
-
-%l_2_64.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=2 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
-
-nql_2_257: $(subst .o,l_2_257.o,$(NQ_OBJ))
-
-%l_2_257.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=2 -DMODULUS_EXPONENT=257 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
-
-nql_2_320: $(subst .o,l_2_320.o,$(NQ_OBJ))
-
-%l_2_320.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=2 -DMODULUS_EXPONENT=320 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
-
-nql_3_38: $(subst .o,l_3_38.o,$(NQ_OBJ))
-
-%l_3_38.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=3 -DMODULUS_EXPONENT=38 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
-
-nql_3_39: $(subst .o,l_3_39.o,$(NQ_OBJ))
-
-%l_3_39.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=3 -DMODULUS_EXPONENT=39 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
-
-nql_5_26: $(subst .o,l_5_26.o,$(NQ_OBJ))
-
-%l_5_26.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=5 -DMODULUS_EXPONENT=26 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
-
-nql_5_27: $(subst .o,l_5_27.o,$(NQ_OBJ))
-
-%l_5_27.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=5 -DMODULUS_EXPONENT=27 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
-
-nql_5_100: $(subst .o,l_5_100.o,$(NQ_OBJ))
-
-%l_5_100.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=5 -DMODULUS_EXPONENT=100 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
+	$(CXX) -c -DCOEFF="integer<0,0>" -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
 
 nqg_mpz: $(subst .o,g_mpz.o,$(NQ_OBJ))
 
 %g_mpz.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DCOEFF_IS_MPZ -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
+	$(CXX) -c -DCOEFF="integer<0,0>" -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
 
-nqg_z: $(subst .o,g_z.o,$(NQ_OBJ))
+nql_2_64: $(subst .o,l_2_64.o,$(NQ_OBJ))
 
-%g_z.o: %.cc $(NQ_INCL) coeff_z.h
-	$(CXX) -c -DCOEFF_IS_Z -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
-
-nqg_long: $(subst .o,g_long.o,$(NQ_OBJ))
-
-%g_long.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DCOEFF_IS_LONG -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
-
-nqg_2_3: $(subst .o,g_2_3.o,$(NQ_OBJ))
-
-%g_2_3.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=2 -DMODULUS_EXPONENT=3 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
-
-nqg_2_63: $(subst .o,g_2_63.o,$(NQ_OBJ))
-
-%g_2_63.o: %.cc $(NQ_INCL) coeff_2_k.h
-	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=2 -DMODULUS_EXPONENT=63 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
+%l_2_64.o: %.cc $(NQ_INCL)
+	$(CXX) -c -DCOEFF="integer<2,64>" -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
 
 nqg_2_64: $(subst .o,g_2_64.o,$(NQ_OBJ))
 
 %g_2_64.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=2 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
-
-nqg_2_257: $(subst .o,g_2_257.o,$(NQ_OBJ))
-
-%g_2_257.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=2 -DMODULUS_EXPONENT=257 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
-
-nqg_2_320: $(subst .o,g_2_320.o,$(NQ_OBJ))
-
-%g_2_320.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=2 -DMODULUS_EXPONENT=320 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
-
-nqg_3_38: $(subst .o,g_3_38.o,$(NQ_OBJ))
-
-%g_3_38.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=3 -DMODULUS_EXPONENT=38 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
-
-nqg_3_39: $(subst .o,g_3_39.o,$(NQ_OBJ))
-
-%g_3_39.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=3 -DMODULUS_EXPONENT=39 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
-
-nqg_5_26: $(subst .o,g_5_26.o,$(NQ_OBJ))
-
-%g_5_26.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=5 -DMODULUS_EXPONENT=26 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
-
-nqg_5_27: $(subst .o,g_5_27.o,$(NQ_OBJ))
-
-%g_5_27.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=5 -DMODULUS_EXPONENT=27 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
-
-nqg_5_100: $(subst .o,g_5_100.o,$(NQ_OBJ))
-
-%g_5_100.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DCOEFF_IS_pADIC -DMODULUS_PRIME=5 -DMODULUS_EXPONENT=100 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
-
-coeff_test: coeff_test.cc coeff.h coeff_2_k.h coeff_p_k.h coeff_2_mp.h coeff_p_mp.h
-	$(CXX) -o $@ coeff_test.cc -lgmp
+	$(CXX) -c -DCOEFF="integer<2,64>" -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
 
 test: test.cc
 
