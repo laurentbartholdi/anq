@@ -23,11 +23,9 @@
 
    API:
    ****************************************************************
-   sparsevec<T,U> v;
+   sparsevec<T> v;
 
    T is a type.
-   U is a class with methods init(T&), clear(T&), set(T&, const T&), setzero(T&), nz_p(T&),
-   which defaults to the standard arithmetic operations: nop, nop, x=y, x=0, x!=0
 
    sparsevec(slot *): creates a new sparsevec out of a pointer
    sparsevec(s): creates a new sparsevec with given size
@@ -66,15 +64,7 @@
    ****************************************************************
    */
 
-template <typename T> struct defaultsparseops {
-  static void init(T &) { }
-  static void clear(T &) { }
-  static void set(T &x, const T &y) { x = y; }
-  static void setzero(T &x) { x = 0; }
-  static bool nz_p(const T &x) { return x != 0; }
-};
-
-template <typename T, class U = defaultsparseops<T>> struct sparsevec {
+template <typename T> struct sparsevec {
   typedef unsigned key;
   typedef std::pair<key,T> slot;
 private:
@@ -112,7 +102,7 @@ public:
     p = (slot *) malloc(s*sizeof(slot)+sizeof(key));
     if (p == nullptr) throw std::runtime_error("couldn't malloc() sparse vector");
 
-    for (key k = 0; k < s; k++) U::init(p[k].second);
+    for (key k = 0; k < s; k++) p[k].second.init();
      /* we don't allocate the coefficient in the last position, it's
 	only used for the eol marker */
     clear();
@@ -121,14 +111,14 @@ public:
   void free() {
     if (p == nullptr) return;
     for (auto kd : *this)
-      U::clear(kd.second);
+      kd.second.clear();
     ::free(p);
   }
 
   void resize(size_t olds, size_t news) {
     if (olds > news)
       for (key k = news; k < olds; k++)
-	U::clear(p[k].second);
+	p[k].second.clear();
 
     p = (slot *) realloc ((void *)p, news*sizeof(slot)+sizeof(key));
     if (p == nullptr)
@@ -136,7 +126,7 @@ public:
 
     if (olds < news)
       for (key k = olds; k < news; k++)
-	U::init(p[k].second);
+	p[k].second.init();
   }
 
   void resize(size_t news) {
@@ -200,27 +190,39 @@ public:
   template <typename V> void copy(const V &v) {
     auto i = begin();
     for (const auto &kc : v)
-      U::set(i->second, kc.second), i->first = kc.first, i++;
+      i->second.set(kc.second), i->first = kc.first, i++;
     i.markend();
   }
 
   template <typename I> void copy(I from, const I to) {
     auto i = begin();
     while (from != to)
-      U::set(i->second, (*from).second), i->first = (*from).first, i++, from++;
+      i->second.set((*from).second), i->first = (*from).first, i++, from++;
     i.markend();
   }
   
-  friend sparsevec emptyvec() { sparsevec v; v.alloc(0); return v; }
+  static sparsevec emptyvec() { sparsevec v; v.alloc(0); return v; }
+
+  struct hash {
+    size_t operator()(const sparsevec &vec) const {
+      size_t seed = vec.size();
+    
+      for(const auto &kc : vec) {
+	seed ^= kc.first + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+	seed ^= std::hash<T>()(kc.second) + (seed << 6) + (seed >> 2);
+      }
+    
+      return seed;
+    }
+  };
 };
 
 /****************************************************************
-   hollowvec<T,U>: a vector of data, with additional information for
+   hollowvec<T>: a vector of data, with additional information for
    fast skipping over 0's
  
    T is a type.
-   U is a class with methods init(T&), clear(T&), set(T&, const T&), setzero(T&), nz_p(T&),
-   which defaults to the standard arithmetic operations: nop, nop, x=y, x=0, x==0
+
    API:
    ****************************************************************
    alloc(size): create. size is rounded to next power of 2
@@ -229,7 +231,7 @@ public:
    T &operator[](key k) = element k in the vector
    size() = number of non-zero elements
    clear(): empty vector
-   copysorted(const sparsevec<T,U> &): load a sorted sparsevec
+   copy(const sparsevec<T> &): load a sorted sparsevec
 
    begin(), end(), front(), back(): iterators
    ****************************************************************
@@ -239,7 +241,7 @@ public:
 
 //#define FOUND_A_WAY_TO_AVOID_ITERATOR_DUPLICATION
 
-template <typename T, typename U, typename slot, typename key, typename skey, const skey nil> struct hollowvec_iterator {
+template <typename T, typename slot, typename key, typename skey, const skey nil> struct hollowvec_iterator {
   struct key_data {
     key first;
     T &second;
@@ -248,8 +250,8 @@ template <typename T, typename U, typename slot, typename key, typename skey, co
 protected:
   slot *const p;
   skey k;
-  inline skey next_key(skey k) { do k = p[k].next; while (k != nil && !U::nz_p(p[k].data)); return k; }
-  inline skey prev_key(skey k) { do k = p[k].prev; while (k != nil && !U::nz_p(p[k].data)); return k; }
+  inline skey next_key(skey k) { do k = p[k].next; while (k != nil && p[k].data.z_p()); return k; }
+  inline skey prev_key(skey k) { do k = p[k].prev; while (k != nil && p[k].data.z_p()); return k; }
 public:
   hollowvec_iterator(slot *const _p, skey _k) : p(_p), k(_k) { }
   void operator=(const hollowvec_iterator &that) {
@@ -267,17 +269,17 @@ public:
   hollowvec_iterator operator--(int) { auto old = hollowvec_iterator(p,k); --(*this); return old; }
 };
 
-template <typename T, typename U, typename slot, typename key, typename skey, const skey nil> struct std::iterator_traits<hollowvec_iterator<T, U, slot, key, skey, nil>> {
+template <typename T, typename slot, typename key, typename skey, const skey nil> struct std::iterator_traits<hollowvec_iterator<T, slot, key, skey, nil>> {
   using difference_type = std::ptrdiff_t;
   using size_type = std::size_t;
-  using value_type = typename hollowvec_iterator<T, U, slot, key, skey, nil>::key_data;
-  using pointer = const typename hollowvec_iterator<T, U, slot, key, skey, nil>::key_data*;
-  using reference = const typename hollowvec_iterator<T, U, slot, key, skey, nil>::key_data&;
+  using value_type = typename hollowvec_iterator<T, slot, key, skey, nil>::key_data;
+  using pointer = const typename hollowvec_iterator<T, slot, key, skey, nil>::key_data*;
+  using reference = const typename hollowvec_iterator<T, slot, key, skey, nil>::key_data&;
   using iterator_category = std::random_access_iterator_tag;
 };
 
 #ifndef FOUND_A_WAY_TO_AVOID_ITERATOR_DUPLICATION // can't use std::reverse_iterator :(
-template <typename T, typename U, typename slot, typename key, typename skey, const skey nil> struct hollowvec_riterator {
+template <typename T, typename slot, typename key, typename skey, const skey nil> struct hollowvec_riterator {
   struct key_data {
     key first;
     const T &second;
@@ -286,8 +288,8 @@ template <typename T, typename U, typename slot, typename key, typename skey, co
 protected:
   slot *const p;
   skey k;
-  inline skey next_key(skey k) { do k = p[k].next; while (k != nil && !U::nz_p(p[k].data)); return k; }
-  inline skey prev_key(skey k) { do k = p[k].prev; while (k != nil && !U::nz_p(p[k].data)); return k; }
+  inline skey next_key(skey k) { do k = p[k].next; while (k != nil && p[k].data.z_p()); return k; }
+  inline skey prev_key(skey k) { do k = p[k].prev; while (k != nil && p[k].data.z_p()); return k; }
 public:
   hollowvec_riterator(slot *const _p, skey _k) : p(_p), k(_k) { }
   void operator=(const hollowvec_riterator &that) {
@@ -305,17 +307,17 @@ public:
   hollowvec_riterator operator--(int) { auto old = hollowvec_riterator(p,k); --(*this); return old; }
 };
 
-template <typename T, typename U, typename slot, typename key, typename skey, const skey nil> struct std::iterator_traits<hollowvec_riterator<T, U, slot, key, skey, nil>> {
+template <typename T, typename slot, typename key, typename skey, const skey nil> struct std::iterator_traits<hollowvec_riterator<T, slot, key, skey, nil>> {
   using difference_type = std::ptrdiff_t;
   using size_type = std::size_t;
-  using value_type = typename hollowvec_iterator<T, U, slot, key, skey, nil>::key_data;
-  using pointer = const typename hollowvec_iterator<T, U, slot, key, skey, nil>::key_data*;
-  using reference = const typename hollowvec_iterator<T, U, slot, key, skey, nil>::key_data&;
+  using value_type = typename hollowvec_iterator<T, slot, key, skey, nil>::key_data;
+  using pointer = const typename hollowvec_iterator<T, slot, key, skey, nil>::key_data*;
+  using reference = const typename hollowvec_iterator<T, slot, key, skey, nil>::key_data&;
   using iterator_category = std::random_access_iterator_tag;
 };
 #endif
 
-template<typename T, class U = defaultsparseops<T>> struct hollowvec {
+template<typename T> struct hollowvec {
   typedef unsigned key;
   //!!!  struct key_data { key first; T &second; };
 private:
@@ -407,7 +409,7 @@ private:
     p[k].prev = prev;
     p[next].prev = p[prev].next = k;
     markup(k);
-    U::setzero(p[k].data);
+    p[k].data.zero();
   }
 
   void clear_recur(herd h) {
@@ -422,15 +424,15 @@ private:
 
   herd &topbit() const { return *(herd *) (p-2); }
 
-  inline skey next_key(skey k) const { do k = p[k].next; while (k != nil && !U::nz_p(p[k].data)); return k; }
-  inline skey prev_key(skey k) const { do k = p[k].prev; while (k != nil && !U::nz_p(p[k].data)); return k; }
+  inline skey next_key(skey k) const { do k = p[k].next; while (k != nil && p[k].data.z_p()); return k; }
+  inline skey prev_key(skey k) const { do k = p[k].prev; while (k != nil && p[k].data.z_p()); return k; }
   
 public:
-  using iterator = hollowvec_iterator<T, U, slot, key, skey, nil>;
-  using const_iterator = hollowvec_iterator<const T, U, const slot, key, skey, nil>;
+  using iterator = hollowvec_iterator<T, slot, key, skey, nil>;
+  using const_iterator = hollowvec_iterator<const T, const slot, key, skey, nil>;
 #ifndef FOUND_A_WAY_TO_AVOID_ITERATOR_DUPLICATION
-  using reverse_iterator = hollowvec_riterator<T, U, const slot, key, skey, nil>;
-  using const_reverse_iterator = hollowvec_riterator<const T, U, const slot, key, skey, nil>;
+  using reverse_iterator = hollowvec_riterator<T, const slot, key, skey, nil>;
+  using const_reverse_iterator = hollowvec_riterator<const T, const slot, key, skey, nil>;
 #else
   using reverse_iterator = std::reverse_iterator<iterator>;
   using const_reverse_iterator = std::reverse_iterator<const_iterator>;
@@ -455,19 +457,19 @@ public:
 
     for (key k = 0; k < msb<<1; k++) {
       p[k].set = p[k].herd = 0;
-      U::init(p[k].data);
+      p[k].data.init();
     }
   }
 
   void free() {
     for (key k = 0; k < topbit()<<1; k++)
-      U::clear(p[k].data);
+      p[k].data.clear();
     ::free(p-2);
   }
 
   void free(size_t size) {
     for (key k = 0; k < topbit()<<1; k++)
-      U::clear(p[k].data);
+      p[k].data.clear();
     ::free(p-2);
   }
 
@@ -480,7 +482,7 @@ public:
       if (p[nil].prev >= (signed) msb<<1)
 	throw std::runtime_error("resize() attempted on hollow vector containing entries beyond new limit");
       for (key k = msb<<1; k < oldtopbit<<1; k++)
-	U::clear(p[k].data);
+	p[k].data.clear();
     }
     p = (slot *) realloc(p-2, ((msb<<1)+2)*sizeof(slot));
     if (p == nullptr)
@@ -489,7 +491,7 @@ public:
     if (msb > oldtopbit) {
       for (key k = oldtopbit<<1; k < msb<<1; k++) {
 	p[k].set = p[k].herd = 0;
-	U::init(p[k].data);
+	p[k].data.init();
       }
       if (p[oldtopbit].herd) { // array is not empty
 	for (herd h = msb; h != oldtopbit; h >>= 1)
@@ -554,7 +556,7 @@ public:
       skey k = kc.first;
       if (k <= prev)
 	throw std::invalid_argument("sparsevec must be sorted");
-      U::set(p[k].data, kc.second);
+      p[k].data.set(kc.second);
       markup(k);
       p[prev].next = k;
       p[k].prev = prev;
@@ -564,8 +566,8 @@ public:
     p[nil].prev = prev;
   }
 
-  sparsevec<T,U> getsparse() {
-    sparsevec<T,U> v;
+  sparsevec<T> getsparse() const {
+    sparsevec<T> v;
     v.alloc(size());
     v.copy(*this);
     return v;
@@ -580,13 +582,13 @@ public:
   //!!!  key_data &front() const { key k = next_key(nil); return key_data{k,p[k].data}; }
   //!!!key_data &back() { key k = prev_key(nil); return {k,p[k].data}; }
   iterator lower_bound(key k) {
-    if (p[k].set && U::nz_p(p[k].data))
+    if (p[k].set && p[k].data.nz_p())
       return iterator(p,k);
     else
       return ++iterator(p,prevkey(k));
   }
   const_iterator lower_bound(key k) const {
-    if (p[k].set && U::nz_p(p[k].data))
+    if (p[k].set && p[k].data.nz_p())
       return iterator(p,k);
     else
       return ++iterator(p,prevkey(k));
@@ -620,6 +622,49 @@ public:
 #endif
 
   bool is_identical(const hollowvec &that) const { return p == that.p; }
+
+  struct hash {
+    size_t operator()(const hollowvec &vec) const {
+      size_t seed = vec.size();
+    
+      for(const auto &kc : vec) {
+	seed ^= kc.first + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+	seed ^= std::hash<T>()(kc.second) + (seed << 6) + (seed >> 2);
+      }
+    
+      return seed;
+    }
+  };
+
+  template <typename V> inline void add(const V v) { // this += v
+    for (const auto &kc : v)
+      (*this)[kc.first] += kc.second;
+  }
+
+  template <typename V> inline void sub(const V v) { // this -= v
+    for (const auto &kc : v)
+      (*this)[kc.first] -= kc.second;
+  }
+
+  template <typename V> inline void addmul(const T &c, const V v) { // this += c*v
+    for (const auto &kc : v)
+      (*this)[kc.first] += {c, kc.second};
+  }
+
+  template <typename V> inline void submul(const T &c, const V v) { // this -= c*v
+    for (const auto &kc : v)
+      (*this)[kc.first] -= {c, kc.second};
+  }
+
+  inline void neg() {
+    for (const auto &kc : *this)
+      (*this)[kc.first].neg(kc.second);
+  }
+
+  inline void scale(const T &c) {
+    for (const auto &kc : *this)
+      (*this)[kc.first] *= c;
+  }
 };
 
 /****************************************************************
@@ -651,6 +696,7 @@ public:
       v.alloc(vecsize);
       this->push_back(v);
     }
+    (*this)[pos].clear();
     return (*this)[pos++];
   }
       
@@ -659,7 +705,6 @@ public:
       throw std::logic_error("cannot pop(): stack is already empty");
     if (!(*this)[pos].is_identical(v))
       throw std::logic_error("stack is popped out of order");
-    (*this)[pos].clear();
   }
 };
 
@@ -668,7 +713,7 @@ public:
  * like std::vector, but with allocation and deallocation of T.
  ****************************************************************/
 
-template <typename T, class U = defaultsparseops<T>> class T_stack {
+template <typename T> class T_stack {
 public:  typedef unsigned key;
   typedef std::pair<key,T> slot;
   typedef typename std::vector<slot>::iterator iterator;
@@ -682,18 +727,18 @@ public:
   void push(const slot &kx) {
     if (watermark == data.size()) {
       T newx;
-      U::init(newx);
+      newx.init();
       slot s{kx.first,newx};
-      U::set(s.second,kx.second);
+      s.second.set(kx.second);
       data.push_back(s);
     } else
-      data[watermark].first = kx.first, U::set(data[watermark].second, kx.second);
+      data[watermark].first = kx.first, data[watermark].second.set(kx.second);
     watermark++;
   }
   void push(key k) {
     if (watermark == data.size()) {
       T newx;
-      U::init(newx);
+      newx.init();
       data.push_back({k,newx});
     } else
       data[watermark].first = k;
@@ -713,6 +758,37 @@ public:
   T_stack() : watermark(0) { }
   ~T_stack() {
     for (auto &kc : data)
-      U::clear(kc.second);
+      kc.second.clear();
   }
 };
+
+template <typename V, typename W> bool vec_equal(const V &vec1, const W &vec2) {
+  auto p1 = vec1.begin();
+  auto p2 = vec2.begin();
+  for (;;) {
+    bool p1end = (p1 == vec1.end()), p2end = (p2 == vec2.end());
+    if (p1end || p2end)
+      return p1end == p2end;
+    if (p1->first != p2->first)
+      return false;
+    if (cmp(p1->second, p2->second))
+      return false;
+    p1++; p2++;
+  }
+}
+
+template <typename V, typename W> inline int vec_cmp(const V vec1, const W vec2) {
+  auto p1 = vec1.begin();
+  auto p2 = vec2.begin();
+  for (;;) {
+    bool p1end = (p1 == vec1.end()), p2end = (p2 == vec2.end());
+    if (p1end || p2end)
+      return p1end - p2end;
+    if (p1->first != p2->first)
+      return p1->first > p2->first ? 1 : -1;
+    int c = cmp(p1->second, p2->second);
+    if (c)
+      return c;
+    p1++; p2++;
+  }
+}

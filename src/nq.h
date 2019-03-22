@@ -9,9 +9,11 @@
 #define printf trio_printf
 #define sprintf trio_sprintf
 #define fprintf trio_fprintf
-#define PRIcoeff "$<c%p:>"
-#define PRIsparsecvec "$<s%p:>"
-#define PRIhollowcvec "$<h%p:>"
+#define PRIpccoeff "$<c%p:>"
+#define PRIfpcoeff "$<c%p:>"
+#define PRIsparsepcvec "$<s%p:>"
+#define PRIsparsematvec "$<m%p:>"
+#define PRIhollowpcvec "$<h%p:>"
 #endif
 
 #include <errno.h>
@@ -21,14 +23,9 @@
 #include <vector>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include "ring.hh"
 #include "vectors.hh"
-
-#ifdef COEFF
-typedef COEFF coeff;
-#else
-typedef integer<0,1> coeff;
-#endif
 
 /****************************************************************
  * the code will work for groups and Lie algebras, with different
@@ -63,23 +60,114 @@ void abortprintf(int, const char *, ...) __attribute__((format(__printf__, 2, 3)
 void TimeStamp(const char *);
 
 /****************************************************************
- * generator-coefficient pairs and vectors.
- * Used to store structure constants and sparse matrix rows;
- * never used for calculations.
+ * there are 3 kinds of coefficients:
+ * - pccoeff, used within pc presentations
+ * - fpcoeff, used in the defining fp presentation
+ * - matcoeff, used in matrix calculations involving the centre.
+ *
+ * all 3 can be different. e.g., to compute a 2-central series, one
+ * would select pccoeff=fpcoeff=Z and matcoeff=Z/2.
+ * to compute in a p-restricted Lie algebra, one would select fpcoeff=Z
+ * and pccoeff=matcoeff=Z/p.
+ *
+ * generator-coefficient pairs are used for sparse vectors.  They
+ * store structure constants and sparse matrix rows; never used for
+ * calculations.
  */
 
-struct coeff_ops {
-  static void init(coeff &c) { c.init(); }
-  static void clear(coeff &c) { c.clear(); }
-  static bool nz_p(const coeff &c) { return c.nz_p(); }
-  static void set(coeff &c, const coeff &d) { c.set(d); }
-  static void setzero(coeff &c) { c.zero(); }
-};
-typedef sparsevec<coeff,coeff_ops> sparsecvec;
-typedef sparsecvec::key gen;
-const gen LASTGEN = (gen) -1;
+#ifndef PCCOEFF_P
+#define PCCOEFF_P 0
+#endif
+#ifndef PCCOEFF_K
+#define PCCOEFF_K 1
+#endif
+#ifndef MATCOEFF_P
+#define MATCOEFF_P 0
+#endif
+#ifndef MATCOEFF_K
+#define MATCOEFF_K 1
+#endif
 
-typedef std::vector<sparsecvec> sparsecmat; // compressed rows
+#if PCCOEFF_P > 0 && (MATCOEFF_P != PCCOEFF_P || MATCOEFF_K > PCCOEFF_K)
+#error Matrix coefficients are not a quotient of pc coefficients
+#endif
+
+typedef integer<PCCOEFF_P,PCCOEFF_K> pccoeff;
+template<> struct std::hash<pccoeff> : public pccoeff::hash { };
+template<> struct std::equal_to<pccoeff> : public pccoeff::equal_to { };
+
+typedef sparsevec<pccoeff> sparsepcvec;
+typedef sparsepcvec::key gen;
+struct hollowpcvec;
+typedef std::vector<sparsepcvec> sparsepcmat; // compressed rows
+template<> struct std::hash<sparsepcvec> : public sparsepcvec::hash { };
+
+typedef pccoeff fpcoeff;
+
+#if PCCOEFF_P != MATCOEFF_P || PCCOEFF_K != MATCOEFF_K
+typedef integer<MATCOEFF_P,MATCOEFF_K> matcoeff;
+template<> struct std::hash<matcoeff> : public matcoeff::hash { };
+template<> struct std::equal_to<matcoeff> : public matcoeff::equal_to { };
+
+typedef sparsevec<matcoeff> sparsematvec;
+template<> struct std::hash<sparsematvec> : public sparsematvec::hash { };
+typedef std::vector<sparsematvec> sparsematmat; // compressed rows
+
+struct hollowmatvec : hollowvec<matcoeff> { };
+template<> struct std::hash<hollowmatvec> : public hollowmatvec::hash { };
+
+inline bool operator==(const sparsematvec &vec1, const sparsematvec &vec2) { return vec_equal(vec1, vec2); }
+inline bool operator==(const sparsematvec &vec1, const hollowmatvec &vec2) { return vec_equal(vec1, vec2); }
+inline bool operator==(const hollowmatvec &vec1, const sparsematvec &vec2) { return vec_equal(vec1, vec2); }
+inline bool operator==(const hollowmatvec &vec1, const hollowmatvec &vec2) { return vec_equal(vec1, vec2); }
+inline bool operator!=(const sparsematvec &vec1, const sparsematvec &vec2) { return !vec_equal(vec1, vec2); }
+inline bool operator!=(const sparsematvec &vec1, const hollowmatvec &vec2) { return !vec_equal(vec1, vec2); }
+inline bool operator!=(const hollowmatvec &vec1, const sparsematvec &vec2) { return !vec_equal(vec1, vec2); }
+inline bool operator!=(const hollowmatvec &vec1, const hollowmatvec &vec2) { return !vec_equal(vec1, vec2); }
+inline bool operator<(const sparsematvec &vec1, const sparsematvec &vec2) { return vec_cmp(vec1, vec2) < 0; }
+inline bool operator<(const sparsematvec &vec1, const hollowmatvec &vec2) { return vec_cmp(vec1, vec2) < 0; }
+inline bool operator<(const hollowmatvec &vec1, const sparsematvec &vec2) { return vec_cmp(vec1, vec2) < 0; }
+inline bool operator<(const hollowmatvec &vec1, const hollowmatvec &vec2) { return vec_cmp(vec1, vec2) < 0; }
+#else
+typedef pccoeff matcoeff;
+typedef sparsepcvec sparsematvec;
+typedef hollowpcvec hollowmatvec;
+typedef sparsepcmat sparsematmat;
+#endif
+
+/****************************************************************
+ * matrix functions.
+ * matrices are stored as std::vector<sparsecvec>
+ * 
+ * we implement Gaussian elimination, with no care in selecting the
+ * best numerical values as pivots, but attempting to avoid too much
+ * fill-in using colamd.
+ */
+class matrix {
+  /* we maintain a square NrColsxNrCols matrix (with sparse rows)
+     to store the current relations. If row Matrix[i] is allocated, then
+     its pivot should be in position i+Shift; so the matrix
+     really has (row,column)-space equal to
+     [0,nrcols) x [shift,NrTotalGens].
+  */
+  const unsigned nrcols, shift;
+  const bool torsionfree;
+  sparsematmat rows;
+  std::unordered_set<sparsematvec> queue;
+  mutable vec_supply<hollowmatvec> rowstack;
+
+  void inittorsion();
+  bool add1row(hollowmatvec);
+ public:
+  matrix(unsigned, unsigned, bool);
+  ~matrix();
+  void queuerow(const hollowpcvec);
+  bool addrow(hollowpcvec);
+  hollowmatvec reducerow(const sparsepcvec &) const;
+  void flushqueue();
+  void hermite();
+  void getrel(pccoeff &, sparsepcvec &, gen) const;
+};
 
 /****************************************************************
  * groups and Lie algebras are input in the usual presentation
@@ -108,7 +196,7 @@ struct node {
   nodetype type;
     
   union {
-    coeff n;
+    fpcoeff n;
     gen g;
     struct {
       node *l, *r;
@@ -116,7 +204,7 @@ struct node {
     node *u;
   };
   node(nodetype _type) : type(_type) { }
-  node(nodetype _type, coeff _n) : type(_type) { n.init_set(_n); }  
+  node(nodetype _type, fpcoeff _n) : type(_type) { n.init_set(_n); }  
   node(nodetype _type, gen _g) : type(_type), g(_g) { }
   node(nodetype _type, node *_l, node *_r) : type(_type), l(_l), r(_r) { }
   node(nodetype _type, node *_u) : type(_type), u(_u) { }
@@ -145,7 +233,7 @@ struct fppresentation {
   std::vector<std::string> GeneratorName;
   std::vector<node *> Relators, Aliases, Endomorphisms;
 
-  explicit fppresentation(const char *);
+  explicit fppresentation(const char *, bool);
   ~fppresentation();
   void printnode(FILE *f, const node *) const;
 private:
@@ -183,35 +271,33 @@ struct deftype {
 
 struct pcpresentation {
   const fppresentation &fp;
-  std::vector<std::vector<sparsecvec>> Comm; // the commutators: [aj,ai] = ... for j>i
-  std::vector<sparsecvec> Power, // powers: Exponent[i]*ai = ...
+  std::vector<std::vector<sparsepcvec>> Comm; // the commutators: [aj,ai] = ... for j>i
+  std::vector<sparsepcvec> Power, // powers: Exponent[i]*ai = ...
     Epimorphism; // epimorphism from fppresentation: Epimorphism[xi] = ...
-  std::vector<coeff> Exponent, // the Exponent[i]*ai in next class
+  std::vector<pccoeff> Exponent, // the Exponent[i]*ai in next class
     Annihilator; // Annihilator[i]*ai = 0 was enforced earlier
   std::vector<deftype> Generator; // Generator[i] defines ai in terms of previous aj
   unsigned Class, // current class
     NrPcGens; // number of ai in current consistent pc presentation
   std::vector<unsigned> LastGen; // last generator number of given weight
   bool Graded; // is it a graded Lie algebra?
-  bool PAlgebra; // is it a p-Lie algebra/group?
   bool Jennings; // is the algebra restricted/the Jennings series?
   bool Metabelian; // is the algebra/group metabelian?
-  coeff TorsionExp; // if PAlgebra, enforce TorsionExp*ai in next class
   unsigned NilpotencyClass; // commutators of longer length must die
   
   explicit pcpresentation(const fppresentation &);
   ~pcpresentation();
 
   unsigned addtails();
-  void consistency() const;
-  void evalrels();
-  void reduce(const sparsecmat &);
+  void consistency(matrix &) const;
+  void evalrels(matrix &);
+  void reduce(const matrix &);
   void print(FILE *f, bool, bool, bool) const;
   void printGAP(FILE *f) const;
 private:
-  void add1generator(sparsecvec &, deftype);
+  void add1generator(sparsepcvec &, deftype);
   inline bool isgoodweight_comm(int i, int j) const;
-  void collecttail(const sparsecmat &, sparsecvec &, std::vector<int>);
+  void collecttail(sparsepcvec &, const matrix &m, std::vector<int>);
   unsigned NrTotalGens; // number of current+tail ai in extended presentation
 };
 
@@ -225,47 +311,21 @@ private:
  * - O(1) access to previous and next nonzero entry, and in particular O(Z) traversal
  * - O(log (N/Z)) extra access time on first visit.
  *
- * we implement lots of arithmetic operations on these vectors, and
- * also more pcpresentation-specific ones.
+ * we implement here some pcpresentation-specific operations.
  */
-struct hollowcvec : hollowvec<coeff,coeff_ops> {
-  template <typename V> inline void add(const V v) { // this += v
-    for (const auto &kc : v)
-      (*this)[kc.first] += kc.second;
-  }
-  template <typename V> inline void sub(const V v) { // this -= v
-    for (const auto &kc : v)
-      (*this)[kc.first] -= kc.second;
-  }
-  template <typename V> inline void addmul(const coeff &c, const V v) { // this += c*v
-    for (const auto &kc : v)
-      (*this)[kc.first] += {c, kc.second};
-  }
-  template <typename V> inline void submul(const coeff &c, const V v) { // this -= c*v
-    for (const auto &kc : v)
-      (*this)[kc.first] -= {c, kc.second};
-  }
-  inline void neg() {
-    for (const auto &kc : *this)
-      (*this)[kc.first].neg(kc.second);
-  }
-  inline void mul(const coeff &c) {
-    for (const auto &kc : *this)
-      (*this)[kc.first] *= c;
-  }
-    
+struct hollowpcvec : hollowvec<pccoeff> {
   void eval(const pcpresentation &, node *);
 
   // functions for Lie algebras
-  void liebracket(const pcpresentation &, const hollowcvec, const hollowcvec); // this += [v,w]
+  void liebracket(const pcpresentation &, const hollowpcvec, const hollowpcvec); // this += [v,w]
   void lie3bracket(const pcpresentation &, gen, gen, gen, bool); // this (+/-)= [[v,w],x]
-  void frobenius(const pcpresentation &, const hollowcvec);
+  void frobenius(const pcpresentation &, const hollowpcvec);
   void liecollect(const pcpresentation &);
 
   // functions for groups
-  void collect(const pcpresentation &, gen, const coeff *c = nullptr); // collect one; last==nullptr means "1"
+  void collect(const pcpresentation &, gen, const pccoeff *c = nullptr); // collect one; last==nullptr means "1"
 
-  void mul(const pcpresentation &pc, gen g, const coeff &c) { // this *= g^c
+  void mul(const pcpresentation &pc, gen g, const pccoeff &c) { // this *= g^c
     if (c.z_p()) // easy peasy, but should not happen
       return;
 
@@ -281,96 +341,25 @@ struct hollowcvec : hollowvec<coeff,coeff_ops> {
       mul(pc, kc.first, kc.second);
   }
 
-  template <typename V> void pow(const pcpresentation &, const V, const coeff &); // this *= v^n
-  void lquo(const pcpresentation &, hollowcvec, const hollowcvec); // this *= v^-1 w
+  template <typename V> void pow(const pcpresentation &, const V, const pccoeff &); // this *= v^n
+  void lquo(const pcpresentation &, hollowpcvec, const hollowpcvec); // this *= v^-1 w
   template <typename V> void div(const pcpresentation &, const V); // this *= v^-1
 };
 
-template<> struct std::hash<coeff> {
-  size_t operator()(const coeff &c) const { return c.hash(); }
-};
-
-template<> struct std::equal_to<coeff> {
-  bool operator()(const coeff &c1, const coeff &c2) const {
-    return !cmp(c1, c2);
-  }   
-};
-
-template <typename V> struct hashvec {
-  size_t operator()(V const& vec) const {
-    size_t seed = vec.size();
-    
-    for(const auto &kc : vec) {
-      seed ^= kc.first + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-      seed ^= std::hash<coeff>()(kc.second) + (seed << 6) + (seed >> 2);
-    }
-    
-    return seed;
-  }
-};
-template<> struct std::hash<sparsecvec> : public hashvec<sparsecvec> { };
-template<> struct std::hash<hollowcvec> : public hashvec<hollowcvec> { };
-
-template <typename V, typename W> bool vec_equal(const V &vec1, const W &vec2) {
-  auto p1 = vec1.begin();
-  auto p2 = vec2.begin();
-  for (;;) {
-    bool p1end = (p1 == vec1.end()), p2end = (p2 == vec2.end());
-    if (p1end || p2end)
-      return p1end == p2end;
-    if (p1->first != p2->first)
-      return false;
-    if (cmp(p1->second, p2->second))
-      return false;
-    p1++; p2++;
-  }
-}
-inline bool operator==(const sparsecvec &vec1, const sparsecvec &vec2) { return vec_equal(vec1, vec2); }
-inline bool operator==(const sparsecvec &vec1, const hollowcvec &vec2) { return vec_equal(vec1, vec2); }
-inline bool operator==(const hollowcvec &vec1, const sparsecvec &vec2) { return vec_equal(vec1, vec2); }
-inline bool operator==(const hollowcvec &vec1, const hollowcvec &vec2) { return vec_equal(vec1, vec2); }
-inline bool operator!=(const sparsecvec &vec1, const sparsecvec &vec2) { return !vec_equal(vec1, vec2); }
-inline bool operator!=(const sparsecvec &vec1, const hollowcvec &vec2) { return !vec_equal(vec1, vec2); }
-inline bool operator!=(const hollowcvec &vec1, const sparsecvec &vec2) { return !vec_equal(vec1, vec2); }
-inline bool operator!=(const hollowcvec &vec1, const hollowcvec &vec2) { return !vec_equal(vec1, vec2); }
-
-template <typename V, typename W> inline int vec_cmp(const V vec1, const W vec2) {
-  auto p1 = vec1.begin();
-  auto p2 = vec2.begin();
-  for (;;) {
-    bool p1end = (p1 == vec1.end()), p2end = (p2 == vec2.end());
-    if (p1end || p2end)
-      return p1end - p2end;
-    if (p1->first != p2->first)
-      return p1->first > p2->first ? 1 : -1;
-    int c = cmp(p1->second, p2->second);
-    if (c)
-      return c;
-    p1++; p2++;
-  }
-}
-
-inline bool operator<(const sparsecvec &vec1, const sparsecvec &vec2) { return vec_cmp(vec1, vec2) < 0; }
-inline bool operator<(const sparsecvec &vec1, const hollowcvec &vec2) { return vec_cmp(vec1, vec2) < 0; }
-inline bool operator<(const hollowcvec &vec1, const sparsecvec &vec2) { return vec_cmp(vec1, vec2) < 0; }
-inline bool operator<(const hollowcvec &vec1, const hollowcvec &vec2) { return vec_cmp(vec1, vec2) < 0; }
-
 // a global stack to supply with very low overhead a fresh vector
-extern vec_supply<hollowcvec> vecstack;
+extern vec_supply<hollowpcvec> vecstack;
 
-/****************************************************************
- * matrix functions.
- * matrices are stored as std::vector<sparsecvec>
- * 
- * we implement Gaussian elimination, with no care in selecting the
- * best numerical values as pivots, but attempting to avoid too much
- * fill-in using colamd.
- */
-void InitMatrix(const coeff *, unsigned, unsigned);
-void QueueInMatrix(const hollowcvec);
-void FlushMatrixQueue();
-void ReduceRow(hollowcvec &);
-void Hermite();
-void FreeMatrix();
-bool AddToMatrix(const hollowcvec);
-sparsecmat GetMatrix();
+inline bool operator==(const sparsepcvec &vec1, const sparsepcvec &vec2) { return vec_equal(vec1, vec2); }
+inline bool operator==(const sparsepcvec &vec1, const hollowpcvec &vec2) { return vec_equal(vec1, vec2); }
+inline bool operator==(const hollowpcvec &vec1, const sparsepcvec &vec2) { return vec_equal(vec1, vec2); }
+inline bool operator==(const hollowpcvec &vec1, const hollowpcvec &vec2) { return vec_equal(vec1, vec2); }
+inline bool operator!=(const sparsepcvec &vec1, const sparsepcvec &vec2) { return !vec_equal(vec1, vec2); }
+inline bool operator!=(const sparsepcvec &vec1, const hollowpcvec &vec2) { return !vec_equal(vec1, vec2); }
+inline bool operator!=(const hollowpcvec &vec1, const sparsepcvec &vec2) { return !vec_equal(vec1, vec2); }
+inline bool operator!=(const hollowpcvec &vec1, const hollowpcvec &vec2) { return !vec_equal(vec1, vec2); }
+inline bool operator<(const sparsepcvec &vec1, const sparsepcvec &vec2) { return vec_cmp(vec1, vec2) < 0; }
+inline bool operator<(const sparsepcvec &vec1, const hollowpcvec &vec2) { return vec_cmp(vec1, vec2) < 0; }
+inline bool operator<(const hollowpcvec &vec1, const sparsepcvec &vec2) { return vec_cmp(vec1, vec2) < 0; }
+inline bool operator<(const hollowpcvec &vec1, const hollowpcvec &vec2) { return vec_cmp(vec1, vec2) < 0; }
+
+template<> struct std::hash<hollowpcvec> : public hollowpcvec::hash { };

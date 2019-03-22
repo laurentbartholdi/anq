@@ -44,10 +44,6 @@ void TimeStamp(const char *s) {
   }
 }
 
-#define S(x) #x
-#define S_(x) S(x)
-#define Scoeff_prime S_(coeff_prime)
-
 const char USAGE[] = "Usage: nq <options> [<inputfile>] [<maximal weight>]\n"
   "(with no input file, presentation is read from STDIN)\n"
   "\t[-A]\ttoggle GAP output, default false (load then object with `ReadAsFunction(filename)()`)\n"
@@ -57,15 +53,16 @@ const char USAGE[] = "Usage: nq <options> [<inputfile>] [<maximal weight>]\n"
 #ifdef LIEALG
   "\t[-G]\tcompute graded Lie algebra, default false\n"
 #endif
-#ifdef coeff_prime
-  "\t[-J]\tcompute " Scoeff_prime "-Jennings series, default false\n"
+#ifdef LIEALG
+  "\t[-J]\tcompute Jacobson-restricted Lie algebra, default false\n"
+#else
+  "\t[-J]\tcompute quotient by Jennings series, default false\n"
 #endif
   "\t[-L <logfile>]\n"
   "\t[-M]\tcompute metabelian " LIEGPSTRING ", default false\n"
   "\t[-N <nilpotency class>]\n"
   "\t[-P]\ttoggle printing definitions of basic commutators, default false\n"
   "\t[-W <maximal weight>] (can also appear as last argument)\n"
-  "\t[-X <exponent>]\tset exponent for p-central series, default 0\n"
   "\t[-Z]\ttoggle printing zeros in multiplication table, default true";
 
 const char EXTENDEDUSAGE[] = "Presentation format:\n"
@@ -79,9 +76,9 @@ const char EXTENDEDUSAGE[] = "Presentation format:\n"
   "\tnumber = [0-9]+ (if starting with 0 then in given base, otherwise base 10)\n";
 
 #ifndef NO_TRIO
-static int coeff_print(void *ref)
+template <typename T> static int coeff_print(void *ref)
 {
-  coeff *data = (coeff *) trio_get_argument(ref);
+  T *data = (T *) trio_get_argument(ref);
   if (data == nullptr)
     return -1;
   char *buffer = (char *) get_str(nullptr, 10, *data);
@@ -128,23 +125,23 @@ char *utoa(char *s, unsigned n) {
 
 int main(int argc, char **argv) {
   int c;
-  bool PrintZeros = true, PrintCompact = true, PrintDefs = false, Gap = false, Graded = false, PAlgebra = false, Metabelian = false, Jennings = false;
-  coeff TorsionExp;
-  init_set_si(TorsionExp, 0);
-  unsigned MaxWeight = -1, NilpotencyClass = -1;
+  bool PrintZeros = true, PrintCompact = true, PrintDefs = false, PrintGap = false;
+  bool Graded = false, Metabelian = false, Jennings = false;
+  unsigned MaxWeight = -1u, NilpotencyClass = -1u;
   const char *InputFileName;
 
   // install handler
 #ifndef NO_TRIO
-  auto handle_coeff = trio_register(coeff_print, "c%p"); // coeffs can be printed as PRIcoeff
-  auto handle_sparsecvec = trio_register(cvec_print<sparsecvec>, "s%p"); // sparsecvecs can be printed as PRIsparsecvec
-  auto handle_hollowcvec = trio_register(cvec_print<hollowcvec>, "h%p"); // hollowcvecs can be printed as PRIhollowcvec
+  auto handle_pccoeff = trio_register(coeff_print<pccoeff>, "c%p"); // coeffs can be printed as PRIpccoeff
+  auto handle_sparsepcvec = trio_register(cvec_print<sparsepcvec>, "s%p"); // sparsepcvecs can be printed as PRIsparsepcvec
+  auto handle_sparsematvec = trio_register(cvec_print<sparsematvec>, "m%p"); // sparsematvecs can be printed as PRIsparsematvec
+  auto handle_hollowpcvec = trio_register(cvec_print<hollowpcvec>, "h%p"); // hollowpcvecs can be printed as PRIhollowpcvec
 #endif
 
-  while ((c = getopt (argc, argv, "ACDF:GhJL:MN:PX:W:Z")) != -1)
+  while ((c = getopt (argc, argv, "ACDF:GhJL:MN:PW:Z")) != -1)
     switch (c) {
     case 'A':
-      Gap ^= true;
+      PrintGap ^= true;
       break;
     case 'C':
       PrintCompact ^= true;
@@ -165,13 +162,9 @@ int main(int argc, char **argv) {
     case 'h':
       printf("%s\n\n%s", USAGE, EXTENDEDUSAGE);
       return 0;
-#ifdef coeff_prime
     case 'J':
       Jennings = true;
-      PAlgebra = true;
-      set_si(TorsionExp, coeff_prime);
       break;
-#endif
     case 'L':
       LogFile = fopen(optarg, "w");
       if (LogFile == NULL)
@@ -185,10 +178,6 @@ int main(int argc, char **argv) {
       break;
     case 'P':
       PrintDefs ^= true;
-      break;
-    case 'X':
-      PAlgebra = true;
-      set_str(TorsionExp, optarg, 10);
       break;
     case 'W':
       MaxWeight = atoi(optarg);
@@ -220,19 +209,21 @@ int main(int argc, char **argv) {
     strftime(timestring, 128, "%c", localtime(&t));
 
     fprintf(LogFile, "# The %s nilpotent quotient program, by Laurent Bartholdi (from Wernel Nickel and Csaba Schneider code)\n", LIEGPSTRING);
-    fprintf(LogFile, "# Version %s, coefficients %s\n", VERSION, coeff::COEFF_ID());
+    fprintf(LogFile, "# Version %s, coefficients [pc=%s, mat=%s]\n", VERSION, pccoeff::COEFF_ID(), matcoeff::COEFF_ID());
     fprintf(LogFile, "# \"%s\" with input \"%s\" started %s on %s\n", argv[0], InputFileName ? InputFileName : "<stdin>", timestring, hostname);
-    fprintf(LogFile, "# %s%s output %s%swill go to \"%s\"\n", PrintCompact ? "compact " : "", Gap ? "GAP" : "NQ", PrintZeros ? "with zeros " : "", PrintDefs ? "with defs" : "", OutputFile == stdout ? "<stdout>" : "file");
+    fprintf(LogFile, "# %s%s output %s%swill go to \"%s\"\n", PrintCompact ? "compact " : "", PrintGap ? "GAP" : "NQ", PrintZeros ? "with zeros " : "", PrintDefs ? "with defs" : "", OutputFile == stdout ? "<stdout>" : "file");
 
     char flags[1000] = "", nstring[20], mstring[20];
     if (Metabelian)
       strcat(flags, "metabelian, ");
     if (Jennings)
+#ifdef LIEALG
+      strcat(flags, "Jacobson-restricted, ");
+#else
       strcat(flags, "Jennings, ");
+#endif
     if (Graded)
       strcat(flags, "graded, ");
-    if (PAlgebra)
-      sprintf(flags+strlen(flags), "exponent-" PRIcoeff ", ", &TorsionExp);
     if (strlen(flags))
       flags[strlen(flags)-2] = 0; // remove ", "
     else
@@ -240,7 +231,7 @@ int main(int argc, char **argv) {
     fprintf(LogFile, "# flags %s; nilpotency class %s; maximal weight %s\n\n", flags, utoa(nstring, NilpotencyClass), utoa(mstring, MaxWeight));
   }
   
-  fppresentation fppres(InputFileName);
+  fppresentation fppres(InputFileName, Jennings && fpcoeff::characteristic > 0);
     
 #ifdef MEMCHECK
   mtrace();
@@ -248,38 +239,35 @@ int main(int argc, char **argv) {
 
   pcpresentation pc(fppres);
   pc.Graded = Graded;
-  pc.PAlgebra = PAlgebra;
   pc.Metabelian = Metabelian;
   pc.Jennings = Jennings;
   pc.NilpotencyClass = NilpotencyClass;
-  set(pc.TorsionExp, TorsionExp);
-  clear(TorsionExp);
 
   for (pc.Class = 1; pc.Class <= MaxWeight; pc.Class++) {
     unsigned oldnrpcgens = pc.NrPcGens;
 
     unsigned nrcentralgens = pc.addtails(); // add fresh tails
 
-    InitMatrix(pc.PAlgebra ? &pc.TorsionExp : nullptr, pc.NrPcGens+1, nrcentralgens);
+    {
+      matrix m(nrcentralgens, pc.NrPcGens+1, Jennings && matcoeff::characteristic == 0);
 
-    pc.consistency(); // enforce Jacobi and Z-linearity, via queue
+      pc.consistency(m); // enforce Jacobi and Z-linearity, via queue
 
-    FlushMatrixQueue();
+      m.flushqueue();
+      
+      pc.evalrels(m);
 
-    pc.evalrels();
-
-    Hermite();
+      m.hermite();
     
-    pc.reduce(GetMatrix()); // quotient the cover by rels
-
-    FreeMatrix();
-
+      pc.reduce(m); // quotient the cover by rels
+    }
+    
     int newgens = pc.NrPcGens-oldnrpcgens;
     fprintf(LogFile, "# The %d%s factor has %d generator%s", pc.Class, ordinal(pc.Class), newgens, plural(newgens));
     if (newgens) {
       fprintf(LogFile, " of relative order%s ", plural(newgens));
       for (unsigned i = oldnrpcgens + 1; i <= pc.NrPcGens; i++)
-	fprintf(LogFile, PRIcoeff "%s", &pc.Exponent[i], i == pc.NrPcGens ? "" : ", ");
+	fprintf(LogFile, PRIpccoeff "%s", &pc.Exponent[i], i == pc.NrPcGens ? "" : ", ");
     }
     fprintf(LogFile,"\n");
 
@@ -287,7 +275,7 @@ int main(int argc, char **argv) {
       break;
   }
 
-  if (Gap)
+  if (PrintGap)
     pc.printGAP(OutputFile);  
   else
     pc.print(OutputFile, PrintCompact, PrintDefs, PrintZeros);
@@ -295,9 +283,10 @@ int main(int argc, char **argv) {
   TimeStamp("main()");
 
 #ifndef NO_TRIO
-  trio_unregister(handle_hollowcvec);
-  trio_unregister(handle_sparsecvec);
-  trio_unregister(handle_coeff);
+  trio_unregister(handle_hollowpcvec);
+  trio_unregister(handle_sparsematvec);
+  trio_unregister(handle_sparsepcvec);
+  trio_unregister(handle_pccoeff);
 #endif
   
   return 0;

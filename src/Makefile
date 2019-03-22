@@ -6,15 +6,19 @@
 ##
 
 TRIO = trio-1.16
-NQVERSION = -DVERSION='"4.0.0 2019-02-26"'
+NQVERSION = -DVERSION='"4.0.1 2019-03-22"'
 OPT = -march=native -O0 #-Ofast
 DEBUG = -g -fsanitize=address 
 CFLAGS = -Wall -Werror -I$(TRIO) $(DEBUG) $(OPT)
-CXXFLAGS = -std=gnu++11 $(CFLAGS)
+CXXFLAGS = -std=c++11 $(CFLAGS)
 LDFLAGS = $(DEBUG) -L$(TRIO) -lcolamd -lgmp -ltrio -Wl,-no_pie
 
 CXX=g++
 CC=$(CXX)
+
+ifndef COEFF
+COEFF = integer<0,1>
+endif
 
 NQ_OBJ = fppresentation.o pcpresentation.o operations.o matrix.o nq.o
 NQ_INCL = nq.h ring.hh r_*.hh vectors.hh
@@ -68,32 +72,37 @@ nqg: $(subst .o,g.o,$(NQ_OBJ))
 nql_64: $(subst .o,l_64.o,$(NQ_OBJ))
 
 %l_64.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DCOEFF="integer<0,1>" -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
+	$(CXX) -c -DPCCOEFF_P=0 -DPCCOEFF_K=1 -DMATCOEFF_P=0 -DMATCOEFF_K=1 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
 
 nqg_64: $(subst .o,g_64.o,$(NQ_OBJ))
 
 %g_64.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DCOEFF="integer<0,1>" -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
+	$(CXX) -c -DPCCOEFF_P=0 -DPCCOEFF_K=1 -DMATCOEFF_P=0 -DMATCOEFF_K=1 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
 
 nql_mpz: $(subst .o,l_mpz.o,$(NQ_OBJ))
 
 %l_mpz.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DCOEFF="integer<0,0>" -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
+	$(CXX) -c -DPCCOEFF_P=0 -DPCCOEFF_K=0 -DMATCOEFF_P=0 -DMATCOEFF_K=0 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
 
 nqg_mpz: $(subst .o,g_mpz.o,$(NQ_OBJ))
 
 %g_mpz.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DCOEFF="integer<0,0>" -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
+	$(CXX) -c -DPCCOEFF_P=0 -DPCCOEFF_K=0 -DMATCOEFF_P=0 -DMATCOEFF_K=0 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
 
 nql_2_64: $(subst .o,l_2_64.o,$(NQ_OBJ))
 
 %l_2_64.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DCOEFF="integer<2,64>" -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
+	$(CXX) -c -DPCCOEFF_P=2 -DPCCOEFF_K=64 -DMATCOEFF_P=2 -DMATCOEFF_K=64 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
 
 nqg_2_64: $(subst .o,g_2_64.o,$(NQ_OBJ))
 
 %g_2_64.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DCOEFF="integer<2,64>" -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
+	$(CXX) -c -DPCCOEFF_P=2 -DPCCOEFF_K=64 -DMATCOEFF_P=2 -DMATCOEFF_K=64 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
+
+nqg_2_2: $(subst .o,g_2_2.o,$(NQ_OBJ))
+
+%g_2_2.o: %.cc $(NQ_INCL)
+	$(CXX) -c -DPCCOEFF_P=2 -DPCCOEFF_K=64 -DMATCOEFF_P=2 -DMATCOEFF_K=1 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
 
 test: test.cc
 

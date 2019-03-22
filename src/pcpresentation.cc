@@ -15,10 +15,8 @@ pcpresentation::pcpresentation(const fppresentation &pres) : fp(pres) {
   Class = 0;
   LastGen = {0};
   
-  init(TorsionExp);
-
   Epimorphism.resize(pres.NrGens + 1);
-  Epimorphism[0] = sparsecvec::bad(); // guard
+  Epimorphism[0] = sparsepcvec::bad(); // guard
   for (unsigned i = 1; i <= pres.NrGens; i++)
     Epimorphism[i].alloc(0);
   
@@ -30,7 +28,7 @@ pcpresentation::pcpresentation(const fppresentation &pres) : fp(pres) {
   //Annihilator.resize(NrPcGens + 1);
 
   Power.resize(1);
-  Power[0] = sparsecvec::bad(); // guard
+  Power[0] = sparsepcvec::bad(); // guard
 
   Comm.resize(NrPcGens + 1);
 
@@ -48,14 +46,13 @@ pcpresentation::~pcpresentation() {
   }
   for (unsigned i = 1; i <= fp.NrGens; i++)
     Epimorphism[i].free();
-  clear(TorsionExp);
 }
 
 #ifdef GROUP
 // return fresh tail to (f*g)*h / f*(g*h), with f > g > h
-static hollowcvec tail_assoc(const pcpresentation &pc, gen f, gen g, gen h) {
-  hollowcvec rhs = vecstack.fresh();
-  hollowcvec lhs = vecstack.fresh();
+static hollowpcvec tail_assoc(const pcpresentation &pc, gen f, gen g, gen h) {
+  hollowpcvec rhs = vecstack.fresh();
+  hollowpcvec lhs = vecstack.fresh();
   
   set_si(lhs[f], 1);
   lhs.mul(pc, h);
@@ -76,9 +73,9 @@ static hollowcvec tail_assoc(const pcpresentation &pc, gen f, gen g, gen h) {
 // if f>g: it's f*g^N \ f*g*g^(N-1)
 // if f=g: it's f^N*f \ f*f^N
 // if f<g: it's g^N*f \ g^(N-1)*f*g*[g,f]
-static hollowcvec tail_pow(const pcpresentation &pc, gen f, gen g) {
-  hollowcvec rhs = vecstack.fresh();
-  hollowcvec lhs = vecstack.fresh();
+static hollowpcvec tail_pow(const pcpresentation &pc, gen f, gen g) {
+  hollowpcvec rhs = vecstack.fresh();
+  hollowpcvec lhs = vecstack.fresh();
   
   if (f > g) { /* f*g*g^(N-1) = f*g^N */
     set_si(lhs[f], 1);
@@ -133,7 +130,7 @@ inline bool pcpresentation::isgoodweight_comm(int i, int j) const {
 }
 
 /* add generator newgen to vector v, and store its definition */
-void pcpresentation::add1generator(sparsecvec &v, deftype def) {
+void pcpresentation::add1generator(sparsepcvec &v, deftype def) {
   unsigned len = v.size();
   v.resize(len+1);
   v[len].first = ++NrTotalGens;
@@ -188,24 +185,19 @@ unsigned pcpresentation::addtails() {
        - g is defined as a power
        
        - we're in graded, torsion mode (so producing a
-       (Z/TorsionExp)[t]-algebra) and g has degree < Class-1
+       (Z/torsion)[t]-algebra) and g has degree < Class-1
     */
     for (unsigned i = 1; i <= NrPcGens; i++) {
-      if (is_dpow[i] || !nz_p(Exponent[i]))
+      if (is_dpow[i] || z_p(Exponent[i]))
 	  continue;
-#ifdef prime
-      if (Jennings && Generator[i].w*prime != weight)
+      unsigned totalweight = Jennings ? Generator[i].w*pccoeff::characteristic : Generator[i].w+1;
+      if (totalweight != weight)
 	continue;
-#endif
-      if (!Jennings && Generator[i].w+1 != weight)
-	continue;
-      if (Graded && !PAlgebra)
-	continue;
-
+      
       const deftype newdeftype = {.type = (weight == Class ? DPOW : TEMPPOW), .w = Class, .cw = Generator[i].cw, {.p = i}};
       add1generator(Power[i], newdeftype);
       if (Debug >= 2)
-	fprintf(LogFile, "# added tail a%d to weight-%d non-defining torsion a%d^" PRIcoeff "\n", NrTotalGens, Generator[i].w, i, &Exponent[i]);
+	fprintf(LogFile, "# added tail a%d to weight-%d non-defining torsion a%d^" PRIpccoeff "\n", NrTotalGens, Generator[i].w, i, &Exponent[i]);
     }
     
     /* for all non-power pc generators g of weight <=Class-k and all
@@ -262,8 +254,10 @@ unsigned pcpresentation::addtails() {
    *  also they have coefficients 0.
    */
   Exponent.resize(NrTotalGens + 1);
-  for (unsigned i = NrPcGens + 1; i <= NrTotalGens; i++)
-    init_set(Exponent[i], TorsionExp);
+  for (unsigned i = NrPcGens + 1; i <= NrTotalGens; i++) {
+    Exponent[i].init();
+    Exponent[i].kernel<matcoeff>();
+  }
 
   Annihilator.resize(NrTotalGens + 1);
   for (unsigned i = NrPcGens + 1; i <= NrTotalGens; i++)
@@ -297,7 +291,7 @@ unsigned pcpresentation::addtails() {
 #endif
 	  continue;
 
-      hollowcvec tail;
+      hollowpcvec tail;
 
 #ifdef LIEALG
       /* compute the correct tail for [aj,ai]: in Lie algebra,
@@ -314,14 +308,14 @@ unsigned pcpresentation::addtails() {
 	tail.liecollect(*this);
 
 	if (Debug >= 2)
-	  fprintf(LogFile, "# tail: [a%d,a%d] = [a%d,[a%d,a%d]] = " PRIhollowcvec "\n", j, i, j, g, h, &tail);
+	  fprintf(LogFile, "# tail: [a%d,a%d] = [a%d,[a%d,a%d]] = " PRIhollowpcvec "\n", j, i, j, g, h, &tail);
       } else if (Generator[i].type == DPOW) { /* ai = N*g */
 	gen g = Generator[i].p;
 	tail.addmul(Exponent[g], Comm[j][g]);
 	tail.liecollect(*this);
 
 	if (Debug >= 2)
-	  fprintf(LogFile, "# tail: [a%d,a%d] = " PRIcoeff "*[a%d,a%d] = " PRIhollowcvec "\n", j, i, &Exponent[g], j, g, &tail);
+	  fprintf(LogFile, "# tail: [a%d,a%d] = " PRIpccoeff "*[a%d,a%d] = " PRIhollowpcvec "\n", j, i, &Exponent[g], j, g, &tail);
       } else if (Generator[j].type == DPOW) { /* aj = N*g */
 	gen g = Generator[j].p;
 	if (g > i)
@@ -331,7 +325,7 @@ unsigned pcpresentation::addtails() {
 	tail.liecollect(*this);
 
 	if (Debug >= 2)
-	  fprintf(LogFile, "# tail: [a%d,a%d] = " PRIcoeff "*[a%d,a%d] = " PRIhollowcvec "\n", j, i, &Exponent[g], g, i, &tail);
+	  fprintf(LogFile, "# tail: [a%d,a%d] = " PRIpccoeff "*[a%d,a%d] = " PRIhollowpcvec "\n", j, i, &Exponent[g], g, i, &tail);
       } else
 	abortprintf(4, "AddTails: unknown definition for [a%d,a%d]", j, i);
       
@@ -359,19 +353,19 @@ unsigned pcpresentation::addtails() {
 	tail = tail_assoc(*this, j, Generator[i].g, Generator[i].h);
 
 	if (Debug >= 2)
-	  fprintf(LogFile, "# tail: [a%d,a%d] = [a%d,[a%d,a%d]] *= " PRIhollowcvec "\n", j, i, j, Generator[i].g, Generator[i].h, &tail);
+	  fprintf(LogFile, "# tail: [a%d,a%d] = [a%d,[a%d,a%d]] *= " PRIhollowpcvec "\n", j, i, j, Generator[i].g, Generator[i].h, &tail);
       } else if (Generator[i].type == DPOW) { /* ai = g^N */
 	tail = tail_pow(*this, j, Generator[i].p);
 	tail.neg();
 
 	if (Debug >= 2)
-	  fprintf(LogFile, "# tail: [a%d,a%d] = [a%d,a%d^" PRIcoeff "] *= " PRIhollowcvec "\n", j, i, j, Generator[i].p, &Exponent[Generator[i].p], &tail);
+	  fprintf(LogFile, "# tail: [a%d,a%d] = [a%d,a%d^" PRIpccoeff "] *= " PRIhollowpcvec "\n", j, i, j, Generator[i].p, &Exponent[Generator[i].p], &tail);
       } else if (Generator[j].type == DPOW) { /* aj = g^N */
 	abortprintf(4, "AddTails: Generators[%d].type == DPOW shouldn't occur", j);
 	tail = tail_pow(*this, i, Generator[j].p); // !!! disable, put as tails?
 
 	if (Debug >= 2)
-	  fprintf(LogFile, "# tail: [a%d,a%d] = [a%d^" PRIcoeff ",a%d] *= " PRIhollowcvec "\n", j, i, Generator[j].p, &Exponent[Generator[j].p], i, &tail);
+	  fprintf(LogFile, "# tail: [a%d,a%d] = [a%d^" PRIpccoeff ",a%d] *= " PRIhollowpcvec "\n", j, i, Generator[j].p, &Exponent[Generator[j].p], i, &tail);
       } else
 	abortprintf(4, "AddTails: unknown definition for [a%d,a%d]", j, i);
 
@@ -397,7 +391,7 @@ unsigned pcpresentation::addtails() {
 /* check consistency of pc presentation, and deduce relations to
  * impose on centre
  */
-void pcpresentation::consistency() const {
+void pcpresentation::consistency(matrix &m) const {
   // check Jacobi identity
   for (unsigned i = 1; i <= NrPcGens; i++) {
     if (Generator[i].type != DGEN)
@@ -419,27 +413,27 @@ void pcpresentation::consistency() const {
 	  continue;
 	
 #ifdef LIEALG
-	hollowcvec t = vecstack.fresh();
+	hollowpcvec t = vecstack.fresh();
 	t.lie3bracket(*this, i, j, k, true);
 	t.lie3bracket(*this, j, k, i, true);
 	t.lie3bracket(*this, k, i, j, true);
 	t.liecollect(*this);
 
 	if (Debug >= 2)
-	  fprintf(LogFile, "# consistency: jacobi(a%d,a%d,a%d) = " PRIhollowcvec "\n", i, j, k, &t);
+	  fprintf(LogFile, "# consistency: jacobi(a%d,a%d,a%d) = " PRIhollowpcvec "\n", i, j, k, &t);
 #else
-	hollowcvec t = tail_assoc(*this, k, j, i);
+	hollowpcvec t = tail_assoc(*this, k, j, i);
 
 	if (Debug >= 2)
-	  fprintf(LogFile, "# consistency: associator(a%d,a%d,a%d) = " PRIhollowcvec "\n", k, j, i, &t);
+	  fprintf(LogFile, "# consistency: associator(a%d,a%d,a%d) = " PRIhollowpcvec "\n", k, j, i, &t);
 #endif
-	QueueInMatrix(t);	
+	m.queuerow(t);	
 	vecstack.release(t);
       }
     }
   }
   
-  coeff annihilator, unit;
+  pccoeff annihilator, unit;
   annihilator.init();
   unit.init(); // unused
 
@@ -451,7 +445,7 @@ void pcpresentation::consistency() const {
        * if the group's exponent is given (by the torsion in the
        * ccoefficients), impose a power relation.
        */
-      hollowcvec t = vecstack.fresh();
+      hollowpcvec t = vecstack.fresh();
   
       unit_annihilator(unit, annihilator, Exponent[i]);
 #ifdef LIEALG
@@ -459,55 +453,84 @@ void pcpresentation::consistency() const {
       t.liecollect(*this);
   
       if (Debug >= 2)
-	fprintf(LogFile, "# consistency: " PRIcoeff "*" PRIcoeff "*a%d = " PRIhollowcvec "\n", &annihilator, &Exponent[i], i, &t);
+	fprintf(LogFile, "# consistency: " PRIpccoeff "*" PRIpccoeff "*a%d = " PRIhollowpcvec "\n", &annihilator, &Exponent[i], i, &t);
 #else
-      hollowcvec u = vecstack.fresh();
+      hollowpcvec u = vecstack.fresh();
       u.copy(Power[i]);      
       t.pow(*this, u, annihilator);
       vecstack.release(u);
       
       if (Debug >= 2)
-	fprintf(LogFile, "# consistency: (a%d^" PRIcoeff ")^" PRIcoeff " = " PRIhollowcvec "\n", i, &Exponent[i], &annihilator, &t);
+	fprintf(LogFile, "# consistency: (a%d^" PRIpccoeff ")^" PRIpccoeff " = " PRIhollowpcvec "\n", i, &Exponent[i], &annihilator, &t);
 #endif      
-      QueueInMatrix(t);
+      m.queuerow(t);
       vecstack.release(t);
 
       for (unsigned j = 1; j <= NrPcGens; j++) {
 	if (!isgoodweight_comm(i, j))
 	  continue;
-
-	/* enforce N*[a,b] = [N*a,b] if N is the order of a; or
-	 * a^N*b = a^(N-1)*(a*b) or a*b^N = (a*b)*b^(N-1) in groups
-	 */
 #ifdef LIEALG
-	// !!! frobinius map.
-	hollowcvec t = vecstack.fresh();
-  
-	for (const auto &kc : Power[i]) {
-	  gen g = kc.first;
-	  if (g > NrPcGens)
-	    break;
-	  if (g > j)
-	    t.submul(kc.second, Comm[g][j]);
-	  else if (g < j)
-	    t.addmul(kc.second, Comm[j][g]);
-	}
+	/* two different meanings:
+	 * - in usual Lie algebras, enforce
+	     N*[a,b] = [N*a,b] if N is the order of a;
+	 * - in restricted Lie algebras, enforce [a,b,...,b] = [a,b^p] */
+       hollowpcvec t = vecstack.fresh();
 
-	if (i > j)
-	  t.addmul(Exponent[i], Comm[i][j]);
-	else if (i < j)
-	  t.submul(Exponent[i], Comm[j][i]);
-	t.liecollect(*this);
+       // first, we compute -[N*ai,aj] or -[ai^p,aj]
+       for (const auto &kc : Power[i]) {
+	 gen g = kc.first;
+	 if (g > NrPcGens)
+	   break;
+	 if (g > j)
+	   t.submul(kc.second, Comm[g][j]);
+	 else if (g < j)
+	   t.addmul(kc.second, Comm[j][g]);
+       }
 
-	if (Debug >= 2)
-	  fprintf(LogFile, "# consistency: " PRIcoeff "*[a%d,a%d]-[" PRIcoeff "*a%d,a%d] = " PRIhollowcvec "\n", &Exponent[i], i, j, &Exponent[i], i, j, &t);
+       if (Jennings) {
+	 hollowpcvec u[2];
+	 u[0] = vecstack.fresh();
+	 u[1] = vecstack.fresh();
+	 bool index = 0;
+	 set_si(u[index][j], 1);
+	 for (unsigned _ = 1; _ <= pccoeff::characteristic; _++) {
+	   // u[!index] = [u[index],ai]
+	   index = !index;
+	   u[index].clear();
+	   for (const auto &kc : u[!index]) {
+	     gen g = kc.first;
+	     if (g > NrPcGens)
+	       break;
+	     if (g > i)
+	       u[index].addmul(kc.second, Comm[g][i]);
+	     else if (g < i)
+	       u[index].submul(kc.second, Comm[i][g]);
+	   }
+	 }
+	 t.add(u[index]);
+       } else {
+	 if (i > j)
+	   t.addmul(Exponent[i], Comm[i][j]);
+	 else if (i < j)
+	   t.submul(Exponent[i], Comm[j][i]);
+       }
+       t.liecollect(*this);
+
+       if (Debug >= 2) {
+	 if (Jennings)
+	   fprintf(LogFile, "# consistency: [a%d,a%d,...,a%d]-[a%d,a%d^p] = " PRIhollowpcvec "\n", j, i, i, j, i, &t);
+	 else
+	   fprintf(LogFile, "# consistency: " PRIpccoeff "*[a%d,a%d]-[" PRIpccoeff "*a%d,a%d] = " PRIhollowpcvec "\n", &Exponent[i], i, j, &Exponent[i], i, j, &t);	   
+      }
 #else
-	hollowcvec t = tail_pow(*this, j, i);
+      /* enforce a^N*b = a^(N-1)*(a*b) or a*b^N = (a*b)*b^(N-1) in groups
+       */
+	hollowpcvec t = tail_pow(*this, j, i);
 
 	if (Debug >= 2)
-	  fprintf(LogFile, "# consistency: associator(a%d,a%d,a%d^(N-1)) = " PRIhollowcvec "\n", j, i, i, &t);
+	  fprintf(LogFile, "# consistency: associator(a%d,a%d,a%d^(N-1)) = " PRIhollowpcvec "\n", j, i, i, &t);
 #endif	
-	QueueInMatrix(t);
+	m.queuerow(t);
 	vecstack.release(t);
       }
     }
@@ -519,14 +542,14 @@ void pcpresentation::consistency() const {
 }
 
 // compute result = src^phi, except for the symbol g in src
-void MapEndo(hollowcvec &result, const pcpresentation &pc, sparsecvec src, gen avoid, const sparsecmat &phi) {
+void MapEndo(hollowpcvec &result, const pcpresentation &pc, sparsepcvec src, gen avoid, const sparsepcmat &phi) {
   for (const auto &kc : src) {
     if (kc.first == avoid)
       continue;
 #ifdef LIEALG
     result.addmul(kc.second, phi[kc.first]);
 #else
-    hollowcvec p = vecstack.fresh();
+    hollowpcvec p = vecstack.fresh();
     p.copy(phi[kc.first]);
     result.pow(pc, p, kc.second);
     vecstack.release(p);
@@ -535,16 +558,16 @@ void MapEndo(hollowcvec &result, const pcpresentation &pc, sparsecvec src, gen a
 }
 
 // Evaluate all relations in pc, ship them to Matrix
-void pcpresentation::evalrels() {
+void pcpresentation::evalrels(matrix &m) {
   for (const auto &n : fp.Aliases) {
-    hollowcvec v = vecstack.fresh();
+    hollowpcvec v = vecstack.fresh();
     v.eval(*this, n->r);
     v.liecollect(*this);
 
     if (Debug >= 2) {
       fprintf(LogFile, "# aliasing relation: ");
       fp.printnode(LogFile, n);
-      fprintf(LogFile, " (" PRIhollowcvec ")\n", &v);
+      fprintf(LogFile, " (" PRIhollowpcvec ")\n", &v);
     }
     gen g = n->l->g;
     Epimorphism[g].resize(v.size());
@@ -552,17 +575,17 @@ void pcpresentation::evalrels() {
     vecstack.release(v);
   }
 
-  std::deque<sparsecvec> itrels;
+  std::deque<sparsepcvec> itrels;
 
   for (const auto &n : fp.Relators) {
     node *t;
     for (t = n; t->type == TREL; t = t->l);
 
-    hollowcvec v = vecstack.fresh();
+    hollowpcvec v = vecstack.fresh();
     v.eval(*this, t);
 
     for (t = n; t == n || t->type == TREL; t = t->l) {
-      hollowcvec w;
+      hollowpcvec w;
       if (t->type == TREL) {
 	w = vecstack.fresh();
 	w.eval(*this, t->r);
@@ -575,13 +598,13 @@ void pcpresentation::evalrels() {
       if (Debug >= 2) {
 	fprintf(LogFile, "# relation: ");
 	fp.printnode(LogFile, n);
-	fprintf(LogFile, " (" PRIhollowcvec ")\n", &w);
+	fprintf(LogFile, " (" PRIhollowpcvec ")\n", &w);
       }
 
       if (!fp.Endomorphisms.empty())
 	itrels.push_back(w.getsparse());
     
-      AddToMatrix(w);
+      m.addrow(w);
 
       if (t->type == TREL)
 	vecstack.release(w);
@@ -592,14 +615,14 @@ void pcpresentation::evalrels() {
   }
 
   if (!fp.Endomorphisms.empty()) { // now t is a list of evaluations of rels
-    std::vector<sparsecmat> endos;
+    std::vector<sparsepcmat> endos;
 
     for (const auto &n : fp.Endomorphisms) {
-      sparsecmat phi(NrTotalGens+1,sparsecvec::bad());
+      sparsepcmat phi(NrTotalGens+1,sparsepcvec::bad());
 
       for (unsigned g = 1; g <= NrTotalGens; g++) {
-	hollowcvec rhs = vecstack.fresh();
-	hollowcvec lhs = vecstack.fresh();
+	hollowpcvec rhs = vecstack.fresh();
+	hollowpcvec lhs = vecstack.fresh();
 	
 	switch (Generator[g].type) {
 	case DGEN: case TEMPGEN:
@@ -627,8 +650,8 @@ void pcpresentation::evalrels() {
 	    
 	    MapEndo(lhs, *this, Comm[g0][g1], g, phi);
 	    
-	    hollowcvec v = vecstack.fresh();
-	    hollowcvec w = vecstack.fresh();
+	    hollowpcvec v = vecstack.fresh();
+	    hollowpcvec w = vecstack.fresh();
 #ifdef LIEALG
 	    v.copy(phi[g0]);
 	    w.copy(phi[g1]);
@@ -651,9 +674,9 @@ void pcpresentation::evalrels() {
 	    
 #ifdef LIEALG
 	    rhs.copy(phi[g0]);
-	    rhs.mul(Exponent[g0]);
+	    rhs.scale(Exponent[g0]);
 #else
-	    hollowcvec w = vecstack.fresh();
+	    hollowpcvec w = vecstack.fresh();
 	    w.copy(phi[g0]);
 	    rhs.pow(*this, w, Exponent[g0]);
 	    vecstack.release(w);
@@ -677,22 +700,22 @@ void pcpresentation::evalrels() {
 	fp.printnode(LogFile, n);
 	fprintf(LogFile, " (");
 	for (unsigned g = NrPcGens+1; g <= NrTotalGens; g++)
-	  fprintf(LogFile, "a%u → " PRIsparsecvec "%s", g, &phi[g-NrPcGens-1], g == NrTotalGens ? ")\n" : "; ");
+	  fprintf(LogFile, "a%u → " PRIsparsepcvec "%s", g, &phi[g-NrPcGens-1], g == NrTotalGens ? ")\n" : "; ");
       }
     }
 
     while (!itrels.empty()) {
-      sparsecvec t = itrels.front();
+      sparsepcvec t = itrels.front();
       itrels.pop_front();
       
       for (const auto &phi : endos) {
-	hollowcvec h = vecstack.fresh();
+	hollowpcvec h = vecstack.fresh();
 	for (const auto &kc : t)
 	  h.addmul(kc.second, phi[kc.first-NrPcGens-1]);
-	sparsecvec s = h.getsparse();
+	sparsepcvec s = h.getsparse();
 	if (Debug >= 2)
-	  fprintf(LogFile, "# spun relation: " PRIsparsecvec " (" PRIsparsecvec ")\n", &t, &s);
-	if (AddToMatrix(h))
+	  fprintf(LogFile, "# spun relation: " PRIsparsepcvec " (" PRIsparsepcvec ")\n", &t, &s);
+	if (m.addrow(h))
 	  s.free();
 	else
 	  itrels.push_back(s);
@@ -716,7 +739,7 @@ void pcpresentation::evalrels() {
    renumbered.
 
    this routine is time-critical. */
-void pcpresentation::collecttail(const sparsecmat &rels, sparsecvec &v, std::vector<int> renumber) {
+void pcpresentation::collecttail(sparsepcvec &v, const matrix &m, std::vector<int> renumber) {
   if (v.empty())
     return;
   
@@ -724,7 +747,7 @@ void pcpresentation::collecttail(const sparsecmat &rels, sparsecvec &v, std::vec
   unsigned writepos, readpos = 0;
   while (v[readpos].first <= NrPcGens) readpos++;
 
-  for (writepos = readpos; v[readpos].first != sparsecvec::eol; readpos++) {
+  for (writepos = readpos; v[readpos].first != sparsepcvec::eol; readpos++) {
     int newg = renumber[v[readpos].first];
 
     if (newg >= 1 && reduced_p(v[readpos].second, Exponent[newg])) {
@@ -735,68 +758,60 @@ void pcpresentation::collecttail(const sparsecmat &rels, sparsecvec &v, std::vec
       continue;
     }
     
-    if (newg < 1 && rels[-newg].window(1).empty()) // shorten v
+    if (newg == 0) // shorten v
       continue;
 
-    /* we could optimize further, in case rels[-newg] is a two-term
-       relation, or even is a relation of length <=
-       readpos-writepos. That doesn't seem to be necessary.
+    /* we could optimize further, in case the relation with which to
+       replace v[readpos] has length <= readpos-writepos. That doesn't
+       seem to be necessary.
     */
   
-    hollowcvec t = vecstack.fresh();
-    t.copy(v.window(readpos));
-    ReduceRow(t);
+    hollowmatvec t = m.reducerow(v.window(readpos));
 
     // then, copy back and renumber. We're guaranteed that
     // renumber[kc.first] is always >= 1
     v.resize(writepos+t.size());
+    auto vi = v.window(writepos).begin();
     for (const auto &kc : t) {
-      v[writepos].first = renumber[kc.first];
-      set(v[writepos].second, kc.second);
-      writepos++;
+      vi->first = renumber[kc.first+NrPcGens+1]; // !!! make this more elegant; move the "map" inside matrix.ccx
+      map(vi->second, kc.second);
+      vi++;
     }
-    v[writepos].first = sparsecvec::eol;
-    vecstack.release(t);
+    vi.markend();
     return;
   }
 
   if (writepos != readpos) {
-    v[writepos].first = sparsecvec::eol;
+    v[writepos].first = sparsepcvec::eol;
     v.resize(writepos);
   }
 }
 
 /* quotient the centre by the relations rels */
-void pcpresentation::reduce(const sparsecmat &rels) {
+void pcpresentation::reduce(const matrix &m) {  
+  /* renumber[k] = j >= 1 means generator k should be renumbered j.
+     renumber[k] = 0 means it should be removed.
+     renumber[k] = -1u means that it should be replaced by a relation. */
+  std::vector<int> renumber(NrTotalGens + 1);
   unsigned trivialgens = 0;
 
-  if (Debug >= 2) {
-    fprintf(LogFile, "# relations matrix:\n");
-    for (const sparsecvec r : rels)
-      fprintf(LogFile, "# " PRIsparsecvec "\n", &r);
-  }
-
-  /* renumber[k] = j >= 1 means generator k should be renumbered j.
-     renumber[k] = j <= 0 means generator k should be eliminated using row j */
-  std::vector<int> renumber(NrTotalGens + 1);
-
-  for (unsigned k = 1, i = 0; k <= NrTotalGens; k++) {
+  for (unsigned k = NrPcGens+1; k <= NrTotalGens; k++) {
     unsigned newk = renumber[k] = k - trivialgens;
-    if (i == rels.size() || k != rels[i][0].first) /* no relation for k, remains */
-      continue;
 
-    if (cmp_si(rels[i][0].second, 1)) { /* k is torsion, nontrivial */
-      set(Exponent[newk], rels[i][0].second);
-      hollowcvec tail = vecstack.fresh();
-      tail.sub(rels[i].window(1)); // negate N*ai+... = 0 to N*ai = -(...)
-      Power[newk] = tail.getsparse();
-      vecstack.release(tail);
-    } else { /* k is trivial, and will be eliminated */
+    m.getrel(Exponent[newk], Power[newk], k);
+
+    if (Debug >= 2)
+      fprintf(LogFile, "# (%u," PRIpccoeff ") → " PRIsparsepcvec "\n", k, &Exponent[newk], &Power[newk]);
+    
+    if (!cmp_si(Exponent[newk], 1)) { // eliminate generator k
       trivialgens++;
-      renumber[k] = -i; /* mark as trivial */
+      if (Power[newk].empty())
+	renumber[k] = 0;
+      else
+	renumber[k] = -1; // could be smarter, if Power[newk] is a single term
     }
-    i++;
   }
+
   unsigned newnrpcgens = NrTotalGens - trivialgens;
 
   if (Debug >= 2) {
@@ -807,20 +822,19 @@ void pcpresentation::reduce(const sparsecmat &rels) {
     fprintf(LogFile, "\n");
   }
     
-  /* Modify the torsions first, in decreasing order, since they're needed
-     for Collect */
+  /* Modify the torsions: (first, and in decreasing order, though it's unimportant) */
   for (unsigned j = NrTotalGens; j >= 1; j--)
     if (Power[j].allocated())
-      collecttail(rels, Power[j], renumber);
+      collecttail(Power[j], m, renumber);
   
   /*  Modify the epimorphisms: */
   for (unsigned j = 1; j <= fp.NrGens; j++)
-    collecttail(rels, Epimorphism[j], renumber);
+    collecttail(Epimorphism[j], m, renumber);
   
   /*  Modify the products: */
   for (unsigned j = 1; j <= NrPcGens; j++)
     for (unsigned l = 1; l < j; l++)
-      collecttail(rels, Comm[j][l], renumber);
+      collecttail(Comm[j][l], m, renumber);
 
   /* Let us alter the Generator as well. Recall that dead generators
    * cannot have definition at all. It is only the right of the living
@@ -848,7 +862,7 @@ void pcpresentation::reduce(const sparsecmat &rels) {
   for (unsigned i = NrPcGens + 1; i <= newnrpcgens; i++) {
     Comm[i].resize(i);
 
-    Comm[i][0] = sparsecvec::bad(); // guard
+    Comm[i][0] = sparsepcvec::bad(); // guard
     for (unsigned j = 1; j < i; j++)
       Comm[i][j].noalloc();
   }
@@ -890,7 +904,7 @@ void pcpresentation::print(FILE *f, bool PrintCompact, bool PrintDefs, bool Prin
     if (!Epimorphism[i].empty() && Generator[g].type == DGEN && Generator[g].s == i)
       fprintf(f, ": a%d\n", g);
     else
-      fprintf(f, " " PRIsparsecvec "\n", &Epimorphism[i]);
+      fprintf(f, " " PRIsparsepcvec "\n", &Epimorphism[i]);
   }
   if (PrintDefs) {
     fprintf(f, "# The definitions:\n");
@@ -904,9 +918,9 @@ void pcpresentation::print(FILE *f, bool PrintCompact, bool PrintDefs, bool Prin
 	break;
       case DPOW:
 #ifdef LIEALG
-	fprintf(f, PRIcoeff "*a%d = ", &Exponent[i], Generator[i].p);
+	fprintf(f, PRIpccoeff "*a%d = ", &Exponent[i], Generator[i].p);
 #else
-	fprintf(f, "a%d^" PRIcoeff " = ", Generator[i].p, &Exponent[i]);
+	fprintf(f, "a%d^" PRIpccoeff " = ", Generator[i].p, &Exponent[i]);
 #endif
 	break;
       case DGEN:
@@ -919,7 +933,7 @@ void pcpresentation::print(FILE *f, bool PrintCompact, bool PrintDefs, bool Prin
       gen g = i;
       while (Generator[g].type == DPOW) {
 #ifdef LIEALG
-	fprintf(f,PRIcoeff "*", &Exponent[g]);
+	fprintf(f,PRIpccoeff "*", &Exponent[g]);
 #else
 	fprintf(f,"(");
 #endif
@@ -944,7 +958,7 @@ void pcpresentation::print(FILE *f, bool PrintCompact, bool PrintDefs, bool Prin
       fprintf(f, "]");
 #ifdef GROUP
       for (g = i; Generator[g].type == DPOW; g = Generator[g].p)
-	fprintf(f,"^" PRIcoeff ")", &Exponent[g]);
+	fprintf(f,"^" PRIpccoeff ")", &Exponent[g]);
 #endif
       fprintf(f, "^epimorphism\n");
     }
@@ -958,9 +972,9 @@ void pcpresentation::print(FILE *f, bool PrintCompact, bool PrintDefs, bool Prin
 	  fprintf(f, ",\n");
       fprintf(f, "%10s", "");
 #ifdef LIEALG
-      fprintf(f, PRIcoeff "*a%d", &Exponent[i], i);
+      fprintf(f, PRIpccoeff "*a%d", &Exponent[i], i);
 #else
-      fprintf(f, "a%d^" PRIcoeff, i, &Exponent[i]);
+      fprintf(f, "a%d^" PRIpccoeff, i, &Exponent[i]);
 #endif
       if (Power[i].allocated()) {
 	gen g = Power[i][0].first;
@@ -968,7 +982,7 @@ void pcpresentation::print(FILE *f, bool PrintCompact, bool PrintDefs, bool Prin
 	  if (Generator[g].type == DPOW && Generator[g].p == i)
 	    fprintf(f, " =: a%d", g);
 	  else
-	    fprintf(f, " = " PRIsparsecvec, &Power[i]);
+	    fprintf(f, " = " PRIsparsepcvec, &Power[i]);
 	}
       }
       first = false;
@@ -992,7 +1006,7 @@ void pcpresentation::print(FILE *f, bool PrintCompact, bool PrintDefs, bool Prin
 	if (Generator[g].g == j && Generator[g].h == i)
 	  fprintf(f, " =: a%d", g);
 	else
-	  fprintf(f, " = " PRIsparsecvec, &Comm[j][i]);
+	  fprintf(f, " = " PRIsparsepcvec, &Comm[j][i]);
       }
       first = false;
     }
@@ -1004,7 +1018,7 @@ void pcpresentation::print(FILE *f, bool PrintCompact, bool PrintDefs, bool Prin
 template<typename V> bool PrintGAPVec(FILE *f, const V v, bool first) {
   for (const auto &kc : v) {
     if (first) first = false; else fprintf(f, " + ");
-    fprintf(f, PRIcoeff "*bas[%d]", &kc.second, kc.first);
+    fprintf(f, PRIpccoeff "*bas[%d]", &kc.second, kc.first);
   }
   return first;
 }
@@ -1033,7 +1047,7 @@ void pcpresentation::printGAP(FILE *f) const {
 	bool first = true;
 	for (const auto &kc : Comm[j][i]) {
 	  if (!first) fprintf(f, ",");
-	  fprintf(f, PRIcoeff ",%d", &kc.second, kc.first);
+	  fprintf(f, PRIpccoeff ",%d", &kc.second, kc.first);
 	  first = false;
 	}
 	fprintf(f, "]);\n");
@@ -1045,7 +1059,7 @@ void pcpresentation::printGAP(FILE *f) const {
   bool first = true;
   for (unsigned i = 1; i <= NrPcGens; i++) {
     if (nz_p(Exponent[i])) {
-      fprintf(f, "%s-" PRIcoeff "*bas[%d]", first ? "" : ",\n\t\t", &Exponent[i], i);
+      fprintf(f, "%s-" PRIpccoeff "*bas[%d]", first ? "" : ",\n\t\t", &Exponent[i], i);
       if (Power[i].allocated())
 	PrintGAPVec(f, Power[i], false);
       first = false;
@@ -1093,7 +1107,7 @@ template<typename V> void PrintGAPVec(FILE *f, const V v) {
   bool first = true;
   for (const auto &kc : v) {
     if (first) first = false; else fprintf(f, "*");
-    fprintf(f, "g[%u]^" PRIcoeff, kc.first, &kc.second);
+    fprintf(f, "g[%u]^" PRIpccoeff, kc.first, &kc.second);
   }
   if (first)
     fprintf(f, "One(F)");
@@ -1120,7 +1134,7 @@ void pcpresentation::printGAP(FILE *f) const {
 	  "\tc := FromTheLeftCollector(%d);\n", NrPcGens, NrPcGens);
   for (unsigned i = 1; i <= NrPcGens; i++)
     if (nz_p(Exponent[i])) {
-      fprintf(f, "\tSetRelativeOrder(c,%u," PRIcoeff ");\n", i, &Exponent[i]);
+      fprintf(f, "\tSetRelativeOrder(c,%u," PRIpccoeff ");\n", i, &Exponent[i]);
       fprintf(f, "\tSetPower(c,%u,", i); PrintGAPVec(f, Power[i]);
       fprintf(f, ");\n");
     }

@@ -8,22 +8,8 @@
 #include "nq.h"
 #include "colamd.h"
 #include <algorithm>
-//#include <set>
-#include <unordered_set>
 #include <utility>
 #include <unistd.h>
-
-/* static variables, cached from InitMatrix */
-unsigned NrCols, Shift;
-const coeff *TorsionExp;
-
-/* we maintain a square NrColsxNrCols matrix (with sparse rows)
-   to store the current relations. If row Matrix[i] is allocated, then
-   its pivot should be in position i+Shift; so the matrix
-   really has (row,column)-space equal to
-   [0,NrCols) x [Shift,NrTotalGens].
-*/
-sparsecmat Matrix;
 
 #ifdef HACK_to_allow_pointer_to_be_changed_in_set
 // @@@ this experiment was to hack into the std::set by allowing a
@@ -45,91 +31,73 @@ and "Queue.insert(cv);" should become
 }
 #endif
 
-std::unordered_set<sparsecvec> Queue;
-
-static void InitTorsion() {  
-  if (TorsionExp != nullptr) {
-    for (unsigned i = 0; i < NrCols; i++) {
-      Matrix[i].alloc(1);
-      Matrix[i][0].first = Shift + i;
-      set(Matrix[i][0].second, *TorsionExp);
-      Matrix[i].truncate(1);
-    }
-  }
+matrix::matrix(unsigned _nrcols, unsigned _shift, bool _torsionfree) : nrcols(_nrcols), shift(_shift), torsionfree(_torsionfree) {
+  rows.resize(nrcols, sparsematvec::null());
+  rowstack.setsize(nrcols);
 }
 
-void InitMatrix(const coeff *torsionexp, unsigned shift, unsigned len) {
-  Shift = shift;
-  NrCols = len;
-  TorsionExp = torsionexp;
-
-  Matrix.resize(NrCols, sparsecvec::null());
-  InitTorsion();
-}
-
-void FreeMatrix() {
-  if (!Queue.empty())
-    abortprintf(5, "FreeMatrix: row queue not empty");
+matrix::~matrix() {
+  if (!queue.empty())
+    abortprintf(5, "matrix::~matrix: row queue not empty");
   
-  for (sparsecvec v : Matrix)
+  for (sparsematvec v : rows)
     v.free();
-  Matrix.clear();
-}
-
-// for debugging purposes
-void PrintMatrix() {
-  for (const sparsecvec v : Matrix)
-    if (v.allocated())
-      printf(PRIsparsecvec "\n", &v);
-  printf("\n");
+  rows.clear();
 }
 
 // put v in normal form by subtracting rows of Matrix
-void ReduceRow(hollowcvec &v) {
-  coeff q;
+hollowmatvec matrix::reducerow(const sparsepcvec &v) const {
+  matcoeff q;
   q.init();
-  
-  for (const auto &kc : v) {
-    unsigned row = kc.first - Shift;
+  hollowmatvec hv = rowstack.fresh();
+
+  for (auto &kc : v)
+    map(hv[kc.first-shift], kc.second);
+
+  for (const auto &kc : hv) {
+    unsigned row = kc.first;
       
-    if (Matrix[row].allocated() && !reduced_p(kc.second, Matrix[row][0].second)) { // found a pivot
-	fdiv_q(q, kc.second, Matrix[row][0].second);
-	v.submul(q, Matrix[row]);
+    if (rows[row].allocated() && !reduced_p(kc.second, rows[row][0].second)) { // found a pivot
+	fdiv_q(q, kc.second, rows[row][0].second);
+	hv.submul(q, rows[row]);
     }
   }
+  rowstack.release(hv);
   q.clear();
+
+  return hv; // hv is still alive, just top of the stack
 }
 
-// try to add currow to the row space spanned by Matrix.
+// try to add currow to the row space spanned by rows.
 // return true if currow already belonged to the row space.
 // currow will be damaged (well, reduced) in the process.
-static bool AddRow(hollowcvec currow) {
+bool matrix::add1row(hollowmatvec currow) {
   bool belongs = true;
 
-  coeff a, b, c, d;
+  matcoeff a, b, c, d;
   a.init();
   b.init();
   c.init();
   d.init();
 
   for (const auto &kc : currow) {
-    unsigned row = kc.first - Shift;
+    unsigned row = kc.first;
       
-    if (!Matrix[row].allocated()) { /* Insert v in Matrix at position row */
+    if (!rows[row].allocated()) { /* Insert v in rows at position row */
       belongs = false;
       unit_annihilator(b, a, kc.second);
-      currow.mul(b);
-      Matrix[row] = currow.getsparse();
+      currow.scale(b);
+      rows[row] = currow.getsparse();
       currow.clear();
-      currow.addmul(a, Matrix[row]);
+      currow.addmul(a, rows[row]);
       
       if (Debug >= 3)
-	fprintf(LogFile, "# Adding row %d: " PRIsparsecvec "\n", row, &Matrix[row]);
+	fprintf(LogFile, "# Adding row %d: " PRIsparsematvec "\n", row, &rows[row]);
     } else { /* two rows with same pivot. Merge them */
-      gcdext(d, a, b, kc.second, Matrix[row][0].second); /* d = a*v[head]+b*Matrix[row][head] */
-      if (!cmp(d, Matrix[row][0].second)) { /* likely case: Matrix[row][head]=d, b=1, a=0. We're just reducing currow. */
+      gcdext(d, a, b, kc.second, rows[row][0].second); /* d = a*v[head]+b*rows[row][head] */
+      if (!cmp(d, rows[row][0].second)) { /* likely case: rows[row][head]=d, b=1, a=0. We're just reducing currow. */
 	divexact(d, kc.second, d);
-	currow.submul(d, Matrix[row]);
+	currow.submul(d, rows[row]);
 #ifdef IS_MPZ // check coefficient explosion
 	if (Debug >= 1) {
 	  long maxsize = 0;
@@ -141,19 +109,19 @@ static bool AddRow(hollowcvec currow) {
       } else {
 	belongs = false;
 	divexact(c, kc.second, d);
-	divexact(d, Matrix[row][0].second, d);
-	hollowcvec vab = vecstack.fresh();
+	divexact(d, rows[row][0].second, d);
+	hollowmatvec vab = rowstack.fresh();
 	vab.addmul(a, currow);
-	vab.addmul(b, Matrix[row]);
+	vab.addmul(b, rows[row]);
 	neg(d, d);
-	currow.mul(d);
-	currow.addmul(c, Matrix[row]);
-	Matrix[row].free();
-	Matrix[row] = vab.getsparse();
-	vecstack.release(vab);
+	currow.scale(d);
+	currow.addmul(c, rows[row]);
+	rows[row].free();
+	rows[row] = vab.getsparse();
+	rowstack.release(vab);
 	  
 	if (Debug >= 3)
-	  fprintf(LogFile, "# Change row %d: " PRIsparsecvec "\n", row, &Matrix[row]);
+	  fprintf(LogFile, "# Change row %d: " PRIsparsematvec "\n", row, &rows[row]);
       }
     }
   }
@@ -166,23 +134,30 @@ static bool AddRow(hollowcvec currow) {
   return belongs;
 }
 
-bool AddToMatrix(hollowcvec currow) {
+bool matrix::addrow(hollowpcvec currow) {
   if (currow.empty())
     return true;
-  if (currow.begin()->first < Shift)
-    abortprintf(5, "AddToMatrix: vector has a term a%d of too low index", currow.begin()->first);
-  return AddRow(currow);
+  if (currow.begin()->first < shift)
+    abortprintf(5, "matrix::addrow: vector has a term a%d of too low index", currow.begin()->first);
+
+  hollowmatvec row = rowstack.fresh();
+  for (const auto &kc : currow)
+    map(row[kc.first-shift], kc.second);
+    
+  bool status = add1row(row);
+  rowstack.release(row);
+  return status;
 }
 
-std::vector<int> colamd(sparsecmat &m) {
+static std::vector<int> colamd(sparsematmat &m, unsigned nrcols) {
   std::vector<int> ind;
   int stats[COLAMD_STATS];
   std::vector<int> intmat;
 
-  for (const sparsecvec v : m) {
+  for (const sparsematvec v : m) {
     ind.push_back(intmat.size());
     for (const auto &kc : v)
-      intmat.push_back(kc.first - Shift);
+      intmat.push_back(kc.first);
   }
   ind.push_back(intmat.size());
 
@@ -195,9 +170,9 @@ std::vector<int> colamd(sparsecmat &m) {
     fprintf(LogFile, "\n");
   }
 
-  size_t alloc = colamd_recommended(intmat.size(), NrCols, m.size());
+  size_t alloc = colamd_recommended(intmat.size(), nrcols, m.size());
   intmat.reserve(alloc);
-  int ok = colamd(NrCols, m.size(), alloc, intmat.data(), ind.data(), NULL, stats);
+  int ok = colamd(nrcols, m.size(), alloc, intmat.data(), ind.data(), NULL, stats);
   if (Debug >= 3) {
     // we capture the output of colamd_report, and pipe it to LogFile.
     // strangely enough, the documentation says that colamd_report writes to
@@ -243,63 +218,62 @@ std::vector<int> colamd(sparsecmat &m) {
   return ind;
 }
 
-/* collect the vectors in Queue and Matrix, and combine them back into Matrix */
-void FlushMatrixQueue() {
-  if (Queue.empty())
+/* collect the vectors in queue and Matrix, and combine them back into Matrix */
+void matrix::flushqueue() {
+  if (queue.empty())
     return;
   
-  /* remove unbound entries in Matrix */
-  Matrix.erase(std::remove(Matrix.begin(), Matrix.end(), sparsecvec::null()), Matrix.end());
-
+  /* remove unbound entries in rows */
+  rows.erase(std::remove(rows.begin(), rows.end(), sparsematvec::null()), rows.end());
+  
   /* put queue at bottom of matrix */
-  Matrix.insert(Matrix.end(), Queue.begin(), Queue.end());  
-  Queue.clear();
+  rows.insert(rows.end(), queue.begin(), queue.end());  
+  queue.clear();
 
   /* call colamd to determine optimal insertion ordering */
-  std::vector<int> ind = colamd(Matrix);
+  std::vector<int> ind = colamd(rows, nrcols);
   
-  sparsecmat oldrels(NrCols, sparsecvec::null());
-  Matrix.swap(oldrels);
-  InitTorsion();
+  sparsematmat oldrels(nrcols, sparsematvec::null());
+  rows.swap(oldrels);
 
-  /* add rows of oldrels into Matrix, reducing them along the way, and in
+  /* add rows of oldrels into rows, reducing them along the way, and in
      the order specified by the permutation ind */
   for (unsigned i = 0; i < oldrels.size(); i++) {
-    hollowcvec currow = vecstack.fresh();
+    hollowmatvec currow = rowstack.fresh();
     currow.copy(oldrels[ind[i]]);
     oldrels[ind[i]].free();
-    AddRow(currow);
-    vecstack.release(currow);
+    add1row(currow);
+    rowstack.release(currow);
   }
 }
 
 // @@@ find tricks to avoid arithmetic overflow
 
 // complete the Hermite normal form
-void Hermite() {
+void matrix::hermite() {
   /* reduce all the head columns, to achieve Hermite normal form. */
-  coeff q;
+  matcoeff q;
   q.init();
-  for (unsigned j = 0; j < NrCols; j++) { // @@@ performance: would this be faster looping backwards?
-    if (!Matrix[j].allocated())
+  for (unsigned j = 0; j < nrcols; j++) { // @@@ performance: would this be faster looping backwards?
+    if (!rows[j].allocated())
       continue;
 
-    hollowcvec currow = vecstack.fresh();
-    currow.copy(Matrix[j]);
-    Matrix[j].free();
+    hollowmatvec currow = rowstack.fresh();
+    currow.copy(rows[j]);
+    rows[j].free();
 
     for (const auto &kc : currow) {
-      unsigned row = kc.first - Shift;
-      if (row == j || !Matrix[row].allocated())
+      unsigned row = kc.first;
+      if (row == j || !rows[row].allocated())
 	continue;
 
-      if (!reduced_p(kc.second, Matrix[row][0].second)) {
-	fdiv_q(q, kc.second, Matrix[row][0].second);
-	currow.submul(q, Matrix[row]);
+      if (!reduced_p(kc.second, rows[row][0].second)) {
+	fdiv_q(q, kc.second, rows[row][0].second);
+	currow.submul(q, rows[row]);
       }
     }
-    Matrix[j] = currow.getsparse();
-    vecstack.release(currow);
+    rows[j] = currow.getsparse();
+    rowstack.release(currow);
   }
 
   /* @@@ We could improve this code by eliminating redundant
@@ -310,35 +284,54 @@ void Hermite() {
 
   q.clear();
 
-  TimeStamp("Hermite()");  
+  TimeStamp("matrix::hermite()");  
 }
 
-// return list of relators
-sparsecmat GetMatrix() {
-  sparsecmat rels;
-  rels.reserve(NrCols);
-
-  for (unsigned j = 0; j < NrCols; j++) {
-    if (Matrix[j].allocated())
-      rels.push_back(Matrix[j]);
+// return relator
+void matrix::getrel(pccoeff &c, sparsepcvec &v, gen g) const {
+  const auto row = rows[g-shift];
+  matcoeff q;
+  q.init();
+  if (row.allocated()) {
+    v.alloc(row.size()-1);
+    auto vi = v.begin();
+    auto rowi = row.begin();
+    map(c, rowi->second);
+    for (++rowi; rowi != row.end(); ++rowi) {
+      q.neg(rowi->second);
+      map(vi->second, q);
+      vi->first = rowi->first+shift;
+      vi++;
+    }
+    vi.markend();
+  } else {
+    v.noalloc();
+    c.kernel<matcoeff>();
   }
-  
-  return rels;
+  q.clear();
 }
 
 /* tries to add a row to the queue; returns true if the row was added.
  empty the queue if it got full. */
-void QueueInMatrix(hollowcvec hv) {
+void matrix::queuerow(const hollowpcvec hv) {
   if (hv.empty()) // easy case: trivial relation, change nothing
     return;
 
-  // @@@ performance critical: maybe we can avoid making a copy?
-  sparsecvec cv = hv.getsparse();
-
-  if (cv[0].first < Shift) // sanity check
-    abortprintf(5, "QueueInMatrix: vector has a term a%d of too low index", cv[0].first);
-
-  auto p = Queue.insert(cv);
+  sparsematvec cv;
+  {
+    cv.alloc(hv.size());
+    auto i = cv.begin();
+    for (const auto &kc : hv) {
+      i->second.map(kc.second);
+      if (i->first < shift) // sanity check
+	abortprintf(5, "matrix::queuerow: vector has a term a%d of too low index", cv[0].first);
+      i->first = kc.first-shift;
+      i++;
+    }
+    i.markend();
+  }
+  
+  auto p = queue.insert(cv);
   if (!p.second) { // we were already there, insert failed
     cv.free();
     return;
@@ -347,6 +340,6 @@ void QueueInMatrix(hollowcvec hv) {
   /* @@@ optimize for the factor "10". If too small, we'll cause
      fill-in in the matrix. If too large, we'll use too much
      memory. */
-  if (Queue.size() >= 10*NrCols)
-    FlushMatrixQueue();
+  if (queue.size() >= 10*nrcols)
+    flushqueue();
 }

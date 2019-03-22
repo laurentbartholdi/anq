@@ -13,7 +13,7 @@ template<> class __ring0<-1U> {
     bool t:1;
   };
 
-  size_t __hash() {
+  size_t __hashkey() {
     size_t seed = p->_mp_size;
     for (unsigned i = 0; i < abs(p->_mp_size); i++)
       seed ^= p->_mp_d[i] + 0x9e3779b9 + (seed << 6) + (seed >> 2);
@@ -72,11 +72,11 @@ public:
     }
   }
 
-  inline size_t hash() {
+  inline size_t hashkey() {
     if (__builtin_expect(t, 1))
       return d;
     else
-      return __hash();
+      return __hashkey();
   }
 
   inline bool nz_p() const {

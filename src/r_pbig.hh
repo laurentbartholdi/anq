@@ -136,7 +136,7 @@ public:
     return s;
   }
 
-  inline size_t hash() const {
+  inline size_t hashkey() const {
     size_t seed = COEFF_WORDS;
     for (unsigned i = 0; i < COEFF_WORDS; i++)
       seed ^= data[i] + 0x9e3779b9 + (seed << 6) + (seed >> 2);
@@ -482,7 +482,9 @@ public:
   }
 
   template<unsigned L> inline void map(const __localp_big<P,L> &a) {
-    if (K > L) {
+    if (K == L)
+      mpn_copyi(data, a.data, a.COEFF_WORDS);
+    else if (K > L) {
       zero();
       mpn_copyi(data, a.data, a.COEFF_WORDS);
     } else

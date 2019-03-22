@@ -102,7 +102,7 @@ public:
     return s;
   }
 
-  inline size_t hash() const { return data; }
+  inline size_t hashkey() const { return data; }
 
   inline bool nz_p() const { return data != 0; }
 
@@ -382,7 +382,10 @@ public:
   }
 
   template<unsigned L> inline void map(const __localp_small<P,L> &a) {
-    *this = uint64_t2c(a.c2uint64_t(a));
+    if (K == L)
+      data = a.data;
+    else
+      *this = uint64_t2c(a.c2uint64_t(a));
   }  
 };
 

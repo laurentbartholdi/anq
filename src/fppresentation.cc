@@ -10,6 +10,8 @@
 #include <stdio.h>
 #include <stdarg.h>
 
+const gen LASTGEN = -1u;
+
 enum token {
   LPAREN, RPAREN, LBRACK, RBRACK, LBRACE, RBRACE,
   NUMBER, GEN,
@@ -70,15 +72,15 @@ inline nodetype binary_node(token t) {
   }
 }
 
-static char Ch;           /* Contains the next char on the input. */
-static token Token;       /* Contains the current token. */
-static int Line;          /* Current line number. */
-static int TLine;         /* Line number where token starts. */
-static int Column;          /* Current character number. */
-static int TColumn;         /* Character number where token starts. */
+static char Ch;		/* Contains the next char on the input. */
+static token Token;	/* Contains the current token. */
+static int Line;	/* Current line number. */
+static int TLine;	/* Line number where token starts. */
+static int Column;	/* Current character number. */
+static int TColumn;	/* Character number where token starts. */
 static const char *InFileName; /* Current input file name. */
-static FILE *InFp;        /* Current input file pointer. */
-static coeff N;           /* Contains the integer just read. */
+static FILE *InFp;	/* Current input file pointer. */
+static fpcoeff N;	/* Contains the integer just read. */
 static std::string GenName; /* Contains the generator name. */
 
 void FreeNode(node *n) {
@@ -102,11 +104,8 @@ void FreeNode(node *n) {
 enum genstatus { NOCREATE, CREATE };
 
 static gen GenNumber(fppresentation &pres, genstatus status, unsigned weight) {
-  if (status == CREATE && pres.NrGens == 0) {
-    pres.Weight.resize(1); // we start indexing at 1
-    pres.GeneratorName.resize(1);
-  }
-  for (unsigned i = 1; i <= pres.NrGens; i++) {
+  // we start at 0, including the name "p" at position 0, to recognize p-powers
+  for (unsigned i = 0; i <= pres.NrGens; i++) {
     if (GenName == pres.GeneratorName[i]) {
       if (status == CREATE)
         return LASTGEN;
@@ -308,7 +307,7 @@ static void NextToken() {
   case '9': {
     Token = NUMBER;
     zero(N);
-    int base = (Ch == '0' ? coeff::characteristic : 10);
+    int base = (Ch == '0' ? fpcoeff::characteristic : 10);
     
     while (isalnum(Ch)) {
       mul_si(N, N, base);
@@ -414,14 +413,11 @@ node *Expression(fppresentation &pres, int precedence) {
 
     node *u = Expression(pres, new_precedence);
 
-#if defined(LIEALG) && defined(prime)
-    if (oper == TPOW && u->type == TNUM) { // p-power mapping
-      if (!cmp_si(u->n, prime)) {
-	FreeNode(u);
-	t = new node{TFROB, t};
-	continue;
-      } else
-	abortprintf(3, "I can only accept p-power mapping with exponent %d", prime);
+#ifdef LIEALG
+    if (oper == TPOW && u->type == TGEN && u->g == 0) { // p-power mapping
+      FreeNode(u);
+      t = new node{TFROB, t};
+      continue;
     }
 #endif
     if (t->type == TNUM && u->type == TNUM) { // compile-time evaluation
@@ -515,7 +511,7 @@ void ValidateMap(const node *n, const fppresentation &pres, std::vector<bool> &s
   seen[v->g] = true;
 }
 
-fppresentation::fppresentation(const char *InputFileName) {
+fppresentation::fppresentation(const char *InputFileName, bool ppower) {
   if (InputFileName == nullptr) {
     InFileName = "<stdin>";
     InFp = stdin;
@@ -527,6 +523,11 @@ fppresentation::fppresentation(const char *InputFileName) {
   }
 
   NrGens = 0;
+
+  Weight.resize(1); // we start indexing at 1
+  GeneratorName.resize(1);
+  if (ppower)
+    GeneratorName[0] = "p";
   
   Ch = '\0';
   Column = 0;
@@ -674,7 +675,7 @@ void fppresentation::printnodes(FILE *f, const node *n, nodetype t) const {
 void fppresentation::printnode(FILE *f, const node *n) const {
   switch (n->type) {
   case TNUM:
-    fprintf(f, PRIcoeff, &n->n);
+    fprintf(f, PRIfpcoeff, &n->n);
     break;
   case TGEN:
     fprintf(f, "%s", GeneratorName[n->g].c_str());
@@ -689,13 +690,11 @@ void fppresentation::printnode(FILE *f, const node *n) const {
     printnode(f, n->u);
     fprintf(f, ")");
     break;
-#ifdef prime
   case TFROB:
     fprintf(f, "(");
     printnode(f, n->u);
-    fprintf(f, ")^%d", prime);
+    fprintf(f, ")^p");
     break;
-#endif
   case TSUM:
     printnode(f, n->l);
     fprintf(f, " + ");

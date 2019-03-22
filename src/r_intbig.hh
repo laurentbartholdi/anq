@@ -23,7 +23,7 @@ public:
 
   inline void clear() { }
 
-  size_t hash() const {
+  size_t hashkey() const {
     size_t seed = K;
     for (unsigned i = 0; i < K; i++)
       seed ^= data[i] + 0x9e3779b9 + (seed << 6) + (seed >> 2);
@@ -311,6 +311,8 @@ public:
   template<unsigned L> friend class __local2_big;
   
   template<unsigned L> inline void map(const __ring0<L> &a) {
+    if (K == L) { set(a); return; }
+    
     if (a.period()) {
       __ring0<L> b;
       b.neg(a);

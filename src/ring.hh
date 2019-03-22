@@ -19,11 +19,11 @@
 #include <stdlib.h>
 
 template<uint64_t P, unsigned K> struct integer;
-template<unsigned K> struct __ring0;
-template<unsigned P> struct __local2_small;
-template<unsigned P> struct __local2_big;
-template<uint64_t P, unsigned K> struct __localp_small;
-template<uint64_t P, unsigned K> struct __localp_big;
+template<unsigned K> class __ring0;
+template<unsigned P> class __local2_small;
+template<unsigned P> class __local2_big;
+template<uint64_t P, unsigned K> class __localp_small;
+template<uint64_t P, unsigned K> class __localp_big;
 
 typedef __ring0<0> __ring0_mpz;
 typedef __ring0<1> __ring0_64;
@@ -31,60 +31,59 @@ typedef __ring0<1> __ring0_64;
 #include "r_int1.hh"
 #include "r_intbig.hh"
 #include "r_intmax.hh"
-#include "r_intX.hh"
-template<unsigned K=1> struct intglobal : __ring0<K> {
+template<unsigned K=1> struct __intglobal : __ring0<K> {
   /* returns unit and generator of annihilator ideal:
      a*unit is canonical (>0 or power of P) and a*annihilator=0 */
-  inline void inv(const intglobal &a) {
+  inline void inv(const __intglobal &a) {
     if (!a.cmp_si(1) || !a.cmp_si(-1))
       this->set(a);
     else
       throw std::runtime_error("inv() of non-invertible element");
   }
 
-  inline friend void unit_annihilator(intglobal &unit, intglobal &annihilator, const intglobal &a) {
+  inline friend void unit_annihilator(__intglobal &unit, __intglobal &annihilator, const __intglobal &a) {
     unit.set_si(a.sgn());
     annihilator.set_si(a.z_p());
   }
 
-  inline unsigned val(const intglobal &a) {
+  inline unsigned val(const __intglobal &a) {
     throw std::runtime_error("val(): meaningless for global integers");
   }
     
-  inline void shdivexact(const intglobal &a, const intglobal &b) {
+  inline void shdivexact(const __intglobal &a, const __intglobal &b) {
     shdiv_q(a, b);
   }
 
-  inline void shdiv_q(const intglobal &a, const intglobal &b) {
-    intglobal r;
+  inline void shdiv_q(const __intglobal &a, const __intglobal &b) {
+    __intglobal r;
     shdiv_qr(*this, r, a, b);
   }
 
-  inline void shdiv_r(const intglobal &a, const intglobal &b) {
-    intglobal q;
+  inline void shdiv_r(const __intglobal &a, const __intglobal &b) {
+    __intglobal q;
     shdiv_qr(q, *this, a, b);
   }
 
-  inline friend uint64_t shdiv_ui(const intglobal &a, uint64_t b) {
-    intglobal q, r;
+  inline friend uint64_t shdiv_ui(const __intglobal &a, uint64_t b) {
+    __intglobal q, r;
     return shdiv_qr_ui(q, r, a, b);
   }
 
-  inline uint64_t shdiv_q_ui(const intglobal &a, uint64_t b) {
-    intglobal r;
+  inline uint64_t shdiv_q_ui(const __intglobal &a, uint64_t b) {
+    __intglobal r;
     return shdiv_qr_ui(*this, r, a, b);
   }
 
-  inline uint64_t shdiv_r_ui(const intglobal &a, uint64_t b) {
-    intglobal q;
+  inline uint64_t shdiv_r_ui(const __intglobal &a, uint64_t b) {
+    __intglobal q;
     return shdiv_qr_ui(q, *this, a, b);
   }
 
-  inline friend void shdiv_qr(intglobal &q, intglobal &r, const intglobal &a, const intglobal &b) {
+  inline friend void shdiv_qr(__intglobal &q, __intglobal &r, const __intglobal &a, const __intglobal &b) {
     fdiv_qr(q, r, a, b);
   }    
 
-  inline friend uint64_t shdiv_qr_ui(intglobal &q, intglobal &r, const intglobal &a, uint64_t b) {
+  inline friend uint64_t shdiv_qr_ui(__intglobal &q, __intglobal &r, const __intglobal &a, uint64_t b) {
     return fdiv_qr_ui(q, r, a, b);
   }
 };
@@ -97,7 +96,7 @@ constexpr unsigned MAXK(int64_t p) { return p <= 2 ? 64 : p <= 3 ? 40 : p <= 5 ?
 #include "r_pbig.hh"
 
 #if 0 // compiler produces just-as-good code with local2_small
-template<> class intlocal<2,64> {
+template<> class __intlocal<2,64> {
   uint64_t data;
 public:
 };
@@ -107,83 +106,83 @@ template<unsigned K> struct __local2 : public std::conditional<K<=64,__local2_sm
 
 template<uint64_t P, unsigned K> struct __localp : std::conditional<K<=MAXK(P),__localp_small<P,K>,__localp_big<P,K>>::type { };
 
-template<uint64_t P, unsigned K> struct intlocal : std::conditional<P==2,__local2<K>,__localp<P,K>>::type {
+template<uint64_t P, unsigned K> struct __intlocal : std::conditional<P==2,__local2<K>,__localp<P,K>>::type {
   inline void init() { }
 
-  inline void init_set(const intlocal &a) { this->set(a); }
+  inline void init_set(const __intlocal &a) { this->set(a); }
 
   inline void init_set_si(int64_t a) { this->set_si(a); }
 
   inline void clear() { }
 
-  inline void swap(intlocal &b) {
-    intlocal tmp;
+  inline void swap(__intlocal &b) {
+    __intlocal tmp;
     tmp.set(*this);
     set(b);
     b.set(tmp);
   }
   
-  inline void divexact(const intlocal &a, const intlocal &b) {
+  inline void divexact(const __intlocal &a, const __intlocal &b) {
     fdiv_q(a, b);
   }
   
-  inline void fdiv_q(const intlocal &a, const intlocal &b) {
-    intlocal r;
+  inline void fdiv_q(const __intlocal &a, const __intlocal &b) {
+    __intlocal r;
     fdiv_qr(*this, r, a, b);
   }
 
-  inline void fdiv_r(const intlocal &a, const intlocal &b) {
-    intlocal q;
+  inline void fdiv_r(const __intlocal &a, const __intlocal &b) {
+    __intlocal q;
     fdiv_qr(q, *this, a, b);
   }
 
-  inline friend uint64_t fdiv_ui(const intlocal &a, uint64_t b) {
-    intlocal q, r;
+  inline friend uint64_t fdiv_ui(const __intlocal &a, uint64_t b) {
+    __intlocal q, r;
     return fdiv_qr_ui(q, r, a, b);
   }
 
-  inline uint64_t fdiv_q_ui(const intlocal &a, uint64_t b) {
-    intlocal r;
+  inline uint64_t fdiv_q_ui(const __intlocal &a, uint64_t b) {
+    __intlocal r;
     return fdiv_qr_ui(*this, r, a, b);
   }
 
-  inline uint64_t fdiv_r_ui(const intlocal &a, uint64_t b) {
-    intlocal q;
+  inline uint64_t fdiv_r_ui(const __intlocal &a, uint64_t b) {
+    __intlocal q;
     return fdiv_qr_ui(q, *this, a, b);
   }
   
   /* these functions should be used when it is guaranteed that b is a power of characteristic */
-  inline void shdivexact(const intlocal &a, const intlocal &b) {
+  inline void shdivexact(const __intlocal &a, const __intlocal &b) {
     shdiv_q(a, b);
   }
 
-  inline void shdiv_q(const intlocal &a, const intlocal &b) {
-    intlocal r;
+  inline void shdiv_q(const __intlocal &a, const __intlocal &b) {
+    __intlocal r;
     shdiv_qr(*this, r, a, b);
   }
 
-  inline void shdiv_r(const intlocal &a, const intlocal &b) {
-    intlocal q;
+  inline void shdiv_r(const __intlocal &a, const __intlocal &b) {
+    __intlocal q;
     shdiv_qr(q, *this, a, b);
   }
 
-  inline friend uint64_t shdiv_ui(const intlocal &a, uint64_t b) {
-    intlocal q, r;
+  inline friend uint64_t shdiv_ui(const __intlocal &a, uint64_t b) {
+    __intlocal q, r;
     return shdiv_qr_ui(q, r, a, b);
   }
 
-  inline uint64_t shdiv_q_ui(const intlocal &a, uint64_t b) {
-    intlocal r;
+  inline uint64_t shdiv_q_ui(const __intlocal &a, uint64_t b) {
+    __intlocal r;
     return shdiv_qr_ui(*this, r, a, b);
   }
 
-  inline uint64_t shdiv_r_ui(const intlocal &a, uint64_t b) {
-    intlocal q;
+  inline uint64_t shdiv_r_ui(const __intlocal &a, uint64_t b) {
+    __intlocal q;
     return shdiv_qr_ui(q, *this, a, b);
   }
 };
 
-template<uint64_t P=0, unsigned K=0> struct integer : std::conditional<P==0,intglobal<K>,intlocal<P,K>>::type {
+template<uint64_t P=0, unsigned K=0> struct integer : std::conditional<P==0,__intglobal<K>,__intlocal<P,K>>::type {
   static const uint64_t characteristic = P;
   static const unsigned exponent = K;
   
@@ -218,18 +217,16 @@ template<uint64_t P=0, unsigned K=0> struct integer : std::conditional<P==0,intg
   }
 
   // the kernel of the map integer<P,K> -> integer<Q,L>
-  template<uint64_t Q, unsigned L> static const integer kernel(const integer<Q,L> &a) {
-    integer r;
-    if (0 > (int64_t) Q) {
-      r.init_set_si(Q >> 1); r.mul_si(r, 2); r.add_si(r, Q & 1);
+  template<typename T> const void kernel() {
+    if (0 > (int64_t) T::characteristic) {
+      this->set_si(T::characteristic >> 1);
+      this->mul_si(*this, 2);
+      this->add_si(*this, T::characteristic & 1);
     } else
-      r.init_set_si(Q);
-    if (Q != 0)
-      r.pow(r, L);
-    return r;
+      this->set_si(T::characteristic);
+    if (T::characteristic != 0)
+      pow(*this, T::exponent);
   }
-  
-  //  template<uint64_t Q, unsigned L> inline void map(const integer<Q,L> &);
   
   explicit inline operator int64_t() const { return this->get_si(); }
 
@@ -260,6 +257,16 @@ template<uint64_t P=0, unsigned K=0> struct integer : std::conditional<P==0,intg
   integer &operator -=(int64_t a) { this->add_si(*this, -a); return *this; }
   integer &operator *=(int64_t a) { this->mul_si(*this, a); return *this; }
   integer &operator /=(int64_t a) { this->fdiv_ui(*this, a); return *this; }
+
+  struct hash {
+    size_t operator()(const integer &c) const { return c.hashkey(); }
+  };
+
+  struct equal_to {
+    bool operator()(const integer &c1, const integer &c2) const {
+      return !cmp(c1, c2);
+    }
+  };
 };
 
 template<uint64_t P, unsigned K> inline void init(integer<P,K> &a) { a.init(); }

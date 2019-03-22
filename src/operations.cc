@@ -8,7 +8,7 @@
 #include "nq.h"
 #include <map>
 
-vec_supply<hollowcvec> vecstack;
+vec_supply<hollowpcvec> vecstack;
 
 /* Lie algebra operations.
  *
@@ -18,8 +18,8 @@ vec_supply<hollowcvec> vecstack;
  */
 
 // this += [v,w]
-void hollowcvec::liebracket(const pcpresentation &pc, const hollowcvec v, const hollowcvec w) {
-  coeff c;
+void hollowpcvec::liebracket(const pcpresentation &pc, const hollowpcvec v, const hollowpcvec w) {
+  pccoeff c;
   c.init();
 
   for (const auto &kcv : v)
@@ -35,9 +35,9 @@ void hollowcvec::liebracket(const pcpresentation &pc, const hollowcvec v, const 
 }
 
 // add/subtract [[a,b],c]. sign == add, ~sign == subtract.
-void hollowcvec::lie3bracket(const pcpresentation &pc, gen a, gen b, gen c, bool sign) {
+void hollowpcvec::lie3bracket(const pcpresentation &pc, gen a, gen b, gen c, bool sign) {
   const bool sab = (a < b);
-  const sparsecvec v = sab ? pc.Comm[b][a] : pc.Comm[a][b];
+  const sparsepcvec v = sab ? pc.Comm[b][a] : pc.Comm[a][b];
   
   for (const auto &kc : v) {
     if (kc.first > pc.NrPcGens)
@@ -45,7 +45,7 @@ void hollowcvec::lie3bracket(const pcpresentation &pc, gen a, gen b, gen c, bool
     if (kc.first == c)
       continue;
     const bool skc = kc.first < c;
-    const sparsecvec w = skc ? pc.Comm[c][kc.first] : pc.Comm[kc.first][c];
+    const sparsepcvec w = skc ? pc.Comm[c][kc.first] : pc.Comm[kc.first][c];
     if (sign ^ sab ^ skc)
       addmul(kc.second, w);
     else
@@ -53,11 +53,10 @@ void hollowcvec::lie3bracket(const pcpresentation &pc, gen a, gen b, gen c, bool
   }
 }
 
-#ifdef prime
-static void frobenius_brackets(hollowcvec &r, const pcpresentation &pc, hollowcvec s[prime+1], coeff tempc[2], int c, unsigned i) {
+static void frobenius_brackets(hollowpcvec &r, const pcpresentation &pc, hollowpcvec s[pccoeff::characteristic+1], pccoeff tempc[2], int c, unsigned i) {
   if (s[i].empty())
     return;
-  if (i == prime) {
+  if (i == pccoeff::characteristic) {
     set_si(tempc[0], c);
     inv(tempc[1], tempc[0]);
     r.addmul(tempc[1], s[i]);
@@ -72,16 +71,20 @@ static void frobenius_brackets(hollowcvec &r, const pcpresentation &pc, hollowcv
 }
 
 // the p-power mapping, in restricted algebras
-void hollowcvec::frobenius(const pcpresentation &pc, const hollowcvec v) {
+void hollowpcvec::frobenius(const pcpresentation &pc, const hollowpcvec v) {
+  if (pccoeff::characteristic == 0)
+    abortprintf(3, "frobenius p-mapping can only be called in positive characteristic");
+
   for (const auto &kc : v)
     addmul(kc.second, pc.Power[kc.first]); // formally, add kc.second^p * ...
 
-  hollowcvec z[prime+1];
-  for (unsigned i = 0; i <= prime; i++)
+  hollowpcvec z[pccoeff::characteristic+1];
+  for (unsigned i = 0; i <= pccoeff::characteristic; i++)
     z[i] = vecstack.fresh();
+
   z[1].copy(v);
 
-  coeff c[2];
+  pccoeff c[2];
   c[0].init();
   c[1].init();
   
@@ -96,12 +99,11 @@ void hollowcvec::frobenius(const pcpresentation &pc, const hollowcvec v) {
 
   c[1].clear();
   c[0].clear();
-  for (int i = prime; i >= 0; i--)
+  for (int i = pccoeff::characteristic; i >= 0; i--)
     vecstack.release(z[i]);
 }
-#endif
 
-void hollowcvec::liecollect(const pcpresentation &pc) {
+void hollowpcvec::liecollect(const pcpresentation &pc) {
   if (pc.Jennings) {
     /* special case: here there is no torsion, but the pc.Power field is
        used for the p-mapping */
@@ -111,7 +113,7 @@ void hollowcvec::liecollect(const pcpresentation &pc) {
     return;
   }
   
-  coeff q;
+  pccoeff q;
   q.init();
   
   for (const auto &kc : *this)
@@ -127,7 +129,7 @@ void hollowcvec::liecollect(const pcpresentation &pc) {
 /****************************************************************
  * a simple stack for the collector
  */
-typedef T_stack<coeff> stack;
+typedef T_stack<pccoeff> stack;
 stack collectstack;
 
 /****************************************************************
@@ -146,7 +148,7 @@ const unsigned TOP_POW = -1;
 constexpr conjdict_entry top_conj_entry(gen g) {
   return {.g = g, .two_pow = TOP_POW, .p_pow = TOP_POW};
 }
-typedef std::unordered_map<conjdict_entry,sparsecvec> conjdict_map;
+typedef std::unordered_map<conjdict_entry,sparsepcvec> conjdict_map;
 
 template<> struct std::hash<conjdict_entry> {
   size_t operator()(const conjdict_entry &key) const {
@@ -160,25 +162,21 @@ template<> struct std::equal_to<conjdict_entry> {
   }   
 };
 
-#ifdef prime
-#define pow_base prime
-#else
-#define pow_base 2
-#endif
+const uint64_t pow_base = pccoeff::characteristic ? pccoeff::characteristic : 2;
 
 // the following functions compute g^(h^c) using cache. assume g > h.
 
 // return k.g^(h^(2^k.two_pow p^p_pow)), computing it if needed, and put it in the cache.
-static sparsecvec conj_lookup(const pcpresentation &pc, gen h, const coeff &c, const conjdict_entry &k, conjdict_map &conjdict) {
+static sparsepcvec conj_lookup(const pcpresentation &pc, gen h, const pccoeff &c, const conjdict_entry &k, conjdict_map &conjdict) {
   auto f = conjdict.find(k);
   if (f != conjdict.end())
     return f->second;
 
   // OK, so it's not yet in the table. Let's fill it in.
-  hollowcvec v = vecstack.fresh();
+  hollowpcvec v = vecstack.fresh();
 
   if (k.two_pow == TOP_POW && k.p_pow == TOP_POW) { // return g^(h^|c|)
-    coeff d;
+    pccoeff d;
     d.init();
     if (cmp_si(c, 0) < 0)
       neg(d, c);
@@ -190,7 +188,7 @@ static sparsecvec conj_lookup(const pcpresentation &pc, gen h, const coeff &c, c
       unsigned long r = fdiv_q_ui(d, d, pow_base);
       for (unsigned l = 0; r != 0; l++, r >>= 1)
 	if (r & 1) {
-	  hollowcvec x = vecstack.fresh();
+	  hollowpcvec x = vecstack.fresh();
 	  for (const auto &kc : v)
 	    x.pow(pc, conj_lookup(pc, h, c, {.g = kc.first, .two_pow = l, .p_pow = k}, conjdict), kc.second);
 	  v.copy(x);
@@ -208,7 +206,7 @@ static sparsecvec conj_lookup(const pcpresentation &pc, gen h, const coeff &c, c
     unsigned long p = pow_base;
     for (unsigned l = 0; p != 0; l++, p >>= 1)
       if (p & 1) {
-	hollowcvec x = vecstack.fresh();
+	hollowpcvec x = vecstack.fresh();
 	for (const auto &kc : v)
 	  x.pow(pc, conj_lookup(pc, h, c, {.g = kc.first, .two_pow = l, .p_pow = k.p_pow-1}, conjdict), kc.second);
 	v.copy(x);
@@ -220,7 +218,7 @@ static sparsecvec conj_lookup(const pcpresentation &pc, gen h, const coeff &c, c
     set_si(v[k.g], 1);
   }
 
-  sparsecvec &result = conjdict[k];
+  sparsepcvec &result = conjdict[k];
   result.alloc(v.size());
   result.copy(v);
   vecstack.release(v);
@@ -229,8 +227,8 @@ static sparsecvec conj_lookup(const pcpresentation &pc, gen h, const coeff &c, c
 
 // this is the main function, computing g^(h^c), returned in a fresh vector.
 // we can assume that, throughout a run, h and c remain constant.
-hollowcvec Conjugate(const pcpresentation &pc, gen g, gen h, const coeff *c, conjdict_map &conjdict) {
-  hollowcvec v = vecstack.fresh();
+hollowpcvec Conjugate(const pcpresentation &pc, gen g, gen h, const pccoeff *c, conjdict_map &conjdict) {
+  hollowpcvec v = vecstack.fresh();
 
   if (c == nullptr) { // speedup, c==nullptr means "1"
     if (pc.Generator[g].w < pc.Class)
@@ -248,7 +246,7 @@ hollowcvec Conjugate(const pcpresentation &pc, gen g, gen h, const coeff *c, con
        g_i^x, performing the same operation on v with a g_i.  In the
        end, w = g and v = g^(x^-1).
     */
-    hollowcvec w = vecstack.fresh();
+    hollowpcvec w = vecstack.fresh();
     w.copy(conj_lookup(pc, h, *c, top_conj_entry(g), conjdict));
     set_si(v[g], 1);
 
@@ -263,17 +261,17 @@ hollowcvec Conjugate(const pcpresentation &pc, gen g, gen h, const coeff *c, con
   }
 
   if (Debug >= 3) {
-    fprintf(LogFile, "Conjugate: a%d^(a%d^" PRIcoeff ") = " PRIhollowcvec "\n", g, h, c, &v);
+    fprintf(LogFile, "Conjugate: a%d^(a%d^" PRIpccoeff ") = " PRIhollowpcvec "\n", g, h, c, &v);
   }
   return v;
 }
 
 // for speedups, we allow c to be nullptr, which means really "1"
-void hollowcvec::collect(const pcpresentation &pc, gen g, const coeff *c) {
+void hollowpcvec::collect(const pcpresentation &pc, gen g, const pccoeff *c) {
   if (Debug >= 3) {
-    fprintf(LogFile, "[collect (" PRIhollowcvec ") * a%d", this, g);
+    fprintf(LogFile, "[collect (" PRIhollowpcvec ") * a%d", this, g);
     if (c != nullptr)
-      fprintf(LogFile, "^" PRIcoeff, c);
+      fprintf(LogFile, "^" PRIpccoeff, c);
   }
     
   bool reducecomm = false;
@@ -294,7 +292,7 @@ void hollowcvec::collect(const pcpresentation &pc, gen g, const coeff *c) {
 
   if (reducecomm || reducepower) {
     // find the generators that we have to skip over, put them in storage
-    hollowcvec storage = vecstack.fresh(); // @@@ could be faster with sparsecvec
+    hollowpcvec storage = vecstack.fresh(); // @@@ could be faster with sparsepcvec
 
     for (auto p = lastnoncommuting; p != end() && p->first > g; p--) {
       set(storage[p->first], p->second);
@@ -315,7 +313,7 @@ void hollowcvec::collect(const pcpresentation &pc, gen g, const coeff *c) {
 	if (pc.Comm[kc.first][g].empty())
 	  mul(pc, kc.first, kc.second);
 	else {
-	  hollowcvec conj = Conjugate(pc, kc.first, g, c, conjdict);
+	  hollowpcvec conj = Conjugate(pc, kc.first, g, c, conjdict);
 	  pow(pc, conj, kc.second);
 	  vecstack.release(conj);
 	}
@@ -329,22 +327,22 @@ void hollowcvec::collect(const pcpresentation &pc, gen g, const coeff *c) {
   }
 
   if (Debug >= 3) {
-    fprintf(LogFile, " = " PRIhollowcvec "]\n", this);
+    fprintf(LogFile, " = " PRIhollowpcvec "]\n", this);
   }
 }
 
 #if 0
 // a simple collector, for debugging; also written recursively.
 struct simplestackslot {
-  sparsecvec v;
+  sparsepcvec v;
   int e;
 };
 
-void SimpleCollect(const pcpresentation &pc, hollowcvec &lhs, const sparsecvec &rhs, int e) {
+void SimpleCollect(const pcpresentation &pc, hollowpcvec &lhs, const sparsepcvec &rhs, int e) {
   if (e < 0) {
-    hollowcvec i = vecstack.fresh();
+    hollowpcvec i = vecstack.fresh();
     i.div(pc, rhs);
-    sparsecvec s = i.getsparse();
+    sparsepcvec s = i.getsparse();
     vecstack.release(i);
     SimpleCollect(pc, lhs, s, -e);
     s.free();
@@ -391,7 +389,7 @@ void SimpleCollect(const pcpresentation &pc, hollowcvec &lhs, const sparsecvec &
 	  }
 	add_si(lhs[kc.first], lhs[kc.first], deltae);
 	if (!reduced_p(lhs[kc.first], pc.Exponent[kc.first])) {
-	  coeff q;
+	  pccoeff q;
 	  q.init();
 	  fdiv_qr(q, lhs[kc.first], lhs[kc.first], pc.Exponent[kc.first]);
 	  simplestackslot s;
@@ -412,7 +410,7 @@ void SimpleCollect(const pcpresentation &pc, hollowcvec &lhs, const sparsecvec &
 #endif
 
 // this *= v^-1*w. makes v=w in the process.
-void hollowcvec::lquo(const pcpresentation &pc, hollowcvec v, const hollowcvec w) {
+void hollowpcvec::lquo(const pcpresentation &pc, hollowpcvec v, const hollowpcvec w) {
   /* we seek u with v u = w.
      say v = g^c * v', w = g^d * w'; then u = g^e * u' with e == d-c, and
      w = vu = v g^e u'; so we seek u' with (v g^e) u' = w, knowing that
@@ -421,11 +419,11 @@ void hollowcvec::lquo(const pcpresentation &pc, hollowcvec v, const hollowcvec w
   
   auto pv = v.begin();
   auto pw = w.begin();
-  coeff c;
+  pccoeff c;
   c.init();
 
   for (;;) {
-    gen g = LASTGEN;
+    gen g = -1u; // beyond last generator
     bool minatv, minatw;
     if ((minatv = (pv != v.end()))) g = pv->first;
     if ((minatw = (pw != w.end()))) {
@@ -451,15 +449,15 @@ void hollowcvec::lquo(const pcpresentation &pc, hollowcvec v, const hollowcvec w
 }
 
 // this *= v^-1.
-template <typename V> void hollowcvec::div(const pcpresentation &pc, const V v) {
+template <typename V> void hollowpcvec::div(const pcpresentation &pc, const V v) {
   /* we seek u with v u = 1.
      say v = g^c * v'; then u = g^d * u' with d == -c, and we have
      1 = vu = v g^d u'; so we seek u' with (v g^d) u' = 1, knowing that
      (v g^d) starts with a monomial >g.
   */
-  coeff c;
+  pccoeff c;
   c.init();
-  hollowcvec w = vecstack.fresh();
+  hollowpcvec w = vecstack.fresh();
   w.copy(v);
   
   for (const auto &kc : w) {
@@ -475,13 +473,13 @@ template <typename V> void hollowcvec::div(const pcpresentation &pc, const V v) 
 }
 
 // this *= v^c
-template <typename V> void hollowcvec::pow(const pcpresentation &pc, const V v, const coeff &c) {
+template <typename V> void hollowpcvec::pow(const pcpresentation &pc, const V v, const pccoeff &c) {
   if (z_p(c)) // easy peasy
     return;
   
-  coeff d;
+  pccoeff d;
   d.init();
-  hollowcvec x = vecstack.fresh();
+  hollowpcvec x = vecstack.fresh();
 
   if (sgn(c) < 0) {
     ::neg(d, c);
@@ -494,7 +492,7 @@ template <typename V> void hollowcvec::pow(const pcpresentation &pc, const V v, 
   bool next_nonzero = true;
   while (next_nonzero) {
     unsigned long r = fdiv_q_ui(d, d, pow_base), l = 1;
-    hollowcvec w = vecstack.fresh();
+    hollowpcvec w = vecstack.fresh();
     next_nonzero = nz_p(d);
     for (;;) {
       // throughout this loop, l is a power of 2; x = v^(p^i*l); and
@@ -507,7 +505,7 @@ template <typename V> void hollowcvec::pow(const pcpresentation &pc, const V v, 
       if (l > pow_base)
 	break;
       if (next_nonzero) {
-	hollowcvec y = vecstack.fresh();
+	hollowpcvec y = vecstack.fresh();
 	y.copy(x);
 	x.mul(pc, y); // we can't multiply directly with x, operands must be !=
 	vecstack.release(y);
@@ -522,12 +520,12 @@ template <typename V> void hollowcvec::pow(const pcpresentation &pc, const V v, 
 }
 
 /* evaluate relator, given as tree */
-void hollowcvec::eval(const pcpresentation &pc, node *rel) {
+void hollowpcvec::eval(const pcpresentation &pc, node *rel) {
   switch (rel->type) {
   case TSUM:
     {
       eval(pc, rel->l);
-      hollowcvec t = vecstack.fresh();
+      hollowpcvec t = vecstack.fresh();
       t.eval(pc, rel->r);
       add(t);
       vecstack.release(t);
@@ -536,10 +534,10 @@ void hollowcvec::eval(const pcpresentation &pc, node *rel) {
   case TPROD:
     if (rel->l->type == TNUM) {
       eval(pc, rel->r);
-      mul(rel->l->n);
+      scale(rel->l->n);
     } else {
       eval(pc, rel->l);
-      hollowcvec t = vecstack.fresh();
+      hollowpcvec t = vecstack.fresh();
       t.eval(pc, rel->r);
       mul(pc, t);
       vecstack.release(t);
@@ -548,7 +546,7 @@ void hollowcvec::eval(const pcpresentation &pc, node *rel) {
   case TQUO:
     {
       eval(pc, rel->l);
-      hollowcvec t = vecstack.fresh();
+      hollowpcvec t = vecstack.fresh();
       t.eval(pc, rel->r);
       div(pc, t);
       vecstack.release(t);
@@ -556,8 +554,8 @@ void hollowcvec::eval(const pcpresentation &pc, node *rel) {
     break;
   case TLQUO:
     {
-      hollowcvec t = vecstack.fresh();
-      hollowcvec u = vecstack.fresh();
+      hollowpcvec t = vecstack.fresh();
+      hollowpcvec u = vecstack.fresh();
       t.eval(pc, rel->l);
       u.eval(pc, rel->r);
       lquo(pc, t, u);
@@ -567,14 +565,14 @@ void hollowcvec::eval(const pcpresentation &pc, node *rel) {
     break;
   case TBRACK:
     {
-      hollowcvec t = vecstack.fresh();
-      hollowcvec u = vecstack.fresh();
+      hollowpcvec t = vecstack.fresh();
+      hollowpcvec u = vecstack.fresh();
       t.eval(pc, rel->l);
       u.eval(pc, rel->r);
 #ifdef LIEALG
       liebracket(pc, t, u);
 #else
-      hollowcvec v = vecstack.fresh();
+      hollowpcvec v = vecstack.fresh();
       v.copy(t);
       v.mul(pc, u); // v = t*u
       u.mul(pc, t); // u = u*t
@@ -594,26 +592,24 @@ void hollowcvec::eval(const pcpresentation &pc, node *rel) {
     break;
   case TINV:
     {
-      hollowcvec t = vecstack.fresh();
+      hollowpcvec t = vecstack.fresh();
       t.eval(pc, rel->u);
       div(pc, t);
       vecstack.release(t);
     }
     break;
-#ifdef prime
   case TFROB:
     {
-      hollowcvec t = vecstack.fresh();
+      hollowpcvec t = vecstack.fresh();
       t.eval(pc, rel->u);
       frobenius(pc, t);
       vecstack.release(t);
     }
     break;
-#endif
   case TDIFF:
     {
       eval(pc, rel->l);
-      hollowcvec t = vecstack.fresh();
+      hollowpcvec t = vecstack.fresh();
       t.eval(pc, rel->r);
       sub(t);
       vecstack.release(t);
@@ -621,13 +617,13 @@ void hollowcvec::eval(const pcpresentation &pc, node *rel) {
     break;
   case TPOW:
     if (rel->r->type == TNUM) {
-      hollowcvec t = vecstack.fresh();
+      hollowpcvec t = vecstack.fresh();
       t.eval(pc, rel->l);
       pow(pc, t, rel->r->n);
       vecstack.release(t);
     } else {
-      hollowcvec t = vecstack.fresh();
-      hollowcvec u = vecstack.fresh();
+      hollowpcvec t = vecstack.fresh();
+      hollowpcvec u = vecstack.fresh();
       t.eval(pc, rel->l);
       u.eval(pc, rel->r);
       t.mul(pc, u);

@@ -19,7 +19,7 @@ public:
     return s;
   }
 
-  inline size_t hash() const { return data; }
+  inline size_t hashkey() const { return data; }
 
   inline bool nz_p() const { return data != 0; }
 
@@ -221,6 +221,9 @@ public:
   }
 
   template<unsigned L> inline void map(const __local2_small<L> &a) {
-    data = a.data & COEFF_MASK;
+    if (K == L)
+      data = a.data;
+    else
+      data = a.data & COEFF_MASK;
   }  
 };

@@ -11,7 +11,7 @@ public:
 
   inline void clear() { mpz_clear(data); }
 
-  size_t hash() const {
+  size_t hashkey() const {
     size_t seed = data->_mp_size;
     for (unsigned i = 0; i < abs(data->_mp_size); i++)
       seed ^= data->_mp_d[i] + 0x9e3779b9 + (seed << 6) + (seed >> 2);
