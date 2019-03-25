@@ -11,7 +11,7 @@ OPT = -march=native -O0 #-Ofast
 DEBUG = -g -fsanitize=address 
 CFLAGS = -Wall -Werror -I$(TRIO) $(DEBUG) $(OPT)
 CXXFLAGS = -std=c++11 $(CFLAGS)
-LDFLAGS = $(DEBUG) -L$(TRIO) -lcolamd -lgmp -ltrio -Wl,-no_pie
+LDFLAGS = $(DEBUG) -L$(TRIO) -lcolamd -lgmp -ltrio -Wl,-no_pie $(LDEXTRA)
 
 CXX=g++
 CC=$(CXX)
@@ -49,12 +49,12 @@ viewcoverage:
 	llvm-profdata merge -o default.profdata default.profraw
 	llvm-cov show ./nql_long -instr-profile=default.profdata $(NAME)
 
-profile: clean
-	$(MAKE) CXX=g++ DEBUG="-g" OPT="-Ofast" LDFLAGS+="-lprofiler" nqg_2_64
+profile:
+	$(MAKE) -B CXX=g++ DEBUG="-g" OPT="-Ofast" LDEXTRA="-lprofiler" nqg_2_2
 
 runprofile:
-	CPUPROFILE=nqg_2_64.prof CPUPROFILE_FREQUENCY=10000 ./nqg_2_64 -W40 p/gg
-	pprof --pdf --nodecount=20 ./nqg_2_64 ./nqg_2_64.prof > profile.pdf
+	CPUPROFILE=nqg_2_2.prof CPUPROFILE_FREQUENCY=10000 ./nqg_2_2 -W40 p/gg
+	pprof --pdf --nodecount=20 ./nqg_2_2 ./nqg_2_2.prof > profile.pdf
 
 clean:
 	rm -fr *.o *.gc?? nq[lg]_[0-9]*_[0-9]* nq[lg]_mpz nq[lg]_long nq[lg]_z *.dSYM
@@ -99,10 +99,25 @@ nqg_2_64: $(subst .o,g_2_64.o,$(NQ_OBJ))
 %g_2_64.o: %.cc $(NQ_INCL)
 	$(CXX) -c -DPCCOEFF_P=2 -DPCCOEFF_K=64 -DMATCOEFF_P=2 -DMATCOEFF_K=64 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
 
-nqg_2_2: $(subst .o,g_2_2.o,$(NQ_OBJ))
+nql_2_1: $(subst .o,l_2_1.o,$(NQ_OBJ))
 
-%g_2_2.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DPCCOEFF_P=2 -DPCCOEFF_K=64 -DMATCOEFF_P=2 -DMATCOEFF_K=1 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
+%l_2_1.o: %.cc $(NQ_INCL)
+	$(CXX) -c -DPCCOEFF_P=2 -DPCCOEFF_K=1 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
+
+nqg_2_1: $(subst .o,g_2_1.o,$(NQ_OBJ))
+
+%g_2_1.o: %.cc $(NQ_INCL)
+	$(CXX) -c -DPCCOEFF_P=2 -DPCCOEFF_K=64 -DMATCOEFF_K=1 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
+
+nql_3_1: $(subst .o,l_3_1.o,$(NQ_OBJ))
+
+%l_3_1.o: %.cc $(NQ_INCL)
+	$(CXX) -c -DPCCOEFF_P=3 -DPCCOEFF_K=1 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
+
+nqg_3_1: $(subst .o,g_3_1.o,$(NQ_OBJ))
+
+%g_3_1.o: %.cc $(NQ_INCL)
+	$(CXX) -c -DPCCOEFF_P=3 -DPCCOEFF_K=40 -DMATCOEFF_K=1 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
 
 test: test.cc
 

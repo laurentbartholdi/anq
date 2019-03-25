@@ -82,10 +82,10 @@ void TimeStamp(const char *);
 #define PCCOEFF_K 1
 #endif
 #ifndef MATCOEFF_P
-#define MATCOEFF_P 0
+#define MATCOEFF_P PCCOEFF_P
 #endif
 #ifndef MATCOEFF_K
-#define MATCOEFF_K 1
+#define MATCOEFF_K PCCOEFF_K
 #endif
 
 #if PCCOEFF_P > 0 && (MATCOEFF_P != PCCOEFF_P || MATCOEFF_K > PCCOEFF_K)
@@ -163,10 +163,10 @@ class matrix {
   ~matrix();
   void queuerow(const hollowpcvec);
   bool addrow(hollowpcvec);
-  hollowmatvec reducerow(const sparsepcvec &) const;
+  sparsepcvec reducerow(const sparsepcvec &) const;
   void flushqueue();
   void hermite();
-  void getrel(pccoeff &, sparsepcvec &, gen) const;
+  sparsepcvec getrel(pccoeff &, gen) const;
 };
 
 /****************************************************************
@@ -281,7 +281,14 @@ struct pcpresentation {
     NrPcGens; // number of ai in current consistent pc presentation
   std::vector<unsigned> LastGen; // last generator number of given weight
   bool Graded; // is it a graded Lie algebra?
-  bool Jennings; // is the algebra restricted/the Jennings series?
+#ifdef LIEALG
+  bool Jacobson; // is the algebra restricted?
+  const bool Jennings = false;
+#else
+  const bool Jacobson = false;
+  bool Jennings; // do we compute the Jennings series?
+#endif
+  bool TorsionFree; // do we kill torsion in the centre?
   bool Metabelian; // is the algebra/group metabelian?
   unsigned NilpotencyClass; // commutators of longer length must die
   
@@ -319,6 +326,7 @@ struct hollowpcvec : hollowvec<pccoeff> {
   // functions for Lie algebras
   void liebracket(const pcpresentation &, const hollowpcvec, const hollowpcvec); // this += [v,w]
   void lie3bracket(const pcpresentation &, gen, gen, gen, bool); // this (+/-)= [[v,w],x]
+  void engel(const pcpresentation &, gen, gen, unsigned, bool); // this (+/-)= [u,v...,v]
   void frobenius(const pcpresentation &, const hollowpcvec);
   void liecollect(const pcpresentation &);
 

@@ -45,8 +45,8 @@ matrix::~matrix() {
   rows.clear();
 }
 
-// put v in normal form by subtracting rows of Matrix
-hollowmatvec matrix::reducerow(const sparsepcvec &v) const {
+// put v in normal form by subtracting rows of Matrix, return in fresh vector
+sparsepcvec matrix::reducerow(const sparsepcvec &v) const {
   matcoeff q;
   q.init();
   hollowmatvec hv = rowstack.fresh();
@@ -58,14 +58,26 @@ hollowmatvec matrix::reducerow(const sparsepcvec &v) const {
     unsigned row = kc.first;
       
     if (rows[row].allocated() && !reduced_p(kc.second, rows[row][0].second)) { // found a pivot
-	fdiv_q(q, kc.second, rows[row][0].second);
-	hv.submul(q, rows[row]);
+      shdiv_q(q, kc.second, rows[row][0].second);
+      hv.submul(q, rows[row]);
     }
   }
+
+  sparsepcvec r;
+  r.alloc(hv.size());
+
+  auto ri = r.begin();
+  for (const auto &kc : hv) {
+    ri->first = kc.first+shift;
+    map(ri->second, kc.second);
+    ri++;
+  }    
+  ri.markend();
+
   rowstack.release(hv);
   q.clear();
 
-  return hv; // hv is still alive, just top of the stack
+  return r;
 }
 
 // try to add currow to the row space spanned by rows.
@@ -96,7 +108,7 @@ bool matrix::add1row(hollowmatvec currow) {
     } else { /* two rows with same pivot. Merge them */
       gcdext(d, a, b, kc.second, rows[row][0].second); /* d = a*v[head]+b*rows[row][head] */
       if (!cmp(d, rows[row][0].second)) { /* likely case: rows[row][head]=d, b=1, a=0. We're just reducing currow. */
-	divexact(d, kc.second, d);
+	shdivexact(d, kc.second, d);
 	currow.submul(d, rows[row]);
 #ifdef IS_MPZ // check coefficient explosion
 	if (Debug >= 1) {
@@ -108,8 +120,8 @@ bool matrix::add1row(hollowmatvec currow) {
 #endif
       } else {
 	belongs = false;
-	divexact(c, kc.second, d);
-	divexact(d, rows[row][0].second, d);
+	shdivexact(c, kc.second, d);
+	shdivexact(d, rows[row][0].second, d);
 	hollowmatvec vab = rowstack.fresh();
 	vab.addmul(a, currow);
 	vab.addmul(b, rows[row]);
@@ -254,7 +266,7 @@ void matrix::hermite() {
   /* reduce all the head columns, to achieve Hermite normal form. */
   matcoeff q;
   q.init();
-  for (unsigned j = 0; j < nrcols; j++) { // @@@ performance: would this be faster looping backwards?
+  for (int j = nrcols-1; j >= 0; j--) {
     if (!rows[j].allocated())
       continue;
 
@@ -268,10 +280,30 @@ void matrix::hermite() {
 	continue;
 
       if (!reduced_p(kc.second, rows[row][0].second)) {
-	fdiv_q(q, kc.second, rows[row][0].second);
+	shdiv_q(q, kc.second, rows[row][0].second);
 	currow.submul(q, rows[row]);
       }
     }
+
+    if (torsionfree) { // furthermore, divide by gcd of row entries
+      matcoeff gcd, a, b;
+      gcd.init();
+      a.init();
+      b.init();
+      gcd.set_si(0);
+      for (const auto &kc : currow) {
+	gcdext(gcd, a, b, kc.second, gcd);
+	if (!gcd.cmp_si(1))
+	  goto stop;
+      }
+      for (const auto &kc : currow)
+	shdivexact(kc.second, kc.second, gcd);
+    stop:
+      b.clear();
+      a.clear();
+      gcd.clear();
+    }
+    
     rows[j] = currow.getsparse();
     rowstack.release(currow);
   }
@@ -288,10 +320,12 @@ void matrix::hermite() {
 }
 
 // return relator
-void matrix::getrel(pccoeff &c, sparsepcvec &v, gen g) const {
+sparsepcvec matrix::getrel(pccoeff &c, gen g) const {
   const auto row = rows[g-shift];
   matcoeff q;
   q.init();
+  sparsepcvec v;
+  
   if (row.allocated()) {
     v.alloc(row.size()-1);
     auto vi = v.begin();
@@ -309,6 +343,7 @@ void matrix::getrel(pccoeff &c, sparsepcvec &v, gen g) const {
     c.kernel<matcoeff>();
   }
   q.clear();
+  return v;
 }
 
 /* tries to add a row to the queue; returns true if the row was added.
@@ -323,7 +358,7 @@ void matrix::queuerow(const hollowpcvec hv) {
     auto i = cv.begin();
     for (const auto &kc : hv) {
       i->second.map(kc.second);
-      if (i->first < shift) // sanity check
+      if (kc.first < shift) // sanity check
 	abortprintf(5, "matrix::queuerow: vector has a term a%d of too low index", cv[0].first);
       i->first = kc.first-shift;
       i++;

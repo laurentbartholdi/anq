@@ -1,12 +1,10 @@
-* add restricted Lie algebras, with ^p operation
+* complete test suite, using code coverage:
+  - test suite for vectors, esp. performance compared to std::vector
+  - test suite for Lie algebras and groups, based on examples in p/
 
-* separate coeff's used for fp presentation, pc presentation and matrix. Have operator "map" to convert between types, and "kernel" as substitute for TorsionExp
-
-* complete test suite, using code coverage
+* Allow much more complicated coefficients: rationals, real, complex, non-prime finite fields/rings
 
 * Finish z.h fastint arithmetic (localint<-1U>).
-
-* Implement rationals (mpq or double) for torsion-free part
 
 * Improve matrix code:
   -  make matrix a class with cleaner interface, so one can substitute linbox or other fast implementation
@@ -15,8 +13,9 @@
   - avoid coefficient explosion,
   - use finite fields,
   - (in local rings) permute basis to get rid of redundant generators
+  - use mpq or double coefficients for torsion-free mode
 
-* Make LieNQ a library: accept calls to
+* Make nq a library: accept calls to
   - NewLiePresentation
   - ProductNode, SumNode etc. to create relators
   - AddGen(lpres, string)

@@ -451,6 +451,7 @@ public:
     if (p == nullptr)
       throw std::runtime_error("couldn't malloc() hollow vector");
     p += 2; // we store the head and tail at position -1, and the topbit at position -2
+    memset(p, 0, (msb<<1)*sizeof(slot)); // useless, shut up valgrind
 
     topbit() = msb;
     p[nil].prev = p[nil].next = nil;
@@ -479,8 +480,11 @@ public:
       return;
     if (msb < oldtopbit) {
       // make sure that the part between msb and topbit() is empty
-      if (p[nil].prev >= (signed) msb<<1)
-	throw std::runtime_error("resize() attempted on hollow vector containing entries beyond new limit");
+      while (p[nil].prev >= (signed) msb<<1) {
+	if (p[p[nil].prev].data.nz_p())
+	  throw std::runtime_error("resize() attempted on hollow vector containing entries beyond new limit");
+	erase(p[nil].prev);
+      }
       for (key k = msb<<1; k < oldtopbit<<1; k++)
 	p[k].data.clear();
     }
@@ -489,6 +493,8 @@ public:
       throw std::runtime_error("couldn't realloc() hollow vector");
     p += 2;
     if (msb > oldtopbit) {
+      memset(p + (oldtopbit<<1), 0, ((msb<<1)-(oldtopbit<<1))*sizeof(slot)); // useless, shut up valgrind
+      
       for (key k = oldtopbit<<1; k < msb<<1; k++) {
 	p[k].set = p[k].herd = 0;
 	p[k].data.init();

@@ -53,6 +53,35 @@ void hollowpcvec::lie3bracket(const pcpresentation &pc, gen a, gen b, gen c, boo
   }
 }
 
+// add/subtract [a,b,...,b] repeated n times. sign == add, ~sign == subtract.
+void hollowpcvec::engel(const pcpresentation &pc, gen a, gen b, unsigned n, bool sign) {
+  hollowpcvec u[2];
+  u[0] = vecstack.fresh();
+  u[1] = vecstack.fresh();
+  bool index = 0;
+  set_si(u[index][a], 1);
+  while (n--) {
+    // u[!index] = [u[index],b]
+    index = !index;
+    u[index].clear();
+    for (const auto &kc : u[!index]) {
+      gen g = kc.first;
+      if (g > pc.NrPcGens)
+	break;
+      if (g > a)
+	u[index].addmul(kc.second, pc.Comm[g][a]);
+      else if (g < a)
+	u[index].submul(kc.second, pc.Comm[a][g]);
+    }
+  }
+  if (sign)
+    add(u[index]);
+  else
+    sub(u[index]);
+  vecstack.release(u[1]);
+  vecstack.release(u[0]);
+}
+
 static void frobenius_brackets(hollowpcvec &r, const pcpresentation &pc, hollowpcvec s[pccoeff::characteristic+1], pccoeff tempc[2], int c, unsigned i) {
   if (s[i].empty())
     return;
@@ -104,12 +133,15 @@ void hollowpcvec::frobenius(const pcpresentation &pc, const hollowpcvec v) {
 }
 
 void hollowpcvec::liecollect(const pcpresentation &pc) {
-  if (pc.Jennings) {
+  if (pc.Jacobson) {
     /* special case: here there is no torsion, but the pc.Power field is
-       used for the p-mapping */
+       used for the p-mapping.
+
+       In fact, we should probably not do anything, if the
+       coefficients are the prime field. */
     for (const auto &kc : *this)
       if (!reduced_p(kc.second, pc.Exponent[kc.first]))
-	fdiv_r((*this)[kc.first], kc.second, pc.Exponent[kc.first]);
+	shdiv_r((*this)[kc.first], kc.second, pc.Exponent[kc.first]);
     return;
   }
   
@@ -118,7 +150,7 @@ void hollowpcvec::liecollect(const pcpresentation &pc) {
   
   for (const auto &kc : *this)
     if (!reduced_p(kc.second, pc.Exponent[kc.first])) {
-      fdiv_qr(q, (*this)[kc.first], kc.second, pc.Exponent[kc.first]);
+      shdiv_qr(q, (*this)[kc.first], kc.second, pc.Exponent[kc.first]);
       addmul(q, pc.Power[kc.first]);
     }
   q.clear();
@@ -185,7 +217,7 @@ static sparsepcvec conj_lookup(const pcpresentation &pc, gen h, const pccoeff &c
 
     set_si(v[k.g], 1);
     for (unsigned k = 0; nz_p(d); k++) {
-      unsigned long r = fdiv_q_ui(d, d, pow_base);
+      unsigned long r = shdiv_q_ui(d, d, pow_base);
       for (unsigned l = 0; r != 0; l++, r >>= 1)
 	if (r & 1) {
 	  hollowpcvec x = vecstack.fresh();
@@ -391,7 +423,7 @@ void SimpleCollect(const pcpresentation &pc, hollowpcvec &lhs, const sparsepcvec
 	if (!reduced_p(lhs[kc.first], pc.Exponent[kc.first])) {
 	  pccoeff q;
 	  q.init();
-	  fdiv_qr(q, lhs[kc.first], lhs[kc.first], pc.Exponent[kc.first]);
+	  shdiv_qr(q, lhs[kc.first], lhs[kc.first], pc.Exponent[kc.first]);
 	  simplestackslot s;
 	  s.v.alloc(pc.Power[kc.first].size());
 	  s.v.copy(pc.Power[kc.first]);
@@ -491,7 +523,7 @@ template <typename V> void hollowpcvec::pow(const pcpresentation &pc, const V v,
 
   bool next_nonzero = true;
   while (next_nonzero) {
-    unsigned long r = fdiv_q_ui(d, d, pow_base), l = 1;
+    unsigned long r = shdiv_q_ui(d, d, pow_base), l = 1;
     hollowpcvec w = vecstack.fresh();
     next_nonzero = nz_p(d);
     for (;;) {

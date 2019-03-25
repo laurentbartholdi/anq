@@ -457,7 +457,7 @@ static void ValidateExpression(const node *n, gen g) {
   case TNUM:
     SyntaxError("Expected a %s expression, not a number", LIEGPSTRING);
   case TGEN:
-    if (n->g >= g)
+    if (n->g == 0 || n->g >= g) // generator 0 is for Frobenius map
       SyntaxError("Generator of rank <= %d expected, not %d", g, n->g);
     break;
 #ifdef LIEALG

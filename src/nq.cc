@@ -53,14 +53,18 @@ const char USAGE[] = "Usage: nq <options> [<inputfile>] [<maximal weight>]\n"
 #ifdef LIEALG
   "\t[-G]\tcompute graded Lie algebra, default false\n"
 #endif
-#ifdef LIEALG
+#if defined(LIEALG) && PCCOEFF_P > 0 && PCCOEFF_K == 1
   "\t[-J]\tcompute Jacobson-restricted Lie algebra, default false\n"
-#else
+#endif
+#if defined(GROUP) && PCCOEFF_P > 0
   "\t[-J]\tcompute quotient by Jennings series, default false\n"
 #endif
   "\t[-L <logfile>]\n"
   "\t[-M]\tcompute metabelian " LIEGPSTRING ", default false\n"
   "\t[-N <nilpotency class>]\n"
+#if PCCOEFF_P == 0
+    "\t[-T]\tforce successive quotients to be torsion-free, default false\n"
+#endif
   "\t[-P]\ttoggle printing definitions of basic commutators, default false\n"
   "\t[-W <maximal weight>] (can also appear as last argument)\n"
   "\t[-Z]\ttoggle printing zeros in multiplication table, default true";
@@ -126,7 +130,12 @@ char *utoa(char *s, unsigned n) {
 int main(int argc, char **argv) {
   int c;
   bool PrintZeros = true, PrintCompact = true, PrintDefs = false, PrintGap = false;
-  bool Graded = false, Metabelian = false, Jennings = false;
+  bool Graded = false, Metabelian = false, TorsionFree = false;
+#ifdef LIEALG
+  bool Jacobson = false;
+  #else
+  bool Jennings = false;
+#endif
   unsigned MaxWeight = -1u, NilpotencyClass = -1u;
   const char *InputFileName;
 
@@ -138,7 +147,7 @@ int main(int argc, char **argv) {
   auto handle_hollowpcvec = trio_register(cvec_print<hollowpcvec>, "h%p"); // hollowpcvecs can be printed as PRIhollowpcvec
 #endif
 
-  while ((c = getopt (argc, argv, "ACDF:GhJL:MN:PW:Z")) != -1)
+  while ((c = getopt (argc, argv, "ACDF:GhJL:MN:PTW:Z")) != -1)
     switch (c) {
     case 'A':
       PrintGap ^= true;
@@ -162,9 +171,21 @@ int main(int argc, char **argv) {
     case 'h':
       printf("%s\n\n%s", USAGE, EXTENDEDUSAGE);
       return 0;
+#if defined(LIEALG) && PCCOEFF_P > 0 && PCCOEFF_K == 1
+    case 'J':
+      Jacobson = true;
+      break;
+#endif
+#if defined(GROUP) && PCCOEFF_P > 0
     case 'J':
       Jennings = true;
       break;
+#endif
+#if PCCOEFF_P == 0
+    case 'T':
+      TorsionFree = true;
+      break;
+#endif
     case 'L':
       LogFile = fopen(optarg, "w");
       if (LogFile == NULL)
@@ -216,12 +237,15 @@ int main(int argc, char **argv) {
     char flags[1000] = "", nstring[20], mstring[20];
     if (Metabelian)
       strcat(flags, "metabelian, ");
-    if (Jennings)
 #ifdef LIEALG
+    if (Jacobson)
       strcat(flags, "Jacobson-restricted, ");
 #else
+    if (Jennings)
       strcat(flags, "Jennings, ");
 #endif
+    if (TorsionFree)
+      strcat(flags, "torsion-free, ");
     if (Graded)
       strcat(flags, "graded, ");
     if (strlen(flags))
@@ -231,7 +255,7 @@ int main(int argc, char **argv) {
     fprintf(LogFile, "# flags %s; nilpotency class %s; maximal weight %s\n\n", flags, utoa(nstring, NilpotencyClass), utoa(mstring, MaxWeight));
   }
   
-  fppresentation fppres(InputFileName, Jennings && fpcoeff::characteristic > 0);
+  fppresentation fppres(InputFileName, Jacobson);
     
 #ifdef MEMCHECK
   mtrace();
@@ -240,7 +264,12 @@ int main(int argc, char **argv) {
   pcpresentation pc(fppres);
   pc.Graded = Graded;
   pc.Metabelian = Metabelian;
+#ifdef LIEALG
+  pc.Jacobson = Jacobson;
+#else
   pc.Jennings = Jennings;
+#endif
+  pc.TorsionFree = TorsionFree;
   pc.NilpotencyClass = NilpotencyClass;
 
   for (pc.Class = 1; pc.Class <= MaxWeight; pc.Class++) {
@@ -249,8 +278,8 @@ int main(int argc, char **argv) {
     unsigned nrcentralgens = pc.addtails(); // add fresh tails
 
     {
-      matrix m(nrcentralgens, pc.NrPcGens+1, Jennings && matcoeff::characteristic == 0);
-
+      matrix m(nrcentralgens, pc.NrPcGens+1, TorsionFree);
+      
       pc.consistency(m); // enforce Jacobi and Z-linearity, via queue
 
       m.flushqueue();

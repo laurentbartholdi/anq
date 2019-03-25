@@ -309,6 +309,14 @@ template<uint64_t P, unsigned K> inline void fdiv_r(integer<P,K> &result, const 
 
 template<uint64_t P, unsigned K> inline uint64_t fdiv_q_ui(integer<P,K> &result, const integer<P,K> &a, int64_t b) { return result.fdiv_q_ui(a, b); }
 
+template<uint64_t P, unsigned K> inline void shdivexact(integer<P,K> &result, const integer<P,K> &a, const integer<P,K> &b) { result.shdivexact(a, b); }
+
+template<uint64_t P, unsigned K> inline void shdiv_q(integer<P,K> &result, const integer<P,K> &a, const integer<P,K> &b) { result.shdiv_q(a, b); }
+
+template<uint64_t P, unsigned K> inline void shdiv_r(integer<P,K> &result, const integer<P,K> &a, const integer<P,K> &b) { result.shdiv_r(a, b); }
+
+template<uint64_t P, unsigned K> inline uint64_t shdiv_q_ui(integer<P,K> &result, const integer<P,K> &a, int64_t b) { return result.shdiv_q_ui(a, b); }
+
 template<uint64_t P, unsigned K> inline void inv(integer<P,K> &result, const integer<P,K> &a) { result.inv(a); }
 
 template<uint64_t P, unsigned K> inline void mul(integer<P,K> &result, const integer<P,K> &a, const integer<P,K> &b) { result.mul(a, b); }
