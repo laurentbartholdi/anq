@@ -217,7 +217,7 @@ static sparsepcvec conj_lookup(const pcpresentation &pc, gen h, const pccoeff &c
 
     set_si(v[k.g], 1);
     for (unsigned k = 0; nz_p(d); k++) {
-      unsigned long r = shdiv_q_ui(d, d, pow_base);
+      uint64_t r = shdiv_q_ui(d, d, pow_base);
       for (unsigned l = 0; r != 0; l++, r >>= 1)
 	if (r & 1) {
 	  hollowpcvec x = vecstack.fresh();
@@ -235,7 +235,7 @@ static sparsepcvec conj_lookup(const pcpresentation &pc, gen h, const pccoeff &c
   } else if (k.p_pow > 0) { // return g^(h^(p^m))
     // conj[g,k+1,0] = g @ conj[g,k,0]^a0 @ ... @ conj[g,k,l]^al
     set_si(v[k.g], 1);
-    unsigned long p = pow_base;
+    uint64_t p = pow_base;
     for (unsigned l = 0; p != 0; l++, p >>= 1)
       if (p & 1) {
 	hollowpcvec x = vecstack.fresh();
@@ -292,7 +292,7 @@ hollowpcvec Conjugate(const pcpresentation &pc, gen g, gen h, const pccoeff *c, 
     vecstack.release(w);
   }
 
-  if (Debug >= 3) {
+  if (Debug >= 4) {
     fprintf(LogFile, "Conjugate: a%d^(a%d^" PRIpccoeff ") = " PRIhollowpcvec "\n", g, h, c, &v);
   }
   return v;
@@ -300,7 +300,7 @@ hollowpcvec Conjugate(const pcpresentation &pc, gen g, gen h, const pccoeff *c, 
 
 // for speedups, we allow c to be nullptr, which means really "1"
 void hollowpcvec::collect(const pcpresentation &pc, gen g, const pccoeff *c) {
-  if (Debug >= 3) {
+  if (Debug >= 4) {
     fprintf(LogFile, "[collect (" PRIhollowpcvec ") * a%d", this, g);
     if (c != nullptr)
       fprintf(LogFile, "^" PRIpccoeff, c);
@@ -358,7 +358,7 @@ void hollowpcvec::collect(const pcpresentation &pc, gen g, const pccoeff *c) {
     vecstack.release(storage);
   }
 
-  if (Debug >= 3) {
+  if (Debug >= 4) {
     fprintf(LogFile, " = " PRIhollowpcvec "]\n", this);
   }
 }
@@ -523,7 +523,7 @@ template <typename V> void hollowpcvec::pow(const pcpresentation &pc, const V v,
 
   bool next_nonzero = true;
   while (next_nonzero) {
-    unsigned long r = shdiv_q_ui(d, d, pow_base), l = 1;
+    uint64_t r = shdiv_q_ui(d, d, pow_base), l = 1;
     hollowpcvec w = vecstack.fresh();
     next_nonzero = nz_p(d);
     for (;;) {
@@ -536,7 +536,7 @@ template <typename V> void hollowpcvec::pow(const pcpresentation &pc, const V v,
       l <<= 1;
       if (l > pow_base)
 	break;
-      if (next_nonzero) {
+      if (next_nonzero || (r >= l)) {
 	hollowpcvec y = vecstack.fresh();
 	y.copy(x);
 	x.mul(pc, y); // we can't multiply directly with x, operands must be !=

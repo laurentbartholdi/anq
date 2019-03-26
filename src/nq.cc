@@ -135,6 +135,7 @@ int main(int argc, char **argv) {
   bool Jacobson = false;
   #else
   bool Jennings = false;
+  const bool Jacobson = false;
 #endif
   unsigned MaxWeight = -1u, NilpotencyClass = -1u;
   const char *InputFileName;

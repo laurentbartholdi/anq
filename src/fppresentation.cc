@@ -606,6 +606,12 @@ fppresentation::fppresentation(const char *InputFileName, bool ppower) {
     } else
       ValidateExpression(n, LASTGEN);
 
+    if (Debug >= 3) {
+      fprintf(LogFile, "# ");
+      printnode(LogFile, n);
+      fprintf(LogFile,"\n");
+    }
+
     switch (n->type) {
     case TDREL:
       Aliases.push_back(n);

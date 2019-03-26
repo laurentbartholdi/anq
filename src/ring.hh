@@ -18,6 +18,10 @@
 #include <string.h>
 #include <stdlib.h>
 
+#if GMP_LIMB_BITS != 64
+#error I only considered this code on 64-bit systems
+#endif
+
 template<uint64_t P, unsigned K> struct integer;
 template<unsigned K> class __ring0;
 template<unsigned P> class __local2_small;
@@ -51,32 +55,27 @@ template<unsigned K=1> struct __intglobal : __ring0<K> {
   }
     
   inline void shdivexact(const __intglobal &a, const __intglobal &b) {
-    shdiv_q(a, b);
+    this->divexact(a, b);
   }
 
   inline void shdiv_q(const __intglobal &a, const __intglobal &b) {
-    __intglobal r;
-    shdiv_qr(*this, r, a, b);
+    this->fdiv_q(a, b);
   }
 
   inline void shdiv_r(const __intglobal &a, const __intglobal &b) {
-    __intglobal q;
-    shdiv_qr(q, *this, a, b);
+    this->fdiv_r(a, b);
   }
 
   inline friend uint64_t shdiv_ui(const __intglobal &a, uint64_t b) {
-    __intglobal q, r;
-    return shdiv_qr_ui(q, r, a, b);
+    return fdiv_ui(a, b);
   }
 
   inline uint64_t shdiv_q_ui(const __intglobal &a, uint64_t b) {
-    __intglobal r;
-    return shdiv_qr_ui(*this, r, a, b);
+    return this->fdiv_q_ui(a, b);
   }
 
   inline uint64_t shdiv_r_ui(const __intglobal &a, uint64_t b) {
-    __intglobal q;
-    return shdiv_qr_ui(q, *this, a, b);
+    return this->fdiv_r_ui(a, b);
   }
 
   inline friend void shdiv_qr(__intglobal &q, __intglobal &r, const __intglobal &a, const __intglobal &b) {

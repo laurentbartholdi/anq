@@ -72,32 +72,42 @@ nqg: $(subst .o,g.o,$(NQ_OBJ))
 nql_64: $(subst .o,l_64.o,$(NQ_OBJ))
 
 %l_64.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DPCCOEFF_P=0 -DPCCOEFF_K=1 -DMATCOEFF_P=0 -DMATCOEFF_K=1 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
+	$(CXX) -c -DPCCOEFF_P=0 -DPCCOEFF_K=1 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
 
 nqg_64: $(subst .o,g_64.o,$(NQ_OBJ))
 
 %g_64.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DPCCOEFF_P=0 -DPCCOEFF_K=1 -DMATCOEFF_P=0 -DMATCOEFF_K=1 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
+	$(CXX) -c -DPCCOEFF_P=0 -DPCCOEFF_K=1 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
 
 nql_mpz: $(subst .o,l_mpz.o,$(NQ_OBJ))
 
 %l_mpz.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DPCCOEFF_P=0 -DPCCOEFF_K=0 -DMATCOEFF_P=0 -DMATCOEFF_K=0 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
+	$(CXX) -c -DPCCOEFF_P=0 -DPCCOEFF_K=0 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
 
 nqg_mpz: $(subst .o,g_mpz.o,$(NQ_OBJ))
 
 %g_mpz.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DPCCOEFF_P=0 -DPCCOEFF_K=0 -DMATCOEFF_P=0 -DMATCOEFF_K=0 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
+	$(CXX) -c -DPCCOEFF_P=0 -DPCCOEFF_K=0 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
+
+nqg_big: $(subst .o,g_big.o,$(NQ_OBJ))
+
+%g_big.o: %.cc $(NQ_INCL)
+	$(CXX) -c -DPCCOEFF_P=0 -DPCCOEFF_K=3 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
+
+nqg_65521: $(subst .o,g_65521.o,$(NQ_OBJ))
+
+%g_65521.o: %.cc $(NQ_INCL)
+	$(CXX) -c -DPCCOEFF_P=65521 -DPCCOEFF_K=1 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
 
 nql_2_64: $(subst .o,l_2_64.o,$(NQ_OBJ))
 
 %l_2_64.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DPCCOEFF_P=2 -DPCCOEFF_K=64 -DMATCOEFF_P=2 -DMATCOEFF_K=64 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
+	$(CXX) -c -DPCCOEFF_P=2 -DPCCOEFF_K=64 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
 
 nqg_2_64: $(subst .o,g_2_64.o,$(NQ_OBJ))
 
 %g_2_64.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DPCCOEFF_P=2 -DPCCOEFF_K=64 -DMATCOEFF_P=2 -DMATCOEFF_K=64 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
+	$(CXX) -c -DPCCOEFF_P=2 -DPCCOEFF_K=64 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
 
 nql_2_1: $(subst .o,l_2_1.o,$(NQ_OBJ))
 
