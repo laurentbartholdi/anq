@@ -114,6 +114,26 @@ nql_2_1: $(subst .o,l_2_1.o,$(NQ_OBJ))
 %l_2_1.o: %.cc $(NQ_INCL)
 	$(CXX) -c -DPCCOEFF_P=2 -DPCCOEFF_K=1 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
 
+nql_2_300: $(subst .o,l_2_300.o,$(NQ_OBJ))
+
+%l_2_300.o: %.cc $(NQ_INCL)
+	$(CXX) -c -DPCCOEFF_P=2 -DPCCOEFF_K=300 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
+
+nql_2_310: $(subst .o,l_2_310.o,$(NQ_OBJ))
+
+%l_2_310.o: %.cc $(NQ_INCL)
+	$(CXX) -c -DPCCOEFF_P=2 -DPCCOEFF_K=310 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
+
+nql_2_320: $(subst .o,l_2_320.o,$(NQ_OBJ))
+
+%l_2_320.o: %.cc $(NQ_INCL)
+	$(CXX) -c -DPCCOEFF_P=2 -DPCCOEFF_K=320 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
+
+nql_2_330: $(subst .o,l_2_330.o,$(NQ_OBJ))
+
+%l_2_330.o: %.cc $(NQ_INCL)
+	$(CXX) -c -DPCCOEFF_P=2 -DPCCOEFF_K=330 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
+
 nqg_2_1: $(subst .o,g_2_1.o,$(NQ_OBJ))
 
 %g_2_1.o: %.cc $(NQ_INCL)

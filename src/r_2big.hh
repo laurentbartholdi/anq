@@ -268,21 +268,34 @@ public:
 
     mp_limb_t temp[COEFF_WORDS];
     mpn_copyi(temp, data, COEFF_WORDS);
+    int sign =
+#ifndef ALWAYS_POSITIVE
+      (temp[COEFF_WORDS-1] > COEFF_MASK >> 1);
+#else
+    0;
+#endif
+    if (sign) {
+      mpn_neg(temp, temp, COEFF_WORDS);
+      temp[COEFF_WORDS-1] &= COEFF_MASK;
+    }
     unsigned nzlimbs = __nzlimbs(temp, COEFF_WORDS);
     size_t digits = mpn_sizeinbase(temp, nzlimbs, 10);
 
     if (s == nullptr)
-      p = (char *) malloc(digits+1);
+      p = (char *) malloc(digits+1+sign);
     else
       p = s;
 
-    digits = mpn_get_str((unsigned char *) p, base, temp, nzlimbs);
+    if (sign)
+      p[0] = '-';
+
+    digits = mpn_get_str((unsigned char *) p+sign, base, temp, nzlimbs);
     for (unsigned i = 0; i < digits; i++)
-      p[i] += '0';
-    p[digits] = 0;
+      p[i+sign] += '0';
+    p[digits+sign] = 0;
 
     if (s == nullptr)
-      p = (char *) realloc(p, digits+1);
+      p = (char *) realloc(p, digits+1+sign);
 
     return p;
   }
