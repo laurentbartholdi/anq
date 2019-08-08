@@ -13,6 +13,17 @@ template<unsigned K> class __local2_big {
     return na;
   }
 
+  static void __rshift(mp_limb_t *result, const mp_limb_t *a, unsigned shift) {
+    unsigned shift0 = shift/GMP_LIMB_BITS, shift1 = shift%GMP_LIMB_BITS;
+    
+    if (shift1)
+      mpn_rshift(result, a + shift0, COEFF_WORDS - shift0, shift1);
+    else
+      mpn_copyi(result, a + shift0, COEFF_WORDS - shift0);
+    for (unsigned i = COEFF_WORDS-shift0; i < COEFF_WORDS; i++)
+      result[i] = 0;
+  }
+  
   inline static void __singlebit(__local2_big &a, unsigned shift) {
     a.zero();
     a.data[shift / GMP_LIMB_BITS] = 1ULL << (shift % GMP_LIMB_BITS);
@@ -22,7 +33,7 @@ template<unsigned K> class __local2_big {
     __local2_big shifteda;
 
     shifteda.zero();
-    mpn_rshift(shifteda.data, a.data + shift/GMP_LIMB_BITS, COEFF_WORDS - shift/GMP_LIMB_BITS, shift%GMP_LIMB_BITS);
+    __rshift(shifteda.data, a.data, shift);
 
     set(shifteda); // already 3 correct bits
     for (unsigned i = 3; i < K; i <<= 1) {
@@ -142,8 +153,9 @@ public:
     __r.data[i] = a.data[i] & ((b.data[i] & -b.data[i]) - 1);
     for (++i; i < COEFF_WORDS; i++)
       __r.data[i] = 0;
-    mpn_rshift(__b.data, b.data, COEFF_WORDS, mpn_scan1(b.data, 0));
-    mpn_rshift(q.data, a.data, COEFF_WORDS, mpn_scan1(b.data, 0));
+    unsigned shift = mpn_scan1(b.data, 0);
+    __rshift(__b.data, b.data, shift);
+    __rshift(q.data, a.data, shift);
     __b.inv(__b);
     q.mul(q, __b);
     r.set(__r);
@@ -164,13 +176,13 @@ public:
     __r.data[i] = a.data[i] & (b.data[i] - 1);
     for (++i; i < COEFF_WORDS; i++)
       __r.data[i] = 0;
-    mpn_rshift(q.data, a.data, COEFF_WORDS, mpn_scan1(b.data, 0));
+    __rshift(q.data, a.data, mpn_scan1(b.data, 0));
     r.set(__r);
   }
 
   inline friend uint64_t shdiv_qr_ui(__local2_big &q, __local2_big &r, const __local2_big &a, uint64_t b) {
     uint64_t __r = a.data[0] & ((b & -b) - 1);
-    mpn_rshift(q.data, a.data, COEFF_WORDS, __builtin_ctzll(b));
+    __rshift(q.data, a.data, __builtin_ctzll(b));
     r.data[0] = __r; mpn_zero(r.data+1, COEFF_WORDS-1);
     return __r;
   }
@@ -228,7 +240,7 @@ public:
     }
 
     unsigned aval = mpn_scan1(a.data, 0);
-    mpn_rshift(data, a.data, COEFF_WORDS, aval);
+    __rshift(data, a.data, aval);
     return aval;
   }
 
@@ -269,7 +281,7 @@ public:
     mp_limb_t temp[COEFF_WORDS];
     mpn_copyi(temp, data, COEFF_WORDS);
     int sign =
-#ifndef ALWAYS_POSITIVE
+#ifdef PRINT_2SIGNED
       (temp[COEFF_WORDS-1] > COEFF_MASK >> 1);
 #else
     0;

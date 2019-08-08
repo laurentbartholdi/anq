@@ -33,6 +33,19 @@ void abortprintf(int errorcode, const char *format, ...) {
   exit(errorcode);
 }
 
+// for debugging, lldb is lost when printing these objects
+void PRINT(hollowpcvec &v) {
+  printf(PRIhollowpcvec "\n", &v);
+}
+
+void PRINT(sparsepcvec &v) {
+  printf(PRIsparsepcvec "\n", &v);
+}
+
+void PRINT(pccoeff &c) {
+  printf(PRIpccoeff "\n", &c);
+}
+
 void TimeStamp(const char *s) {
   static clock_t lastclock = 0;
 
