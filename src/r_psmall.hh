@@ -296,17 +296,17 @@ public:
 
   /* returns unit and generator of annihilator ideal:
      a*unit is canonical (P^n) and a*annihilator=0 */
-  inline friend void unit_annihilator(__localp_small &unit, __localp_small &annihilator, const __localp_small &a) {
-    if (a.data == 0) {
-      unit = uint64_t2c(0);
-      annihilator = uint64_t2c(1);
+  inline friend void unit_annihilator(__localp_small *unit, __localp_small *annihilator, const __localp_small &a) {
+    if (a.z_p()) {
+      if (unit) unit->zero();
+      if (annihilator) annihilator->set_si(1);
       return;
     }
 
     __localp_small va;
     unsigned vala = va.val(a);
-    unit.inv(va);
-    annihilator = uint64_t2c(powP(K-vala));
+    if (unit) unit->inv(va);
+    if (annihilator) *annihilator = uint64_t2c(powP(K-vala));
   }
 
   inline int out_str(FILE *f) const {

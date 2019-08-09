@@ -97,7 +97,7 @@ bool matrix::add1row(hollowmatvec currow) {
 
     if (!rows[row].allocated()) { /* Insert v in rows at position row */
       belongs = false;
-      unit_annihilator(b, a, kc.second);
+      unit_annihilator(&b, &a, kc.second);
       currow.scale(b);
       rows[row] = currow.getsparse();
       currow.clear();
@@ -132,6 +132,10 @@ bool matrix::add1row(hollowmatvec currow) {
 	rows[row] = vab.getsparse();
 	rowstack.release(vab);
 
+	unit_annihilator(&a, nullptr, rows[row].begin()->second);
+	if (rows[row].begin()->first != row || !cmp_si(a, 1))
+	  abortprintf(5, "add1row created a row with wrong pivot");
+	
 	if (Debug >= 3)
 	  fprintf(LogFile, "# Change row %d: " PRIsparsematvec "\n", row, &rows[row]);
       }

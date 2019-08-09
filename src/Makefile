@@ -6,7 +6,7 @@
 ##
 
 TRIO = trio-1.16
-NQVERSION = -DVERSION='"4.0.1 2019-03-22"'
+NQVERSION = -DVERSION='"4.1.0 2019-08-09"'
 OPT = -march=native -O0 #-Ofast
 DEBUG = -g -fsanitize=address 
 CFLAGS = -Wall -Werror -I$(TRIO) $(DEBUG) $(OPT)
@@ -20,8 +20,8 @@ ifndef COEFF
 COEFF = integer<0,1>
 endif
 
-NQ_OBJ = fppresentation.o pcpresentation.o operations.o matrix.o nq.o
-NQ_INCL = nq.h ring.hh r_*.hh vectors.hh
+NQ_OBJ := fppresentation.o pcpresentation.o operations.o matrix.o nq.o
+NQ_INCL := nq.h ring.hh r_*.hh vectors.hh
 
 all: trio nql nqg
 
@@ -57,97 +57,29 @@ runprofile:
 	pprof --pdf --nodecount=20 ./nqg_2_2 ./nqg_2_2.prof > profile.pdf
 
 clean:
-	rm -fr *.o *.gc?? nq[lg]_[0-9]*_[0-9]* nq[lg]_mpz nq[lg]_long nq[lg]_z *.dSYM
+	rm -fr *.o *.gc?? nq_[lg]_[0-9]*_[0-9]* *.dSYM
 
-nql: $(subst .o,l.o,$(NQ_OBJ))
+nq_l: $(subst .o,_l.o,$(NQ_OBJ))
 
-%l.o: %.cc $(NQ_INCL)
+%_l.o: %.cc $(NQ_INCL)
 	$(CXX) -c -DCOEFF="$(COEFF)" -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
 
-nqg: $(subst .o,g.o,$(NQ_OBJ))
+nq_g: $(subst .o,_g.o,$(NQ_OBJ))
 
-%g.o: %.cc $(NQ_INCL)
+%_g.o: %.cc $(NQ_INCL)
 	$(CXX) -c -DCOEFF="$(COEFF)" -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
 
-nql_64: $(subst .o,l_64.o,$(NQ_OBJ))
+.SECONDEXPANSION:
 
-%l_64.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DPCCOEFF_P=0 -DPCCOEFF_K=1 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
+%.o: $$(word 1,$$(subst _, ,$$*)).cc $(NQ_INCL)
+	$(if $(findstring $(word 2,$(subst _, ,$*)),lg),,$(error l or g required in stem of $*))
+	$(CXX) -c -DPCCOEFF_P=$(word 3,$(subst _, ,$*)) -DPCCOEFF_K=$(word 4,$(subst _, ,$*)) -D$(if $(findstring $(word 2,$(subst _, ,$*)),l),LIEALG,GROUP) $(CXXFLAGS) $(NQVERSION) $< -o $@
 
-nqg_64: $(subst .o,g_64.o,$(NQ_OBJ))
+nq_%: $$(subst .o,_%.o,$(NQ_OBJ))
+	$(CXX) -o $@ $(CXXFLAGS) $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS)
 
-%g_64.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DPCCOEFF_P=0 -DPCCOEFF_K=1 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
-
-nql_mpz: $(subst .o,l_mpz.o,$(NQ_OBJ))
-
-%l_mpz.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DPCCOEFF_P=0 -DPCCOEFF_K=0 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
-
-nqg_mpz: $(subst .o,g_mpz.o,$(NQ_OBJ))
-
-%g_mpz.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DPCCOEFF_P=0 -DPCCOEFF_K=0 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
-
-nqg_big: $(subst .o,g_big.o,$(NQ_OBJ))
-
-%g_big.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DPCCOEFF_P=0 -DPCCOEFF_K=3 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
-
-nqg_65521: $(subst .o,g_65521.o,$(NQ_OBJ))
-
-%g_65521.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DPCCOEFF_P=65521 -DPCCOEFF_K=1 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
-
-nql_2_64: $(subst .o,l_2_64.o,$(NQ_OBJ))
-
-%l_2_64.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DPCCOEFF_P=2 -DPCCOEFF_K=64 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
-
-nqg_2_64: $(subst .o,g_2_64.o,$(NQ_OBJ))
-
-%g_2_64.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DPCCOEFF_P=2 -DPCCOEFF_K=64 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
-
-nql_2_1: $(subst .o,l_2_1.o,$(NQ_OBJ))
-
-%l_2_1.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DPCCOEFF_P=2 -DPCCOEFF_K=1 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
-
-nql_2_300: $(subst .o,l_2_300.o,$(NQ_OBJ))
-
-%l_2_300.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DPCCOEFF_P=2 -DPCCOEFF_K=300 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
-
-nql_2_310: $(subst .o,l_2_310.o,$(NQ_OBJ))
-
-%l_2_310.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DPCCOEFF_P=2 -DPCCOEFF_K=310 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
-
-nql_2_320: $(subst .o,l_2_320.o,$(NQ_OBJ))
-
-%l_2_320.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DPCCOEFF_P=2 -DPCCOEFF_K=320 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
-
-nql_2_330: $(subst .o,l_2_330.o,$(NQ_OBJ))
-
-%l_2_330.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DPCCOEFF_P=2 -DPCCOEFF_K=330 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
-
-nqg_2_1: $(subst .o,g_2_1.o,$(NQ_OBJ))
-
-%g_2_1.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DPCCOEFF_P=2 -DPCCOEFF_K=64 -DMATCOEFF_K=1 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
-
-nql_3_1: $(subst .o,l_3_1.o,$(NQ_OBJ))
-
-%l_3_1.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DPCCOEFF_P=3 -DPCCOEFF_K=1 -DLIEALG $(CXXFLAGS) $(NQVERSION) $< -o $@
-
-nqg_3_1: $(subst .o,g_3_1.o,$(NQ_OBJ))
-
-%g_3_1.o: %.cc $(NQ_INCL)
-	$(CXX) -c -DPCCOEFF_P=3 -DPCCOEFF_K=40 -DMATCOEFF_K=1 -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
+################################################################
+# the following are unused targets, used for testing / experimenting
 
 test: test.cc
 

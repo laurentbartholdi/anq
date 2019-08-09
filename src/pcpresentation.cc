@@ -448,9 +448,8 @@ void pcpresentation::consistency(matrix &m) const {
     }
   }
   
-  pccoeff annihilator, unit;
+  pccoeff annihilator;
   annihilator.init();
-  unit.init(); // unused
 
   // check torsion relations
   for (unsigned i = 1; i <= NrPcGens; i++)
@@ -464,7 +463,7 @@ void pcpresentation::consistency(matrix &m) const {
       if (!Jacobson) {
 	hollowpcvec t = vecstack.fresh();
 	
-	unit_annihilator(unit, annihilator, Exponent[i]);
+	unit_annihilator(nullptr, &annihilator, Exponent[i]);
 #ifdef LIEALG
 	t.addmul(annihilator, Power[i]);
 	t.liecollect(*this);
@@ -534,7 +533,6 @@ void pcpresentation::consistency(matrix &m) const {
       }
     }
 
-  unit.clear();
   annihilator.clear();
 
   TimeStamp("pcpresentation::consistency()");

@@ -143,18 +143,21 @@ public:
 
   /* returns unit and generator of annihilator ideal:
      a*unit is canonical (2^n) and a*annihilator=0 */
-  inline friend void unit_annihilator(__local2_small &unit, __local2_small &annihilator, const __local2_small &a) {
-    if (a.data == 0) {
-      unit.data = 0;
-      annihilator.data = 1;
+  inline friend void unit_annihilator(__local2_small *unit, __local2_small *annihilator, const __local2_small &a) {
+    if (a.z_p()) {
+      if (unit) unit->zero();
+      if (annihilator) annihilator->set_si(1);
       return;
     }
+    
     int shift = __builtin_ctzll(a.data);
-    unit = inverse_mod_2_k(a.data, shift);
-    if (shift == 0)
-      annihilator.data = 0;
-    else
-      annihilator.data = 1ULL << (K-shift);
+    if (unit) *unit = inverse_mod_2_k(a.data, shift);
+    if (annihilator) {
+      if (shift == 0)
+	annihilator->data = 0;
+      else
+	annihilator->data = 1ULL << (K-shift);
+    }
   }
 
   inline int out_str(FILE *f) const {

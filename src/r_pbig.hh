@@ -390,17 +390,17 @@ public:
 
   /* returns unit and generator of annihilator ideal:
      a*unit is canonical (P^n) and a*annihilator=0 */
-  inline friend void unit_annihilator(__localp_big &unit, __localp_big &annihilator, const __localp_big &a) {
+  inline friend void unit_annihilator(__localp_big *unit, __localp_big *annihilator, const __localp_big &a) {
     if (a.z_p()) {
-      unit.zero();
-      annihilator.set_si(1);
+      if (unit) unit->zero();
+      if (annihilator) annihilator->set_si(1);
       return;
     }
 
     __localp_big va;
     unsigned vala = va.val(a);
-    unit.inv(va);
-    annihilator = __mpn_pow_ui(__mpn_ui(P), K-vala);
+    if (unit) unit->inv(va);
+    if (annihilator) *annihilator = __mpn_pow_ui(__mpn_ui(P), K-vala);
   }
 
   inline char *get_str(char *s, int base) const {

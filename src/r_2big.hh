@@ -261,18 +261,20 @@ public:
 
   /* returns unit and generator of annihilator ideal:
      a*unit is canonical (2^n) and a*annihilator=0 */
-  inline friend void unit_annihilator(__local2_big &unit, __local2_big &annihilator, const __local2_big &a) {
+  inline friend void unit_annihilator(__local2_big *unit, __local2_big *annihilator, const __local2_big &a) {
     if (a.z_p()) {
-      unit.zero();
-      annihilator.set_si(1);
+      if (unit) unit->zero();
+      if (annihilator) annihilator->set_si(1);
       return;
     }
     unsigned shift = mpn_scan1(a.data, 0);
-    unit.inverse_mod_2_k(a, shift);
-    if (shift > 0)
-      __singlebit(annihilator, K - shift);
-    else
-      mpn_zero(annihilator.data, COEFF_WORDS);
+    if (unit) unit->inverse_mod_2_k(a, shift);
+    if (annihilator) {
+      if (shift > 0)
+	__singlebit(*annihilator, K - shift);
+      else
+	mpn_zero(annihilator->data, COEFF_WORDS);
+    }
   }
 
   inline char *get_str(char *s, int base) const {

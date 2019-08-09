@@ -45,9 +45,9 @@ template<unsigned K=1> struct __intglobal : __ring0<K> {
       throw std::runtime_error("inv() of non-invertible element");
   }
 
-  inline friend void unit_annihilator(__intglobal &unit, __intglobal &annihilator, const __intglobal &a) {
-    unit.set_si(a.sgn());
-    annihilator.set_si(a.z_p());
+  inline friend void unit_annihilator(__intglobal *unit, __intglobal *annihilator, const __intglobal &a) {
+    if (unit) unit->set_si(a.sgn());
+    if (annihilator) annihilator->set_si(a.z_p());
   }
 
   inline unsigned val(const __intglobal &a) {
