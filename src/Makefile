@@ -20,6 +20,9 @@ ifndef COEFF
 COEFF = integer<0,1>
 endif
 
+# prevent automatic deletion
+.SECONDARY:
+
 NQ_OBJ := fppresentation.o pcpresentation.o operations.o matrix.o nq.o
 NQ_INCL := nq.h ring.hh r_*.hh vectors.hh
 
