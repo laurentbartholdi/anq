@@ -445,7 +445,7 @@ public:
   }
   
   void alloc(size_t s) {
-    herd msb = getmsb(s);
+    herd msb = s ? getmsb(s) : 1;
 
     p = (slot *) malloc(((msb<<1)+2)*sizeof(slot));
     if (p == nullptr)
@@ -469,13 +469,11 @@ public:
   }
 
   void free(size_t size) {
-    for (key k = 0; k < topbit()<<1; k++)
-      p[k].data.clear();
-    ::free(p-2);
+    free();
   }
 
   void resize(size_t oldsize, size_t s) {
-    herd msb = getmsb(s), oldtopbit = topbit();
+    herd msb = s ? getmsb(s) : 1, oldtopbit = topbit();
     if (msb == oldtopbit)
       return;
     if (msb < oldtopbit) {
