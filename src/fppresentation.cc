@@ -83,6 +83,15 @@ static FILE *InFp;	/* Current input file pointer. */
 static fpcoeff N;	/* Contains the integer just read. */
 static std::string GenName; /* Contains the generator name. */
 
+static void SyntaxError(const char *format, ...) __attribute__((format(__printf__, 1, 2),noreturn));
+static void SyntaxError(const char *format, ...) {
+  va_list va;
+  va_start (va, format);
+  vfprintf(stderr, format, va);
+  fprintf(stderr, " in file %s, line %d, char %d\n", InFileName, TLine, TColumn);
+  exit(3);
+}
+
 void FreeNode(node *n) {
   switch (n->type) {
   case TGEN:
@@ -101,36 +110,13 @@ void FreeNode(node *n) {
   delete n;
 }
 
-enum genstatus { NOCREATE, CREATE };
-
-static gen GenNumber(fppresentation &pres, genstatus status, unsigned weight) {
+static gen GetGen(fppresentation &pres) {
   // we start at 0, including the name "p" at position 0, to recognize p-powers
   for (unsigned i = 0; i <= pres.NrGens; i++) {
-    if (GenName == pres.GeneratorName[i]) {
-      if (status == CREATE)
-        return LASTGEN;
+    if (GenName == pres.GeneratorName[i])
       return (gen) i;
-    }
   }
-  if (status == NOCREATE)
-    return LASTGEN;
-
-  pres.NrGens++;
-  pres.Weight.resize(pres.NrGens + 1);
-  pres.Weight[pres.NrGens] = weight;
-  pres.GeneratorName.resize(pres.NrGens + 1);
-  pres.GeneratorName[pres.NrGens].assign(GenName);
-  
-  return pres.NrGens;
-}
-
-static void SyntaxError(const char *format, ...) __attribute__((format(__printf__, 1, 2),noreturn));
-static void SyntaxError(const char *format, ...) {
-  va_list va;
-  va_start (va, format);
-  vfprintf(stderr, format, va);
-  fprintf(stderr, " in file %s, line %d, char %d\n", InFileName, TLine, TColumn);
-  exit(3);
+  SyntaxError("Unkown generator %s", GenName.c_str());
 }
 
 static void ReadCh() {
@@ -391,10 +377,7 @@ node *Term(fppresentation &pres) {
     return n;
   }
   if (Token == GEN) {
-    const gen g = GenNumber(pres, NOCREATE, 0);
-    if (g == LASTGEN)
-      SyntaxError("Unkown generator %s", GenName.c_str());
-    node *n = new node{TGEN, g};
+    node *n = new node{TGEN, GetGen(pres)};
     NextToken();
     return n;
   }
@@ -553,11 +536,29 @@ fppresentation::fppresentation(const char *InputFileName, bool ppower) {
   read_gen:
     if (Token != GEN)
       SyntaxError("Generator expected");
-    gen g = GenNumber(*this, CREATE, weight);
-    if (g == LASTGEN)
-      SyntaxError("Duplicate generator %s", GenName.c_str());
+
+    // we start at 0, including the name "p" at position 0, to recognize p-powers
+    for (unsigned i = 0; i <= NrGens; i++) {
+      if (GenName == GeneratorName[i])
+	SyntaxError("Duplicate generator %s", GenName.c_str());
+    }
+
+    NrGens++;
+    GeneratorName.resize(NrGens + 1);
+    GeneratorName[NrGens].assign(GenName);
+
     NextToken();
 
+    Weight.resize(NrGens + 1);
+    if (Token == POWER) {
+      NextToken();
+      if (Token != NUMBER)
+	SyntaxError("Number expected as weight of generator");
+      Weight[NrGens] = N.get_si();
+      NextToken();
+    } else
+      Weight[NrGens] = weight;
+      
     if (Token == PIPE)
       break;
 
