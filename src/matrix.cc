@@ -182,9 +182,9 @@ static std::vector<int> colamd(sparsematmat &m, unsigned nrcols) {
   if (Debug >= 2) {
     fprintf(LogFile, "# about to collect %ld relations (%ld nnz)\n", m.size(), intmat.size());
     fprintf(LogFile, "# ind:");
-    for (int i = 0; i < ind.size(); i++) fprintf(LogFile, " %d", ind[i]);
+    for (unsigned i = 0; i < ind.size(); i++) fprintf(LogFile, " %d", ind[i]);
     fprintf(LogFile, "\n# intmat:");
-    for (int i = 0; i < intmat.size(); i++) fprintf(LogFile, " %d", intmat[i]);
+    for (unsigned i = 0; i < intmat.size(); i++) fprintf(LogFile, " %d", intmat[i]);
     fprintf(LogFile, "\n");
   }
 
@@ -283,7 +283,7 @@ void matrix::hermite() {
 
     for (const auto &kc : currow) {
       unsigned row = kc.first;
-      if (row == j || !rows[row].allocated())
+      if (row == (unsigned) j || !rows[row].allocated())
 	continue;
 
       if (!reduced_p(kc.second, rows[row][0].second)) {

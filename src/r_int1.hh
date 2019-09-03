@@ -53,7 +53,7 @@ public:
 #ifdef COEFF_UNSAFE
     data = a.data + b;
 #else
-    if (__builtin_expect(__builtin_saddll_overflow(a.data, b, &data), false))
+    if (__builtin_expect(__builtin_saddll_overflow(a.data, b, (long long *) &data), false))
       throw std::runtime_error("add(): coefficient overflow");
 #endif
   }
@@ -132,7 +132,7 @@ public:
 #ifdef COEFF_UNSAFE
     data = a.data * b;
 #else
-    if (__builtin_expect(__builtin_smulll_overflow(a.data, b, &data), false))
+    if (__builtin_expect(__builtin_smulll_overflow(a.data, b, (long long *) &data), false))
       throw std::runtime_error("mul(): coefficient overflow");
 #endif
   }
@@ -141,7 +141,7 @@ public:
 #ifdef COEFF_UNSAFE
     data = -a.data;
 #else
-    if (__builtin_expect(__builtin_ssubll_overflow(0, a.data, &data), false))
+    if (__builtin_expect(__builtin_ssubll_overflow(0, a.data, (long long *) &data), false))
       throw std::runtime_error("neg(): coefficient overflow");
 #endif
   }
@@ -154,7 +154,7 @@ public:
 #ifdef COEFF_UNSAFE
     data = a.data - b.data;
 #else
-    if (__builtin_expect(__builtin_ssubll_overflow(a.data, b.data, &data), false))
+    if (__builtin_expect(__builtin_ssubll_overflow(a.data, b.data, (long long *) &data), false))
       throw std::runtime_error("sub(): coefficient overflow");
 #endif
   }

@@ -11,10 +11,16 @@ OPT = -march=native -O0 #-Ofast
 DEBUG = -g -fsanitize=address 
 CFLAGS = -Wall -Werror -I$(TRIO) $(DEBUG) $(OPT)
 CXXFLAGS = -std=c++11 $(CFLAGS)
-LDFLAGS = $(DEBUG) -L$(TRIO) -lcolamd -lgmp -ltrio -Wl,-no_pie $(LDEXTRA)
+LDFLAGS = $(DEBUG) -L$(TRIO)
+LDLIBS = -lcolamd -lgmp -ltrio
+
+ifeq ($(shell uname -s),Darwin)
+  LDFLAGS += -Wl,-no_pie
+else
+  CXXFLAGS += -I/usr/include/suitesparse
+endif
 
 CXX=g++
-CC=$(CXX)
 
 ifndef COEFF
 COEFF = integer<0,1>

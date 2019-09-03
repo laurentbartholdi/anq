@@ -812,7 +812,7 @@ typedef struct {
 #if TRIO_FEATURE_USER_DEFINED
   /* For the user-defined specifier */
   union {
-    char namespace[MAX_USER_NAME];
+    char __namespace[MAX_USER_NAME];
     int handler;        /* if flags & FLAGS_USER_DEFINED_PARAMETER */
   } user_defined;
   char user_data[MAX_USER_DATA];
@@ -1878,7 +1878,7 @@ TRIO_ARGS4((type, format, offset, parameter),
 	int ch;
 
 	parameter->type = FORMAT_USER_DEFINED;
-	parameter->user_defined.namespace[0] = NIL;
+	parameter->user_defined.__namespace[0] = NIL;
 
 	while ((ch = format[offset]) != NIL)
 	  {
@@ -1909,7 +1909,7 @@ TRIO_ARGS4((type, format, offset, parameter),
 		max = (int)(&format[offset] - tmpformat);
 		if (max > MAX_USER_NAME)
 		  max = MAX_USER_NAME;
-		trio_copy_max(parameter->user_defined.namespace, max, tmpformat);
+		trio_copy_max(parameter->user_defined.__namespace, max, tmpformat);
 		tmpformat = (char *)&format[offset];
 	      }
 	  }
@@ -3891,7 +3891,7 @@ TRIO_ARGS3((data, format, parameters),
 	    else
 	      {
 		/* Look up namespace */
-		def = TrioFindNamespace(parameters[i].user_defined.namespace, NULL);
+		def = TrioFindNamespace(parameters[i].user_defined.__namespace, NULL);
 	      }
 	    if (def)
 	      {

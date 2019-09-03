@@ -160,7 +160,7 @@ int main(int argc, char **argv) {
   auto handle_sparsematvec = trio_register(cvec_print<sparsematvec>, "m%p"); // sparsematvecs can be printed as PRIsparsematvec
   auto handle_hollowpcvec = trio_register(cvec_print<hollowpcvec>, "h%p"); // hollowpcvecs can be printed as PRIhollowpcvec
 #endif
-
+  
   while ((c = getopt (argc, argv, "ACDF:GhJL:MN:PTW:Z")) != -1)
     switch (c) {
     case 'A':

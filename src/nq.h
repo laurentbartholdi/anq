@@ -4,18 +4,6 @@
  * Based on code by Csaba Schneider
  */
 
-#ifndef NO_TRIO
-#include <trio.h>
-#define printf trio_printf
-#define sprintf trio_sprintf
-#define fprintf trio_fprintf
-#define PRIpccoeff "$<c%p:>"
-#define PRIfpcoeff "$<c%p:>"
-#define PRIsparsepcvec "$<s%p:>"
-#define PRIsparsematvec "$<m%p:>"
-#define PRIhollowpcvec "$<h%p:>"
-#endif
-
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -93,14 +81,18 @@ void TimeStamp(const char *);
 #endif
 
 typedef integer<PCCOEFF_P,PCCOEFF_K> pccoeff;
-template<> struct std::hash<pccoeff> : public pccoeff::hash { };
-template<> struct std::equal_to<pccoeff> : public pccoeff::equal_to { };
+namespace std {
+  template<> struct hash<pccoeff> : public pccoeff::hash { };
+  template<> struct equal_to<pccoeff> : public pccoeff::equal_to { };
+}
 
 typedef sparsevec<pccoeff> sparsepcvec;
 typedef sparsepcvec::key gen;
 struct hollowpcvec;
 typedef std::vector<sparsepcvec> sparsepcmat; // compressed rows
-template<> struct std::hash<sparsepcvec> : public sparsepcvec::hash { };
+namespace std {
+  template<> struct hash<sparsepcvec> : public sparsepcvec::hash { };
+}
 
 typedef pccoeff fpcoeff;
 
@@ -370,4 +362,18 @@ inline bool operator<(const sparsepcvec &vec1, const hollowpcvec &vec2) { return
 inline bool operator<(const hollowpcvec &vec1, const sparsepcvec &vec2) { return vec_cmp(vec1, vec2) < 0; }
 inline bool operator<(const hollowpcvec &vec1, const hollowpcvec &vec2) { return vec_cmp(vec1, vec2) < 0; }
 
-template<> struct std::hash<hollowpcvec> : public hollowpcvec::hash { };
+namespace std {
+  template<> struct hash<hollowpcvec> : public hollowpcvec::hash { };
+}
+
+#ifndef NO_TRIO
+#include <trio.h>
+#define printf trio_printf
+#define sprintf trio_sprintf
+#define fprintf trio_fprintf
+#define PRIpccoeff "$<c%p:>"
+#define PRIfpcoeff "$<c%p:>"
+#define PRIsparsepcvec "$<s%p:>"
+#define PRIsparsematvec "$<m%p:>"
+#define PRIhollowpcvec "$<h%p:>"
+#endif

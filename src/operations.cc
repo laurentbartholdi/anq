@@ -182,17 +182,19 @@ constexpr conjdict_entry top_conj_entry(gen g) {
 }
 typedef std::unordered_map<conjdict_entry,sparsepcvec> conjdict_map;
 
-template<> struct std::hash<conjdict_entry> {
-  size_t operator()(const conjdict_entry &key) const {
-    return (key.g << 16) + (key.p_pow << 8) + key.two_pow;
-  }
-};
+namespace std {
+  template<> struct hash<conjdict_entry> {
+    size_t operator()(const conjdict_entry &key) const {
+      return (key.g << 16) + (key.p_pow << 8) + key.two_pow;
+    }
+  };
 
-template<> struct std::equal_to<conjdict_entry> {
-  bool operator()(const conjdict_entry &key1, const conjdict_entry &key2) const {
-    return key1.g == key2.g && key1.p_pow == key2.p_pow && key1.two_pow == key2.two_pow;
-  }   
-};
+  template<> struct equal_to<conjdict_entry> {
+    bool operator()(const conjdict_entry &key1, const conjdict_entry &key2) const {
+      return key1.g == key2.g && key1.p_pow == key2.p_pow && key1.two_pow == key2.two_pow;
+    }   
+  };
+}
 
 const uint64_t pow_base = pccoeff::characteristic ? pccoeff::characteristic : 2;
 

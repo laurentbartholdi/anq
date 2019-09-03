@@ -97,7 +97,7 @@ public:
       return r;
     } else {
       for (unsigned i = 1; i < COEFF_WORDS-1; i++)
-	if (data[i] != -1)
+	if (data[i] != (uint64_t) -1)
 	  goto error;
       if (data[COEFF_WORDS-1] != COEFF_MASK)
 	goto error;

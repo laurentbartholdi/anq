@@ -15,7 +15,7 @@ template<> class __ring0<-1U> {
 
   size_t __hashkey() {
     size_t seed = p->_mp_size;
-    for (unsigned i = 0; i < abs(p->_mp_size); i++)
+    for (int i = 0; i < abs(p->_mp_size); i++)
       seed ^= p->_mp_d[i] + 0x9e3779b9 + (seed << 6) + (seed >> 2);
     return seed;
   }
@@ -127,7 +127,7 @@ public:
   
   inline void add(const __ring0 &a, const __ring0 &b) {
     int64_t r;
-    if (__builtin_expect(t && a.t && b.t && !__builtin_saddll_overflow(a.d, b.d-1, &r), 1))
+    if (__builtin_expect(t && a.t && b.t && !__builtin_saddll_overflow(a.d, b.d-1, (long long *) &r), 1))
       d = r;
     else
       __add(a, b);

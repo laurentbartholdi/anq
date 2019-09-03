@@ -906,7 +906,7 @@ TRIO_ARGS2((string, type),
  */
 #if defined(TRIO_FUNC_INDEX)
 
-TRIO_PUBLIC_STRING char *
+TRIO_PUBLIC_STRING TRIO_CONST char *
 trio_index
 TRIO_ARGS2((string, character),
 	   TRIO_CONST char *string,
@@ -928,7 +928,7 @@ TRIO_ARGS2((string, character),
  */
 #if defined(TRIO_FUNC_INDEX_LAST)
 
-TRIO_PUBLIC_STRING char *
+TRIO_PUBLIC_STRING TRIO_CONST char *
 trio_index_last
 TRIO_ARGS2((string, character),
 	   TRIO_CONST char *string,
@@ -1112,7 +1112,7 @@ TRIO_ARGS3((target, source, Function),
 */
 #if defined(TRIO_FUNC_SUBSTRING)
 
-TRIO_PUBLIC_STRING char *
+TRIO_PUBLIC_STRING TRIO_CONST char *
 trio_substring
 TRIO_ARGS2((string, substring),
 	   TRIO_CONST char *string,
@@ -2182,7 +2182,7 @@ TRIO_ARGS4((self, max, format, datetime),
  */
 #if defined(TRIO_FUNC_STRING_INDEX)
 
-TRIO_PUBLIC_STRING char *
+TRIO_PUBLIC_STRING TRIO_CONST char *
 trio_string_index
 TRIO_ARGS2((self, character),
 	   trio_string_t *self,
@@ -2200,7 +2200,7 @@ TRIO_ARGS2((self, character),
  */
 #if defined(TRIO_FUNC_STRING_INDEX_LAST)
 
-TRIO_PUBLIC_STRING char *
+TRIO_PUBLIC_STRING TRIO_CONST char *
 trio_string_index_last
 TRIO_ARGS2((self, character),
 	   trio_string_t *self,
@@ -2332,7 +2332,7 @@ TRIO_ARGS2((self, other),
  */
 #if defined(TRIO_FUNC_STRING_SUBSTRING)
 
-TRIO_PUBLIC_STRING char *
+TRIO_PUBLIC_STRING TRIO_CONST char *
 trio_string_substring
 TRIO_ARGS2((self, other),
 	   trio_string_t *self,
@@ -2351,7 +2351,7 @@ TRIO_ARGS2((self, other),
  */
 #if defined(TRIO_FUNC_XSTRING_SUBSTRING)
 
-TRIO_PUBLIC_STRING char *
+TRIO_PUBLIC_STRING TRIO_CONST char *
 trio_xstring_substring
 TRIO_ARGS2((self, other),
 	   trio_string_t *self,

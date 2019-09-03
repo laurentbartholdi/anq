@@ -269,14 +269,16 @@ public:
   hollowvec_iterator operator--(int) { auto old = hollowvec_iterator(p,k); --(*this); return old; }
 };
 
-template <typename T, typename slot, typename key, typename skey, const skey nil> struct std::iterator_traits<hollowvec_iterator<T, slot, key, skey, nil>> {
-  using difference_type = std::ptrdiff_t;
-  using size_type = std::size_t;
-  using value_type = typename hollowvec_iterator<T, slot, key, skey, nil>::key_data;
-  using pointer = const typename hollowvec_iterator<T, slot, key, skey, nil>::key_data*;
-  using reference = const typename hollowvec_iterator<T, slot, key, skey, nil>::key_data&;
-  using iterator_category = std::random_access_iterator_tag;
-};
+namespace std {
+  template <typename T, typename slot, typename key, typename skey, const skey nil> struct iterator_traits<hollowvec_iterator<T, slot, key, skey, nil>> {
+    using difference_type = std::ptrdiff_t;
+    using size_type = std::size_t;
+    using value_type = typename hollowvec_iterator<T, slot, key, skey, nil>::key_data;
+    using pointer = const typename hollowvec_iterator<T, slot, key, skey, nil>::key_data*;
+    using reference = const typename hollowvec_iterator<T, slot, key, skey, nil>::key_data&;
+    using iterator_category = std::random_access_iterator_tag;
+  };
+}
 
 #ifndef FOUND_A_WAY_TO_AVOID_ITERATOR_DUPLICATION // can't use std::reverse_iterator :(
 template <typename T, typename slot, typename key, typename skey, const skey nil> struct hollowvec_riterator {
@@ -307,14 +309,16 @@ public:
   hollowvec_riterator operator--(int) { auto old = hollowvec_riterator(p,k); --(*this); return old; }
 };
 
-template <typename T, typename slot, typename key, typename skey, const skey nil> struct std::iterator_traits<hollowvec_riterator<T, slot, key, skey, nil>> {
-  using difference_type = std::ptrdiff_t;
-  using size_type = std::size_t;
-  using value_type = typename hollowvec_iterator<T, slot, key, skey, nil>::key_data;
-  using pointer = const typename hollowvec_iterator<T, slot, key, skey, nil>::key_data*;
-  using reference = const typename hollowvec_iterator<T, slot, key, skey, nil>::key_data&;
-  using iterator_category = std::random_access_iterator_tag;
-};
+namespace std {
+  template <typename T, typename slot, typename key, typename skey, const skey nil> struct iterator_traits<hollowvec_riterator<T, slot, key, skey, nil>> {
+    using difference_type = std::ptrdiff_t;
+    using size_type = std::size_t;
+    using value_type = typename hollowvec_iterator<T, slot, key, skey, nil>::key_data;
+    using pointer = const typename hollowvec_iterator<T, slot, key, skey, nil>::key_data*;
+    using reference = const typename hollowvec_iterator<T, slot, key, skey, nil>::key_data&;
+    using iterator_category = std::random_access_iterator_tag;
+  };
+}
 #endif
 
 template<typename T> struct hollowvec {
