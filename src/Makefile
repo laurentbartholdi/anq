@@ -32,10 +32,10 @@ endif
 NQ_OBJ := fppresentation.o pcpresentation.o operations.o matrix.o nq.o
 NQ_INCL := nq.h ring.hh r_*.hh vectors.hh
 
-all: trio nql nqg
+all: trio nq_l nq_g
 
 coverage_nql:
-	$(MAKE) -B OPT=-march=native CXX=clang++ DEBUG="-g -fprofile-instr-generate -fcoverage-mapping" nql nqg
+	$(MAKE) -B OPT=-march=native CXX=clang++ DEBUG="-g -fprofile-instr-generate -fcoverage-mapping" nq_l nq_g
 
 # then use as follows:
 # % LLVM_PROFILE_FILE="nq.profraw" ./nql_long ...
@@ -66,7 +66,7 @@ runprofile:
 	pprof --pdf --nodecount=20 ./nqg_2_2 ./nqg_2_2.prof > profile.pdf
 
 clean:
-	rm -fr *.o *.gc?? nq_[lg]_[0-9]*_[0-9]* *.dSYM
+	rm -fr *.o *.gc?? nq_[lg]_[0-9]*_[0-9]* *.dSYM $(TRIO)/libtrio.a
 
 nq_l: $(subst .o,_l.o,$(NQ_OBJ))
 
