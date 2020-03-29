@@ -46,6 +46,7 @@ matrix::~matrix() {
 }
 
 // put v in normal form by subtracting rows of Matrix, return in fresh vector
+// !!! this is time-critical. Optimize!
 sparsepcvec matrix::reducerow(const sparsepcvec &v) const {
   matcoeff q;
   q.init();
@@ -107,7 +108,7 @@ bool matrix::add1row(hollowmatvec currow) {
 	fprintf(LogFile, "# Adding row %d: " PRIsparsematvec "\n", row, &rows[row]);
     } else { /* two rows with same pivot. Merge them */
       gcdext(d, a, b, kc.second, rows[row][0].second); /* d = a*v[head]+b*rows[row][head] */
-      if (a.z_p() && !cmp_si(b,1)) { /* likely case: rows[row][head]=d, b=1, a=0. We're just reducing currow. */
+      if (!cmp(d,rows[row][0].second)) { /* likely case: rows[row][head]=d. We're just reducing currow. */
 	shdivexact(d, kc.second, d);
 	currow.submul(d, rows[row]);
 #ifdef IS_MPZ // check coefficient explosion

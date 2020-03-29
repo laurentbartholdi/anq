@@ -84,8 +84,8 @@ nq_g: $(subst .o,_g.o,$(NQ_OBJ))
 	$(if $(findstring $(word 2,$(subst _, ,$*)),lg),,$(error l or g required in stem of $*))
 	$(CXX) -c -DPCCOEFF_P=$(word 3,$(subst _, ,$*)) -DPCCOEFF_K=$(word 4,$(subst _, ,$*)) -D$(if $(findstring $(word 2,$(subst _, ,$*)),l),LIEALG,GROUP) $(CXXFLAGS) $(NQVERSION) $< -o $@
 
-nq_%: $$(subst .o,_%.o,$(NQ_OBJ))
-	$(CXX) -o $@ $(CXXFLAGS) $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS)
+nq_%: trio $$(subst .o,_%.o,$(NQ_OBJ))
+	$(CXX) -o $@ $(CXXFLAGS) $(LDFLAGS) $(filter-out $<,$^) $(LOADLIBES) $(LDLIBS)
 
 ################################################################
 # the following are unused targets, used for testing / experimenting

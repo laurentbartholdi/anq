@@ -835,10 +835,12 @@ void pcpresentation::reduce(const matrix &m) {
   for (unsigned j = 1; j <= fp.NrGens; j++)
     collecttail(Epimorphism[j], m, renumber);
   
+  TimeStamp("pcpresentation::reduce1");
   /*  Modify the products: */
   for (unsigned j = 1; j <= NrPcGens; j++)
     for (unsigned l = 1; l < j; l++)
       collecttail(Comm[j][l], m, renumber);
+  TimeStamp("pcpresentation::reduce2");
 
   /* Let us alter the Generator as well. Recall that dead generators
    * cannot have definition at all. It is only the right of the living

@@ -283,7 +283,7 @@ public:
     __localp_small va, vb;
     unsigned vala = va.val(a), valb = vb.val(b);
 
-    if (vala > valb) {
+    if (vala >= valb) {
       gcd = uint64_t2c(powP(valb));
       s = uint64_t2c(0);
       t.inv(vb);

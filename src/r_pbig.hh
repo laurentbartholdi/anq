@@ -377,7 +377,7 @@ public:
     __localp_big va, vb;
     unsigned vala = va.val(a), valb = vb.val(b);
 
-    if (vala > valb) {
+    if (vala >= valb) {
       gcd = __mpn_pow_ui(__mpn_ui(P), valb);
       s.zero();
       t.inv(vb);
