@@ -47,7 +47,7 @@ inline int binary_prec(token t) {
   }
 }
 constexpr bool is_relation(token t) {
-  return t <= DEQUALR;
+  return !(t >= LANGLE);
 }
 const nodetype unary_node(token t) {
   switch (t) {
@@ -161,7 +161,6 @@ static void NextToken() {
   TColumn = Column;
   TLine = Line;
   Token = BADTOKEN;
-  bool sign = false;
   
   switch (Ch) {
   case '(':
@@ -275,11 +274,8 @@ static void NextToken() {
     if (Ch == '>') {
       Token = ARROW;
       ReadCh();
-      break;
-    } else if (isdigit(Ch))
-      sign = true;  // and fall through
-    else
-      break;
+    }
+    break;
 
   case '0':
   case '1':
@@ -300,8 +296,6 @@ static void NextToken() {
       add_si(N, N, isdigit(Ch) ? Ch - '0' : Ch + 10 - (isupper(Ch) ? 'A' : 'a'));
       ReadCh();
     }
-    if (sign)
-      neg(N, N);
     break;
   }
 

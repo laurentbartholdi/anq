@@ -90,7 +90,7 @@ public:
 
   inline int64_t get_si() const {
     int64_t r = data[0];
-    if (r > 0) {
+    if (r >= 0) {
       for (unsigned i = 1; i < COEFF_WORDS; i++)
 	if (data[i] != 0)
 	  goto error;
