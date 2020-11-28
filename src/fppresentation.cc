@@ -546,10 +546,10 @@ fppresentation::fppresentation(const char *InputFileName, bool ppower) {
     Weight.resize(NrGens + 1);
     if (Token == POWER) {
       NextToken();
-      if (Token != NUMBER)
-	SyntaxError("Number expected as weight of generator");
-      Weight[NrGens] = N.get_si();
-      NextToken();
+      node *t = Term(*this);
+      if (t->type != TNUM)
+	SyntaxError("Number expected as weight of generator %s", GenName.c_str());
+      Weight[NrGens] = t->n.get_si();
     } else
       Weight[NrGens] = weight;
       
@@ -568,9 +568,11 @@ fppresentation::fppresentation(const char *InputFileName, bool ppower) {
   while (is_relation(Token)) {
     node *n = Expression(*this, 0);
 
-    if (n->type == TDRELR) /* switch sides */
-      *n = node{TDREL, n->r, n->l};
-
+    if (n->type == TDRELR) { /* switch sides */
+      n->type = TDREL;
+      std::swap(n->l,n->r);
+    }
+    
     if (n->type == TREL) { /* chains of equalities */
       node *t;
       for (t = n; t->type == TREL; t = t->l)
