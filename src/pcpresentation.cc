@@ -567,6 +567,12 @@ void pcpresentation::evalrels(matrix &m) {
       fprintf(LogFile, " (" PRIhollowpcvec ")\n", &v);
     }
     gen g = n->l->g;
+    unsigned w = -1;
+    if (!v.empty())
+      w = Generator[v.begin()->first].w;
+    if (w < fp.Weight[g])
+      abortprintf(5, "EvalRels: alias %s has weight %u, should have weight at least %u", fp.GeneratorName[g].c_str(), w, fp.Weight[g]);
+    
     Epimorphism[g].resize(v.size());
     Epimorphism[g].copy(v);
     vecstack.release(v);

@@ -72,7 +72,6 @@ inline nodetype binary_node(token t) {
   }
 }
 
-static char Ch;		/* Contains the next char on the input. */
 static token Token;	/* Contains the current token. */
 static int Line;	/* Current line number. */
 static int TLine;	/* Line number where token starts. */
@@ -119,7 +118,9 @@ static gen GetGen(fppresentation &pres) {
   SyntaxError("Unkown generator %s", GenName.c_str());
 }
 
-static void ReadCh() {
+static char ReadCh() {
+  char Ch;
+
   if ((Ch = getc(InFp)) == EOF)
     SyntaxError("I ran out of characters to read");
   Column++;
@@ -135,21 +136,8 @@ static void ReadCh() {
       Ch = '\\';
     }
   }
-}
 
-static void SkipBlanks() {
-  if (Ch == '\0')
-    ReadCh();
-  while (Ch == ' ' || Ch == '\t' || Ch == '\n' || Ch == '#') {
-    if (Ch == '#')
-      while (Ch != '\n')
-        ReadCh();
-    if (Ch == '\n') {
-      Line++;
-      Column = 0;
-    }
-    ReadCh();
-  }
+  return Ch;
 }
 
 /* gets a new token from the stream, and puts it in the global variable
@@ -157,7 +145,22 @@ static void SkipBlanks() {
    Also sets the globals GenName and N in case a generator / number is read.
 */
 static void NextToken() {
-  SkipBlanks();
+  static char Ch = '\0';
+  
+  /* skip blanks */
+  if (Ch == '\0')
+    Ch = ReadCh();
+  while (Ch == ' ' || Ch == '\t' || Ch == '\n' || Ch == '#') {
+    if (Ch == '#')
+      while (Ch != '\n')
+        Ch = ReadCh();
+    if (Ch == '\n') {
+      Line++;
+      Column = 0;
+    }
+    Ch = ReadCh();
+  }
+
   TColumn = Column;
   TLine = Line;
   Token = BADTOKEN;
@@ -165,115 +168,115 @@ static void NextToken() {
   switch (Ch) {
   case '(':
     Token = LPAREN;
-    ReadCh();
+    Ch = '\0';
     break;
   
   case ')':
     Token = RPAREN;
-    ReadCh();
+    Ch = '\0';
     break;
   
   case '[':
     Token = LBRACK;
-    ReadCh();
+    Ch = '\0';
     break;
   
   case ']':
     Token = RBRACK;
-    ReadCh();
+    Ch = '\0';
     break;
   
   case '{':
     Token = LBRACE;
-    ReadCh();
+    Ch = '\0';
     break;
   
   case '}':
     Token = RBRACE;
-    ReadCh();
+    Ch = '\0';
     break;
   
 
   case '*':
     Token = MULT;
-    ReadCh();
+    Ch = '\0';
     break;
   
   case '/':
     Token = DIV;
-    ReadCh();
+    Ch = '\0';
     break;
   
   case '\\':
     Token = LDIV;
-    ReadCh();
+    Ch = '\0';
     break;
   
   case '^':
     Token = POWER;
-    ReadCh();
+    Ch = '\0';
     break;
     
   case '+':
     Token = PLUS;
-    ReadCh();
+    Ch = '\0';
     break;
     
   case '~':
     Token = INVERSE;
-    ReadCh();
+    Ch = '\0';
     break;
   
 
   case ':':
-    ReadCh();
+    Ch = ReadCh();
     if (Ch != '=')
       SyntaxError("Illegal character '%c' after ':'", Ch);
     Token = DEQUALL;
-    ReadCh();
+    Ch = '\0';
     break;
   
   case '=':
-    ReadCh();
+    Ch = ReadCh();
     if (Ch != ':')
       Token = EQUAL;
     else {
       Token = DEQUALR;
-      ReadCh();
+      Ch = '\0';
     }
     break;
   
   case '<':
     Token = LANGLE;
-    ReadCh();
+    Ch = '\0';
     break;
   
   case '>':
     Token = RANGLE;
-    ReadCh();
+    Ch = '\0';
     break;
   
   case '|':
     Token = PIPE;
-    ReadCh();
+    Ch = '\0';
     break;
   
   case ',':
     Token = COMMA;
-    ReadCh();
+    Ch = '\0';
     break;
   
   case ';':
     Token = SEMICOLON;
-    ReadCh();
+    Ch = '\0';
     break;
   
   case '-':
     Token = MINUS;
-    ReadCh();
+    Ch = ReadCh();
     if (Ch == '>') {
       Token = ARROW;
-      ReadCh();
+      Ch = '\0';
     }
     break;
 
@@ -294,25 +297,24 @@ static void NextToken() {
     while (isalnum(Ch)) {
       mul_si(N, N, base);
       add_si(N, N, isdigit(Ch) ? Ch - '0' : Ch + 10 - (isupper(Ch) ? 'A' : 'a'));
-      ReadCh();
+      Ch = ReadCh();
     }
     break;
   }
-
-  default: {
+    
+  default:
     Token = GEN;
     GenName.clear();
 
     while (isalnum(Ch) || Ch == '_' || Ch == '.') {
       GenName.push_back(Ch);
-      ReadCh();
+      Ch = ReadCh();
     }
 
     if (GenName.empty())
       SyntaxError("Illegal character '%c' (ASCII %d) while parsing name", Ch, Ch);
 
     break;
-  }
   }
 }
 
@@ -435,7 +437,7 @@ static void ValidateExpression(const node *n, gen g) {
     SyntaxError("Expected a %s expression, not a number", LIEGPSTRING);
   case TGEN:
     if (n->g == 0 || n->g >= g) // generator 0 is for Frobenius map
-      SyntaxError("Generator of rank <= %d expected, not %d", g, n->g);
+      SyntaxError("Generator of position <= %d expected, not %d", g, n->g);
     break;
 #ifdef LIEALG
   case TPROD:
@@ -506,64 +508,60 @@ fppresentation::fppresentation(const char *InputFileName, bool ppower) {
   if (ppower)
     GeneratorName[0] = "p";
   
-  Ch = '\0';
   Column = 0;
   Line = 1;
   N.init();
   
   NextToken(); // start parsing
-
-  if (Token == LANGLE)
-    NextToken();
-  else
+  if (Token != LANGLE)
     SyntaxError("'<' expected");
 
   unsigned weight = 1;
 
+  NextToken();
   /* get generators */
   while (true) {
-    while (Token == SEMICOLON) {
+    while (true) {
+      if (Token != SEMICOLON)
+	break;
+      NextToken();
       weight++;
-      NextToken();
     }
-
-  read_gen:
-    if (Token != GEN)
-      SyntaxError("Generator expected");
-
-    // we start at 0, including the name "p" at position 0, to recognize p-powers
-    for (unsigned i = 0; i <= NrGens; i++) {
-      if (GenName == GeneratorName[i])
-	SyntaxError("Duplicate generator %s", GenName.c_str());
-    }
-
-    NrGens++;
-    GeneratorName.resize(NrGens + 1);
-    GeneratorName[NrGens].assign(GenName);
-
-    NextToken();
-
-    Weight.resize(NrGens + 1);
-    if (Token == POWER) {
-      NextToken();
-      node *t = Term(*this);
-      if (t->type != TNUM)
-	SyntaxError("Number expected as weight of generator %s", GenName.c_str());
-      Weight[NrGens] = t->n.get_si();
-    } else
-      Weight[NrGens] = weight;
-      
     if (Token == PIPE)
       break;
 
-    if (Token == COMMA) {
+    while (true) {
+      if (Token != GEN)
+	SyntaxError("Generator expected");
+
+      // we start at 0, including the special name "p" at position 0, to recognize p-powers
+      for (unsigned i = 0; i <= NrGens; i++) {
+	if (GenName == GeneratorName[i])
+	  SyntaxError("Duplicate generator %s", GenName.c_str());
+      }
+
+      NrGens++;
+      GeneratorName.resize(NrGens + 1);
+      GeneratorName[NrGens].assign(GenName);
+      Weight.resize(NrGens + 1);
+      
       NextToken();
-      goto read_gen;
+      if (Token == POWER) {
+	NextToken();
+	node *t = Term(*this);
+	if (t->type != TNUM)
+	  SyntaxError("Number expected as weight of generator %s", GenName.c_str());
+	Weight[NrGens] = t->n.get_si();
+      } else
+	Weight[NrGens] = weight;
+      
+      if (Token != COMMA)
+	break;
+      NextToken();
     }
   }
-
+    
   NextToken();
-
   /* get relators */
   while (is_relation(Token)) {
     node *n = Expression(*this, 0);
@@ -582,9 +580,8 @@ fppresentation::fppresentation(const char *InputFileName, bool ppower) {
       if (n->l->type != TGEN)
 	SyntaxError("LHS should be generator, not %s", nodename[n->l->type]);
 
-      for (const auto &m : Aliases)
-	if (m->l->g == n->l->g)
-	  SyntaxError("(At least) two definitions for generator %s", GeneratorName[n->l->g].c_str());
+      if (!Aliases.empty() && Aliases.back()->l->g >= n->l->g)
+	SyntaxError("Definitions are not in increasing order at generator %s", GeneratorName[n->l->g].c_str());
       
       ValidateExpression(n->r, n->l->g);
     } else if (n->type == TBRACE || n->type == TMAP) {
