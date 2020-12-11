@@ -6,7 +6,7 @@
 ##
 
 TRIO = trio-1.16
-NQVERSION = -DVERSION='"4.1.0 2019-08-09"'
+NQVERSION = -DVERSION='"4.1.1 2020-12-11"'
 OPT = -march=native -O0 #-Ofast
 DEBUG = -g -fsanitize=address 
 CFLAGS = -Wall -Werror -I$(TRIO) $(DEBUG) $(OPT)
