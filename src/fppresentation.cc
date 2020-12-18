@@ -77,6 +77,7 @@ static int Line;	/* Current line number. */
 static int TLine;	/* Line number where token starts. */
 static int Column;	/* Current character number. */
 static int TColumn;	/* Character number where token starts. */
+static std::string CurLine; /* Current line, for debugging */
 static const char *InFileName; /* Current input file name. */
 static FILE *InFp;	/* Current input file pointer. */
 static fpcoeff N;	/* Contains the integer just read. */
@@ -87,7 +88,7 @@ static void SyntaxError(const char *format, ...) {
   va_list va;
   va_start (va, format);
   vfprintf(stderr, format, va);
-  fprintf(stderr, " in file %s, line %d, char %d\n", InFileName, TLine, TColumn);
+  fprintf(stderr, " in file %s, line %d, char %d\n%s\n%*s", InFileName, TLine, TColumn, CurLine.c_str(), TColumn, "^");
   exit(3);
 }
 
@@ -124,12 +125,14 @@ static char ReadCh() {
   if ((Ch = getc(InFp)) == EOF)
     SyntaxError("I ran out of characters to read");
   Column++;
+  CurLine.push_back(Ch);
   if (Ch == '\\') {
     if ((Ch = getc(InFp)) == EOF)
       SyntaxError("I ran out of characters to read");
     if (Ch == '\n') {
       Line++;
       Column = 0;
+      CurLine = "";
       ReadCh();
     } else {
       ungetc(Ch, InFp);
@@ -157,6 +160,7 @@ static void NextToken() {
     if (Ch == '\n') {
       Line++;
       Column = 0;
+      CurLine = "";
     }
     Ch = ReadCh();
   }
@@ -437,7 +441,7 @@ static void ValidateExpression(const node *n, gen g) {
     SyntaxError("Expected a %s expression, not a number", LIEGPSTRING);
   case TGEN:
     if (n->g == 0 || n->g >= g) // generator 0 is for Frobenius map
-      SyntaxError("Generator of position <= %d expected, not %d", g, n->g);
+      SyntaxError("Generator of position < %d expected, not %d", g, n->g);
     break;
 #ifdef LIEALG
   case TPROD:
@@ -509,6 +513,7 @@ fppresentation::fppresentation(const char *InputFileName, bool ppower) {
     GeneratorName[0] = "p";
   
   Column = 0;
+  CurLine = "";
   Line = 1;
   N.init();
   
