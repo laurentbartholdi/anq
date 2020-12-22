@@ -196,6 +196,8 @@ void hollowpcvec::eval(const pcpresentation &pc, node *rel) {
   case TGEN:
     copy(pc.Epimorphism[rel->g]);
     break;
+  case TNUM: // we know the constant has to be 0
+    break;
   case TNEG:
     eval(pc, rel->u);
     neg();
@@ -677,6 +679,8 @@ void hollowpcvec::eval(const pcpresentation &pc, node *rel) {
   case TGEN:
     copy(pc.Epimorphism[rel->g]);
     break;
+  case TNUM: // we know the constant has to be 1
+    break;
   case TINV:
     {
       hollowpcvec t = vecstack.fresh();
@@ -722,7 +726,7 @@ void hollowpcvec::assocprod(const pcpresentation &pc, const hollowpcvec v, const
 
   for (const auto &kcv : v)
     for (const auto &kcw : w)
-      if (kcv.first <= pc.NrPcGens && kcw.first <= pc.NrPcGens && pc.Generator[kcv.first].w + pc.Generator[kcw.first].w <= pc.Class) {
+      if (pc.Generator[kcv.first].w + pc.Generator[kcw.first].w <= pc.Class) {
 	c.mul(kcv.second, kcw.second);
 	if (add)
 	  addmul(c, pc.Prod[kcv.first][kcw.first]);
@@ -735,7 +739,7 @@ void hollowpcvec::assocprod(const pcpresentation &pc, const hollowpcvec v, const
 // this +-= v*g
 template <typename V> void hollowpcvec::assocprod(const pcpresentation &pc, const V v, gen g, bool add) {
   for (const auto &kcv : v)
-    if (kcv.first <= pc.NrPcGens && g <= pc.NrPcGens && pc.Generator[kcv.first].w + pc.Generator[g].w <= pc.Class) {
+    if (pc.Generator[kcv.first].w + pc.Generator[g].w <= pc.Class) {
       if (add)
 	addmul(kcv.second, pc.Prod[kcv.first][g]);
       else
@@ -747,7 +751,7 @@ template void hollowpcvec::assocprod(const pcpresentation &, const sparsepcvec, 
 // this +-= g*v
 template <typename V> void hollowpcvec::assocprod(const pcpresentation &pc, gen g, const V v, bool add) {
   for (const auto &kcv : v)
-    if (kcv.first <= pc.NrPcGens && g <= pc.NrPcGens && pc.Generator[kcv.first].w + pc.Generator[g].w <= pc.Class) {
+    if (pc.Generator[kcv.first].w + pc.Generator[g].w <= pc.Class) {
       if (add)
 	addmul(kcv.second, pc.Prod[g][kcv.first]);
       else
@@ -845,6 +849,9 @@ void hollowpcvec::eval(const pcpresentation &pc, node *rel) {
     break;
   case TGEN:
     copy(pc.Epimorphism[rel->g]);
+    break;
+  case TNUM:
+    (*this)[0].set(rel->n);
     break;
   case TNEG:
     eval(pc, rel->u);

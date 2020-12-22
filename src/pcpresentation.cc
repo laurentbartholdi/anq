@@ -9,6 +9,18 @@
 #include <vector>
 #include <deque>
 
+#ifdef ASSOCALG
+static sparsepcvec unit_vector(gen g)
+{
+  sparsepcvec v;
+  v.alloc(1);
+  v.truncate(1);
+  v[0].first = g;
+  v[0].second.set_si(1);
+  return v;
+}
+#endif
+
 /* initialize Pc presentation, at class 0. No products or powers are set yet. */
 pcpresentation::pcpresentation(const fppresentation &pres) : fp(pres) {
   NrPcGens = 0;
@@ -21,7 +33,11 @@ pcpresentation::pcpresentation(const fppresentation &pres) : fp(pres) {
     Epimorphism[i].alloc(0);
   
   Generator.resize(1);
-  Generator[0] = {.type = (gendeftype) -1};
+#ifdef ASSOCALG
+  Generator[0] = {.type = DUNIT, .w = 0, .cw = 0};  
+#else
+  Generator[0] = {.type = DINVALID};
+#endif
 
   /* we initialize the exponents and annihilators of our pc generators */
   Exponent.reserve(1);
@@ -32,23 +48,27 @@ pcpresentation::pcpresentation(const fppresentation &pres) : fp(pres) {
 
 #ifdef ASSOCALG
   Prod.resize(NrPcGens + 1);
+  Prod[0].resize(NrPcGens + 1);
+  Prod[0][0] = unit_vector(0);
 #else
   Comm.resize(NrPcGens + 1);
 #endif
-  
+
   TimeStamp("pcpresentation::pcpresentation()");  
 }
 
 pcpresentation::~pcpresentation() {
+#ifdef ASSOCALG // starts at 0; we only free Prod[0][i] and Prod[i][0] once
+  for (unsigned i = 0; i <= NrPcGens; i++)
+    for (unsigned j = (i > 0); j <= NrPcGens; j++)
+      Prod[i][j].free();
+#endif
   for (unsigned i = 1; i <= NrPcGens; i++) {
     if (Power[i].allocated())
       Power[i].free();
     Exponent[i].clear();
     Annihilator[i].clear();
-#ifdef ASSOCALG
-    for (unsigned j = 1; j <= NrPcGens; j++)
-      Prod[i][j].free();
-#else
+#ifndef ASSOCALG
     for (unsigned j = 1; j < i; j++)
       Comm[i][j].free();
 #endif
@@ -320,8 +340,16 @@ unsigned pcpresentation::addtails() {
   for (unsigned i = NrPcGens + 1; i <= NrTotalGens; i++)
     Power[i].noalloc();
 
-  /* The Comm/Prod array is not extended yet, because anyways it won't
-     be used.  we'll extend it later, in ReducePcPres */
+  /* Unless we're in the associative algebra case, the Comm array
+     is not extended yet, because anyways it won't be used. */
+#ifdef ASSOCALG
+  Prod.resize(NrTotalGens + 1);
+  Prod[0].resize(NrTotalGens + 1);
+  for (unsigned i = NrPcGens + 1; i <= NrTotalGens; i++) {
+    Prod[i].resize(1);
+    Prod[i][0] = Prod[0][i] = unit_vector(i);
+  }
+#endif
 
   // set the size of vectors in the vector stack, since we'll soon
   // have to do some collecting
@@ -730,11 +758,16 @@ void pcpresentation::evalrels(matrix &m) {
 	fprintf(LogFile, " (" PRIhollowpcvec ")\n", &w);
       }
 
+#ifdef ASSOCALG
+      if (!w.empty() && w.begin()->first == 0)
+	abortprintf(3, "Relation does not belong to augmentation ideal");
+#endif
+
       if (!fp.Endomorphisms.empty())
 	itrels.push_back(w.getsparse());
     
       m.addrow(w);
-
+      
       if (t->type == TREL)
 	vecstack.release(w);
       else
@@ -817,6 +850,8 @@ void pcpresentation::evalrels(matrix &m) {
 #endif
 	    break;
 	  }
+	default:
+	  abortprintf(5, "Invalid generator definition");
 	}
 
 	rhs.sub(lhs);
@@ -1006,12 +1041,14 @@ void pcpresentation::reduce(const matrix &m) {
 
   /* finally extend the Prod/Comm array, by trivial elements */
 #ifdef ASSOCALG
+  // we had already allocated it to NrTotalGens. Free the useless part.
+  for (unsigned i = newnrpcgens+1; i <= NrTotalGens; i++)
+    Prod[0][i].free();
+  Prod[0].resize(newnrpcgens+1);
   Prod.resize(newnrpcgens + 1);
 
   for (unsigned i = 1; i <= newnrpcgens; i++) {
     Prod[i].resize(newnrpcgens+1);
-    if (i > NrPcGens)
-      Prod[i][0] = sparsepcvec::bad(); // guard
     for (unsigned j = (i > NrPcGens ? 0 : NrPcGens)+1; j <= newnrpcgens; j++)
       Prod[i][j].noalloc();
   }

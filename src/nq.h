@@ -258,6 +258,10 @@ enum gendeftype {
   TEMPGEN = DGEN | TEMPDEFMASK, // these temporary versions will be eliminated
   TEMPCOMM = DCOMM | TEMPDEFMASK, // by consistency and relations
   TEMPPOW = DPOW | TEMPDEFMASK,
+#ifdef ASSOCALG
+  DUNIT,
+#endif
+  DINVALID = -1
 };
   
 struct deftype {

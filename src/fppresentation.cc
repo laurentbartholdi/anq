@@ -448,7 +448,17 @@ static void ValidateExpression(const node *n, gen g) {
 
   switch (n->type) {
   case TNUM:
-    SyntaxError("Expected a %s expression, not a number", LIEGPSTRING);
+#ifdef GROUP
+    if (n->n.cmp_si(1))
+      SyntaxError("Only the constant 1 is allowed as group element");
+    break;
+#elif defined(LIEALG)
+    if (n->n.cmp_si(0))
+      SyntaxError("Only the constant 0 is allowed as Lie algebra element");
+    break;
+#elif defined(ASSOCALG)
+    break;    
+#endif
   case TGEN:
     if (n->g == 0 || n->g >= g) // generator 0 is for Frobenius map
       SyntaxError("Generator of position < %d expected, not %d", g, n->g);
