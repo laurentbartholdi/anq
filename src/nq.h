@@ -1,7 +1,8 @@
 /**************************************************************** nq.h
- * Nilpotent Quotient for Groups and Lie Algebras
+ * Nilpotent Quotient for Groups, Lie and Associative Algebras
  *
- * Based on code by Csaba Schneider
+ * Based on code by Csaba Schneider, itself based on code from Werner
+ * Nickel
  */
 
 #include <errno.h>
@@ -16,15 +17,21 @@
 #include "vectors.hh"
 
 /****************************************************************
- * the code will work for groups and Lie algebras, with different
- * routines called for collection, enforcing consistency etc.
+ * the code will work for groups, Lie and associative algebras, with
+ * different routines called for collection, enforcing consistency
+ * etc.
  */
 #ifdef LIEALG
 #define LIEGPSTRING "Lie algebra"
+#define INT_ASSOCALG 0
+#elif defined(ASSOCALG)
+#define LIEGPSTRING "associative algebra"
+#define INT_ASSOCALG 1
 #elif defined(GROUP)
 #define LIEGPSTRING "group"
+#define INT_ASSOCALG 0
 #else
-#error GROUP or LIEALG must be defined
+#error GROUP or LIEALG or ASSOCALG must be defined
 #include /abort
 #endif
 
@@ -171,13 +178,15 @@ class matrix {
 enum nodetype {
   TNUM,
   TGEN,
-  TBRACK, TBRACE, TMAP, TPROD, TQUO, TLQUO, TPOW, TSUM, TDIFF, TREL, TDREL, TDRELR,
+  TBRACK, TBRACE, TMAP, TSPROD, TPROD, TQUO, TLQUO,
+  TPOW, TCONJ, TSUM, TDIFF, TREL, TDREL, TDRELR,
   TNEG, TINV, TFROB
 };
 static const char *nodename[] __attribute__((unused)) = {
   "TNUM",
   "TGEN",
-  "TBRACK","TBRACE","TMAP","TPROD","TQUO","TLQUO","TPOW","TSUM","TDIFF","TREL","TDREL","TDRELR",
+  "TBRACK","TBRACE","TMAP","TSPROD","TPROD","TQUO","TLQUO",
+  "TPOW","TCONJ","TSUM","TDIFF","TREL","TDREL","TDRELR",
   "TNEG", "TINV", "TFROB"
 };
 const nodetype TINVALID = (nodetype) -1;
@@ -244,7 +253,7 @@ private:
 const unsigned TEMPDEFMASK = 0x10;
 enum gendeftype {
   DGEN,  /* g is defined as an image of original generator */
-  DCOMM,  /* g is defined as commutator */
+  DCOMM,  /* g is defined as commutator (or associative product) */
   DPOW, /* g is defined as power of a pc generator */
   TEMPGEN = DGEN | TEMPDEFMASK, // these temporary versions will be eliminated
   TEMPCOMM = DCOMM | TEMPDEFMASK, // by consistency and relations
@@ -263,7 +272,11 @@ struct deftype {
 
 struct pcpresentation {
   const fppresentation &fp;
+#ifdef ASSOCALG
+  std::vector<std::vector<sparsepcvec>> Prod; // the commutators: [aj,ai] = ... for j>i
+#else
   std::vector<std::vector<sparsepcvec>> Comm; // the commutators: [aj,ai] = ... for j>i
+#endif
   std::vector<sparsepcvec> Power, // powers: Exponent[i]*ai = ...
     Epimorphism; // epimorphism from fppresentation: Epimorphism[xi] = ...
   std::vector<pccoeff> Exponent, // the Exponent[i]*ai in next class
@@ -314,14 +327,15 @@ private:
  */
 struct hollowpcvec : hollowvec<pccoeff> {
   void eval(const pcpresentation &, node *);
+  void collect(const pcpresentation &);
 
   // functions for Lie algebras
+#ifdef LIEALG
   void liebracket(const pcpresentation &, const hollowpcvec, const hollowpcvec); // this += [v,w]
   void lie3bracket(const pcpresentation &, gen, gen, gen, bool); // this (+/-)= [[v,w],x]
   void engel(const pcpresentation &, gen, gen, unsigned, bool); // this (+/-)= [u,v...,v]
   void frobenius(const pcpresentation &, const hollowpcvec);
-  void liecollect(const pcpresentation &);
-
+#elif defined(GROUP)
   // functions for groups
   void collect(const pcpresentation &, gen, const pccoeff *c = nullptr); // collect one; last==nullptr means "1"
 
@@ -344,6 +358,12 @@ struct hollowpcvec : hollowvec<pccoeff> {
   template <typename V> void pow(const pcpresentation &, const V, const pccoeff &); // this *= v^n
   void lquo(const pcpresentation &, hollowpcvec, const hollowpcvec); // this *= v^-1 w
   template <typename V> void div(const pcpresentation &, const V); // this *= v^-1
+#elif defined(ASSOCALG)
+  void assocprod(const pcpresentation &, const hollowpcvec, const hollowpcvec, bool add = true); // this += v*w
+  template <typename V> void assocprod(const pcpresentation &, gen, const V, bool add = true); // this += v*w
+  template <typename V> void assocprod(const pcpresentation &, const V, gen, bool add = true); // this += v*w
+  void pow(const pcpresentation &, int); // this ^= n
+#endif
 };
 
 // a global stack to supply with very low overhead a fresh vector

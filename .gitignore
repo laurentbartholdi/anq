@@ -1,6 +1,5 @@
 *~
 *.o
-src/nq[lg]_*
 *.dSYM
 OLD/
 roman/
@@ -10,5 +9,5 @@ src/trio-1.16/config.log
 src/trio-1.16/config.status
 src/trio-1.16/libtrio.*
 tests/
-nq_[gl]_[0-9]*_[0-9]*
-nq_[gl]
+nq_[gla]_[0-9]*_[0-9]*
+nq_[gla]

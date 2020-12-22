@@ -10,11 +10,43 @@
 
 vec_supply<hollowpcvec> vecstack;
 
-/* Lie algebra operations.
+/* general collector, to be run at end of computations if "all powers
+ * commute" (Lie algebra, assoc algebra, tails of group)
+ */
+void hollowpcvec::collect(const pcpresentation &pc) {
+#ifdef LIEALG
+  if (pc.Jacobson) {
+    /* special case: here there is no torsion, but the pc.Power field is
+       used for the p-mapping.
+
+       In fact, we should probably not do anything, if the
+       coefficients are the prime field. */
+    for (const auto &kc : *this)
+      if (!reduced_p(kc.second, pc.Exponent[kc.first]))
+	shdiv_r((*this)[kc.first], kc.second, pc.Exponent[kc.first]);
+    return;
+  }
+#endif
+  pccoeff q;
+  q.init();
+  
+  for (const auto &kc : *this)
+    if (!reduced_p(kc.second, pc.Exponent[kc.first])) {
+      shdiv_qr(q, (*this)[kc.first], kc.second, pc.Exponent[kc.first]);
+      addmul(q, pc.Power[kc.first]);
+    }
+  q.clear();
+}
+
+//================================================================
+
+#ifdef LIEALG
+/****************************************************************
+ * Lie algebra operations.
  *
  * By convention, these operations do not return a normalized vector,
  * i.e. with exponents in the range [0,pc.Exponent[g]. Normalization
- * is done at the end of a calculation, with liecollect.
+ * is done at the end of a calculation, with collect.
  */
 
 // this += [v,w]
@@ -132,31 +164,74 @@ void hollowpcvec::frobenius(const pcpresentation &pc, const hollowpcvec v) {
     vecstack.release(z[i]);
 }
 
-void hollowpcvec::liecollect(const pcpresentation &pc) {
-  if (pc.Jacobson) {
-    /* special case: here there is no torsion, but the pc.Power field is
-       used for the p-mapping.
-
-       In fact, we should probably not do anything, if the
-       coefficients are the prime field. */
-    for (const auto &kc : *this)
-      if (!reduced_p(kc.second, pc.Exponent[kc.first]))
-	shdiv_r((*this)[kc.first], kc.second, pc.Exponent[kc.first]);
-    return;
-  }
-  
-  pccoeff q;
-  q.init();
-  
-  for (const auto &kc : *this)
-    if (!reduced_p(kc.second, pc.Exponent[kc.first])) {
-      shdiv_qr(q, (*this)[kc.first], kc.second, pc.Exponent[kc.first]);
-      addmul(q, pc.Power[kc.first]);
+/* evaluate relator, given as tree */
+void hollowpcvec::eval(const pcpresentation &pc, node *rel) {
+  switch (rel->type) {
+  case TSUM:
+    {
+      eval(pc, rel->l);
+      hollowpcvec t = vecstack.fresh();
+      t.eval(pc, rel->r);
+      add(t);
+      vecstack.release(t);
     }
-  q.clear();
+    break;
+  case TSPROD:
+    {
+      eval(pc, rel->r);
+      scale(rel->l->n);
+    }
+    break;
+  case TBRACK:
+    {
+      hollowpcvec t = vecstack.fresh();
+      hollowpcvec u = vecstack.fresh();
+      t.eval(pc, rel->l);
+      u.eval(pc, rel->r);
+      liebracket(pc, t, u);
+      vecstack.release(u);
+      vecstack.release(t);
+    }
+    break;
+  case TGEN:
+    copy(pc.Epimorphism[rel->g]);
+    break;
+  case TNEG:
+    eval(pc, rel->u);
+    neg();
+    break;
+  case TFROB:
+    {
+      hollowpcvec t = vecstack.fresh();
+      t.eval(pc, rel->u);
+      frobenius(pc, t);
+      vecstack.release(t);
+    }
+    break;
+  case TDIFF:
+    {
+      eval(pc, rel->l);
+      hollowpcvec t = vecstack.fresh();
+      t.eval(pc, rel->r);
+      sub(t);
+      vecstack.release(t);
+    }
+    break;
+  default:
+    abortprintf(3, "eval: operator of type %s should not occur", nodename[rel->type]);
+  }
 }
+#endif
 
-/* group operations */
+//================================================================
+
+#ifdef GROUP
+/****************************************************************
+ * group operations
+ */
+
+// to compute powers efficiently, try to compute powers of characteristic
+const uint64_t pow_base = pccoeff::characteristic ? pccoeff::characteristic : 2;
 
 /****************************************************************
  * a simple stack for the collector
@@ -195,8 +270,6 @@ namespace std {
     }   
   };
 }
-
-const uint64_t pow_base = pccoeff::characteristic ? pccoeff::characteristic : 2;
 
 // the following functions compute g^(h^c) using cache. assume g > h.
 
@@ -556,20 +629,8 @@ template <typename V> void hollowpcvec::pow(const pcpresentation &pc, const V v,
 /* evaluate relator, given as tree */
 void hollowpcvec::eval(const pcpresentation &pc, node *rel) {
   switch (rel->type) {
-  case TSUM:
-    {
-      eval(pc, rel->l);
-      hollowpcvec t = vecstack.fresh();
-      t.eval(pc, rel->r);
-      add(t);
-      vecstack.release(t);
-    }
-    break;
   case TPROD:
-    if (rel->l->type == TNUM) {
-      eval(pc, rel->r);
-      scale(rel->l->n);
-    } else {
+    {
       eval(pc, rel->l);
       hollowpcvec t = vecstack.fresh();
       t.eval(pc, rel->r);
@@ -603,26 +664,18 @@ void hollowpcvec::eval(const pcpresentation &pc, node *rel) {
       hollowpcvec u = vecstack.fresh();
       t.eval(pc, rel->l);
       u.eval(pc, rel->r);
-#ifdef LIEALG
-      liebracket(pc, t, u);
-#else
       hollowpcvec v = vecstack.fresh();
       v.copy(t);
       v.mul(pc, u); // v = t*u
       u.mul(pc, t); // u = u*t
       lquo(pc, u, v); // this = (u*t) \ (t*u)
       vecstack.release(v);
-#endif      
       vecstack.release(u);
       vecstack.release(t);
     }
     break;
   case TGEN:
     copy(pc.Epimorphism[rel->g]);
-    break;
-  case TNEG:
-    eval(pc, rel->u);
-    neg();
     break;
   case TINV:
     {
@@ -632,11 +685,119 @@ void hollowpcvec::eval(const pcpresentation &pc, node *rel) {
       vecstack.release(t);
     }
     break;
-  case TFROB:
+  case TPOW:
     {
       hollowpcvec t = vecstack.fresh();
-      t.eval(pc, rel->u);
-      frobenius(pc, t);
+      t.eval(pc, rel->l);
+      pow(pc, t, rel->r->n);
+      vecstack.release(t);
+    }
+    break;
+  case TCONJ:
+    {
+      hollowpcvec t = vecstack.fresh();
+      hollowpcvec u = vecstack.fresh();
+      t.eval(pc, rel->l);
+      u.eval(pc, rel->r);
+      t.mul(pc, u);
+      lquo(pc, u, t);
+      vecstack.release(u);
+      vecstack.release(t);
+    }
+    break;
+  default:
+    abortprintf(3, "eval: operator of type %s should not occur", nodename[rel->type]);
+  }
+}
+#endif
+
+//================================================================
+
+#ifdef ASSOCALG
+
+// this +-= v*w
+void hollowpcvec::assocprod(const pcpresentation &pc, const hollowpcvec v, const hollowpcvec w, bool add) {
+  pccoeff c;
+  c.init();
+
+  for (const auto &kcv : v)
+    for (const auto &kcw : w)
+      if (kcv.first <= pc.NrPcGens && kcw.first <= pc.NrPcGens && pc.Generator[kcv.first].w + pc.Generator[kcw.first].w <= pc.Class) {
+	c.mul(kcv.second, kcw.second);
+	if (add)
+	  addmul(c, pc.Prod[kcv.first][kcw.first]);
+	else
+	  submul(c, pc.Prod[kcv.first][kcw.first]);
+      }
+  c.clear();
+}
+
+// this +-= v*g
+template <typename V> void hollowpcvec::assocprod(const pcpresentation &pc, const V v, gen g, bool add) {
+  for (const auto &kcv : v)
+    if (kcv.first <= pc.NrPcGens && g <= pc.NrPcGens && pc.Generator[kcv.first].w + pc.Generator[g].w <= pc.Class) {
+      if (add)
+	addmul(kcv.second, pc.Prod[kcv.first][g]);
+      else
+	submul(kcv.second, pc.Prod[kcv.first][g]);
+    }
+}
+template void hollowpcvec::assocprod(const pcpresentation &, const sparsepcvec, gen, bool); // force instance
+
+// this +-= g*v
+template <typename V> void hollowpcvec::assocprod(const pcpresentation &pc, gen g, const V v, bool add) {
+  for (const auto &kcv : v)
+    if (kcv.first <= pc.NrPcGens && g <= pc.NrPcGens && pc.Generator[kcv.first].w + pc.Generator[g].w <= pc.Class) {
+      if (add)
+	addmul(kcv.second, pc.Prod[g][kcv.first]);
+      else
+	submul(kcv.second, pc.Prod[g][kcv.first]);
+    }
+}
+template void hollowpcvec::assocprod(const pcpresentation &, gen, const sparsepcvec, bool); // force instance
+
+// this = this^c
+void hollowpcvec::pow(const pcpresentation &pc, int c) {
+  hollowpcvec x = vecstack.fresh();
+  hollowpcvec y = vecstack.fresh();
+
+  if (c < 0)
+    abortprintf(3,"TPOW can only be used with positive exponents");
+
+  x.copy(*this);
+
+  bool this_is_1 = true;
+  for (int d = 1;;) {
+    if (c & d) {
+      if (this_is_1) {
+	copy(x);
+	this_is_1 = false;
+      } else {
+	y.copy(*this);
+	clear();
+	assocprod(pc, y, x);
+      }
+    }
+    d <<= 1;
+    if (d > c)
+      break;
+    y.copy(x);
+    x.clear();
+    x.assocprod(pc, y, y);
+  }
+  vecstack.release(y);
+  vecstack.release(x);
+}
+
+/* evaluate relator, given as tree */
+void hollowpcvec::eval(const pcpresentation &pc, node *rel) {
+  switch (rel->type) {
+  case TSUM:
+    {
+      eval(pc, rel->l);
+      hollowpcvec t = vecstack.fresh();
+      t.eval(pc, rel->r);
+      add(t);
       vecstack.release(t);
     }
     break;
@@ -649,25 +810,70 @@ void hollowpcvec::eval(const pcpresentation &pc, node *rel) {
       vecstack.release(t);
     }
     break;
-  case TPOW:
-    if (rel->r->type == TNUM) {
-      hollowpcvec t = vecstack.fresh();
-      t.eval(pc, rel->l);
-      pow(pc, t, rel->r->n);
-      vecstack.release(t);
-    } else {
+  case TSPROD:
+    {
+      eval(pc, rel->r);
+      scale(rel->l->n);
+    }
+    break;
+  case TPROD:
+    {
       hollowpcvec t = vecstack.fresh();
       hollowpcvec u = vecstack.fresh();
       t.eval(pc, rel->l);
       u.eval(pc, rel->r);
-      t.mul(pc, u);
-      lquo(pc, u, t);
+      assocprod(pc, t, u);
       vecstack.release(u);
       vecstack.release(t);
-      break;
+    }
+    break;
+  case TBRACK:
+    {
+      hollowpcvec t = vecstack.fresh();
+      hollowpcvec u = vecstack.fresh();
+      t.eval(pc, rel->l);
+      u.eval(pc, rel->r);
+      assocprod(pc, t, u);
+      assocprod(pc, u, t, false);
+      vecstack.release(u);
+      vecstack.release(t);
+    }
+    break;
+  case TPOW:
+    eval(pc, rel->l);
+    pow(pc, get_si(rel->r->n));
+    break;
+  case TGEN:
+    copy(pc.Epimorphism[rel->g]);
+    break;
+  case TNEG:
+    eval(pc, rel->u);
+    neg();
+    break;
+  case TINV: // replace this with -this+this^2-this^3+-...
+    {
+      hollowpcvec t = vecstack.fresh();
+      hollowpcvec u = vecstack.fresh();
+      hollowpcvec v = vecstack.fresh();
+      neg();
+      t.copy(*this);
+      u.copy(*this);
+      for (;;) {
+	v.assocprod(pc, t, u);
+	if (v.empty())
+	  break;
+	t.copy(v);
+	v.clear();
+	add(t);
+      }
+      vecstack.release(v);
+      vecstack.release(u);
+      vecstack.release(t);
     }
     break;
   default:
     abortprintf(3, "eval: operator of type %s should not occur", nodename[rel->type]);
   }
 }
+
+#endif

@@ -421,8 +421,17 @@ node *Expression(fppresentation &pres, int precedence) {
 	abortprintf(3, "I can't evaluate a numerical expression with binary operator %d", oper);
       }
       FreeNode(u);
-    } else
+    } else {
+      if (oper == TPROD && t->type == TNUM)
+	oper = TSPROD;
+      if (oper == TPROD && u->type == TNUM) {
+	oper = TSPROD;
+	std::swap(t, u);
+      }
+      if (oper == TPOW && u->type != TNUM)
+	oper = TCONJ;
       t = new node{oper, t, u};
+    }
   }
   return t;
 }
@@ -430,10 +439,11 @@ node *Expression(fppresentation &pres, int precedence) {
 static void ValidateExpression(const node *n, gen g) {
   /* check that n is a valid expression, involving only generators of index < g.
 
-     in Lie algebras: for TPROD, LHS must be a number, and all other
-     terms must be Lie expressions.  Forbid TINV, TQUO, TLQUO, TREL, TDREL.
+     in Lie algebras: forbid TPROD, TINV, TQUO, TLQUO, TREL, TDREL, TPOW, TCONJ.
 
      in groups: forbid TSUM, TDIFF, TNEG, TREL, TDREL.
+
+     in associative algebras: forbid TQUO, TLQUO, TCONJ, TREL, TDREL.
   */
 
   switch (n->type) {
@@ -443,36 +453,43 @@ static void ValidateExpression(const node *n, gen g) {
     if (n->g == 0 || n->g >= g) // generator 0 is for Frobenius map
       SyntaxError("Generator of position < %d expected, not %d", g, n->g);
     break;
-#ifdef LIEALG
-  case TPROD:
+    // binary expressions
+#ifndef LIEALG
+  case TPOW:
+    ValidateExpression(n->l, g);
+    if (n->r->type != TNUM)
+      SyntaxError("RHS ot TPOW should be number, not %s", nodename[n->l->type]);
+    break;
+#endif
+#ifndef GROUP
+  case TSPROD:
     if (n->l->type != TNUM)
-      SyntaxError("LHS of TPROD should be number, not %s", nodename[n->l->type]);
+      SyntaxError("LHS of TSPROD should be number, not %s", nodename[n->l->type]);
     ValidateExpression(n->r, g);
     break;
 #endif
-#ifdef GROUP
-  case TPOW: // conjugation or power
-    ValidateExpression(n->l, g);
-    if (n->r->type != TNUM)
-      ValidateExpression(n->r, g);
-    break;
-#endif
-  case TBRACK: // binary
-#ifdef LIEALG
+  case TBRACK:
+  case TPROD:
+#ifndef GROUP
   case TSUM:
   case TDIFF:
-#else
-  case TPROD:
+#endif
+#ifdef GROUP
   case TQUO:
   case TLQUO:
+  case TCONJ:
 #endif    
     ValidateExpression(n->l, g);
     ValidateExpression(n->r, g);
     break;
-#ifdef LIEALG // unary
-  case TNEG:
+    // unary
+#ifdef LIEALG
   case TFROB:
-#else
+#endif
+#ifndef GROUP
+  case TNEG:
+#endif
+#ifndef LIEALG
   case TINV:
 #endif
     ValidateExpression(n->u, g);
@@ -710,6 +727,12 @@ void fppresentation::printnode(FILE *f, const node *n) const {
     fprintf(f, " - ");
     printnode(f, n->r);
     break;
+  case TSPROD:
+    printnode(f, n->l);
+    fprintf(f, "*(");
+    printnode(f, n->r);
+    fprintf(f, ")");
+    break;
   case TPROD:
     fprintf(f, "(");
     printnode(f, n->l);
@@ -732,6 +755,12 @@ void fppresentation::printnode(FILE *f, const node *n) const {
     fprintf(f, ")");
     break;
   case TPOW:
+    fprintf(f, "(");
+    printnode(f, n->l);
+    fprintf(f, ")^");
+    printnode(f, n->r);
+    break;
+  case TCONJ:
     fprintf(f, "(");
     printnode(f, n->l);
     fprintf(f, ")^(");

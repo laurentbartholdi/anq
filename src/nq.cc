@@ -114,17 +114,17 @@ template <typename V> static int cvec_print(void *ref)
   bool first = true;
   for (const auto &kc : *data) {
     char *buffer = (char *) get_str(nullptr, 10, kc.second);
-#ifdef LIEALG
-    if (first) first = false; else trio_print_string(ref, " + ");
-    trio_print_string(ref, buffer);
-    trio_print_string(ref, "*a");
-    trio_print_int(ref, kc.first);
-#else
+#ifdef GROUP
     if (first) first = false; else trio_print_string(ref, " * ");
     trio_print_string(ref, "a");
     trio_print_int(ref, kc.first);
     trio_print_string(ref, "^");
     trio_print_string(ref, buffer);
+#else
+    if (first) first = false; else trio_print_string(ref, " + ");
+    trio_print_string(ref, buffer);
+    trio_print_string(ref, "*a");
+    trio_print_int(ref, kc.first);
 #endif
     free(buffer);
   }

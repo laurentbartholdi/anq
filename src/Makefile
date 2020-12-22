@@ -6,7 +6,7 @@
 ##
 
 TRIO = trio-1.16
-NQVERSION = -DVERSION='"4.1.1 2020-12-11"'
+NQVERSION = -DVERSION='"5.0.0 2020-12-22"'
 OPT = -march=native -O0 #-Ofast
 DEBUG = -g -fsanitize=address 
 CFLAGS = -Wall -Werror -I$(TRIO) $(DEBUG) $(OPT)
@@ -20,7 +20,9 @@ else
   CXXFLAGS += -I/usr/include/suitesparse
 endif
 
-CXX=g++
+ifeq ($(shell hostname -s),laurent-mbp) # private settings
+  CXX=/usr/bin/clang++
+endif
 
 ifndef COEFF
 COEFF = integer<0,1>
@@ -32,10 +34,10 @@ endif
 NQ_OBJ := fppresentation.o pcpresentation.o operations.o matrix.o nq.o
 NQ_INCL := nq.h ring.hh r_*.hh vectors.hh
 
-all: trio nq_l nq_g
+all: trio nq_a nq_l nq_g
 
 coverage_nql:
-	$(MAKE) -B OPT=-march=native CXX=clang++ DEBUG="-g -fprofile-instr-generate -fcoverage-mapping" nq_l nq_g
+	$(MAKE) -B OPT=-march=native CXX=clang++ DEBUG="-g -fprofile-instr-generate -fcoverage-mapping" nq_l nq_g nq_a
 
 # then use as follows:
 # % LLVM_PROFILE_FILE="nq.profraw" ./nql_long ...
@@ -66,7 +68,7 @@ runprofile:
 	pprof --pdf --nodecount=20 ./nqg_2_2 ./nqg_2_2.prof > profile.pdf
 
 clean:
-	rm -fr *.o *.gc?? nq_[lg]_[0-9]*_[0-9]* *.dSYM $(TRIO)/libtrio.a
+	rm -fr *.o *.gc?? nq_[lga]_[0-9]*_[0-9]* nq_[lga] *.dSYM $(TRIO)/libtrio.a
 
 nq_l: $(subst .o,_l.o,$(NQ_OBJ))
 
@@ -78,11 +80,16 @@ nq_g: $(subst .o,_g.o,$(NQ_OBJ))
 %_g.o: %.cc $(NQ_INCL)
 	$(CXX) -c -DCOEFF="$(COEFF)" -DGROUP $(CXXFLAGS) $(NQVERSION) $< -o $@
 
+nq_a: $(subst .o,_a.o,$(NQ_OBJ))
+
+%_a.o: %.cc $(NQ_INCL)
+	$(CXX) -c -DCOEFF="$(COEFF)" -DASSOCALG $(CXXFLAGS) $(NQVERSION) $< -o $@
+
 .SECONDEXPANSION:
 
 %.o: $$(word 1,$$(subst _, ,$$*)).cc $(NQ_INCL)
-	$(if $(findstring $(word 2,$(subst _, ,$*)),lg),,$(error l or g required in stem of $*))
-	$(CXX) -c -DPCCOEFF_P=$(word 3,$(subst _, ,$*)) -DPCCOEFF_K=$(word 4,$(subst _, ,$*)) -D$(if $(findstring $(word 2,$(subst _, ,$*)),l),LIEALG,GROUP) $(CXXFLAGS) $(NQVERSION) $< -o $@
+	$(if $(findstring $(word 2,$(subst _, ,$*)),lga),,$(error l or g or a required in stem of $*))
+	$(CXX) -c -DPCCOEFF_P=$(word 3,$(subst _, ,$*)) -DPCCOEFF_K=$(word 4,$(subst _, ,$*)) -D$(if $(findstring $(word 2,$(subst _, ,$*)),l),LIEALG,$(if $(findstring $(word 2,$(subst _, ,$*)),g),GROUP,ASSOCALG)) $(CXXFLAGS) $(NQVERSION) $< -o $@
 
 nq_%: trio $$(subst .o,_%.o,$(NQ_OBJ))
 	$(CXX) -o $@ $(CXXFLAGS) $(LDFLAGS) $(filter-out $<,$^) $(LOADLIBES) $(LDLIBS)
