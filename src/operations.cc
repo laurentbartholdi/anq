@@ -762,35 +762,35 @@ template void hollowpcvec::assocprod(const pcpresentation &, gen, const sparsepc
 
 // this = this^c
 void hollowpcvec::pow(const pcpresentation &pc, int c) {
-  hollowpcvec x = vecstack.fresh();
-  hollowpcvec y = vecstack.fresh();
+  hollowpcvec x[2];
+  x[false] = vecstack.fresh();
+  x[true] = vecstack.fresh();
 
   if (c < 0)
     abortprintf(3,"TPOW can only be used with positive exponents");
 
-  x.copy(*this);
+  x[false].copy(*this);
 
-  bool this_is_1 = true;
-  for (int d = 1;;) {
+  bool b = false, this_is_1 = true;
+  for (int d = 1;; b = !b) {
     if (c & d) {
       if (this_is_1) {
-	copy(x);
+	copy(x[b]);
 	this_is_1 = false;
       } else {
-	y.copy(*this);
+	x[!b].copy(*this);
 	clear();
-	assocprod(pc, y, x);
+	assocprod(pc, x[b], x[!b]);
       }
     }
     d <<= 1;
     if (d > c)
       break;
-    y.copy(x);
-    x.clear();
-    x.assocprod(pc, y, y);
+    x[!b].clear();
+    x[!b].assocprod(pc, x[b], x[b]);
   }
-  vecstack.release(y);
-  vecstack.release(x);
+  vecstack.release(x[true]);
+  vecstack.release(x[false]);
 }
 
 /* evaluate relator, given as tree */
@@ -860,21 +860,19 @@ void hollowpcvec::eval(const pcpresentation &pc, node *rel) {
   case TINV: // replace this with -this+this^2-this^3+-...
     {
       hollowpcvec t = vecstack.fresh();
-      hollowpcvec u = vecstack.fresh();
-      hollowpcvec v = vecstack.fresh();
-      neg();
-      t.copy(*this);
-      u.copy(*this);
-      for (;;) {
-	v.assocprod(pc, t, u);
-	if (v.empty())
-	  break;
-	t.copy(v);
-	v.clear();
-	add(t);
+      t.eval(pc, rel->u);
+      t.neg();
+      hollowpcvec u[2];
+      u[false] = vecstack.fresh();
+      u[true] = vecstack.fresh();
+      u[false].copy(t);
+      for (bool b = false; !u[b].empty(); b = !b) {
+	add(u[b]);
+	u[!b].clear();
+	u[!b].assocprod(pc, t, u[b]);
       }
-      vecstack.release(v);
-      vecstack.release(u);
+      vecstack.release(u[true]);
+      vecstack.release(u[false]);
       vecstack.release(t);
     }
     break;

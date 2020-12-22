@@ -309,8 +309,14 @@ int main(int argc, char **argv) {
     fprintf(LogFile, "# The %d%s factor has %d generator%s", pc.Class, ordinal(pc.Class), newgens, plural(newgens));
     if (newgens) {
       fprintf(LogFile, " of relative order%s ", plural(newgens));
-      for (unsigned i = oldnrpcgens + 1; i <= pc.NrPcGens; i++)
-	fprintf(LogFile, PRIpccoeff "%s", &pc.Exponent[i], i == pc.NrPcGens ? "" : ", ");
+      for (unsigned i = oldnrpcgens + 1; i <= pc.NrPcGens; i++) {
+	if (pc.Exponent[i].z_p())
+	  fprintf(LogFile, "∞");
+	else
+	  fprintf(LogFile, PRIpccoeff, &pc.Exponent[i]);
+	if (i < pc.NrPcGens)
+	  fprintf(LogFile, ", ");
+      }
     }
     fprintf(LogFile,"\n");
 
