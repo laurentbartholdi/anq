@@ -1413,7 +1413,8 @@ void pcpresentation::printGAP(FILE *f) const {
 	fprintf(f, "]);\n");
       }
     }
-  fprintf(f, "\tA := AlgebraByStructureConstants(ListWithIdenticalEntries(%d,0), T);\n", NrPcGens);
+  fprintf(f, "\tA := AlgebraByStructureConstants(Integers, T);\n");
+  fprintf(f, "\tError(\"Basis(A) doesn't work yet!\");\n");
   fprintf(f, "\tbas := Basis(A);\n"
 	  "\tepi := NaturalHomomorphismByIdeal(A,Ideal(A,[");
   bool first = true;
@@ -1451,7 +1452,7 @@ void pcpresentation::printGAP(FILE *f) const {
 	  "\t\tlocal res, i;\n"
 	  "\t\tif not elm in src then Error(\"Element \",elm,\" does not belong to free Lie algebra \",src); fi;\n"
 	  "\t\telm := elm![1];\n"
-	  "\t\tres := Zero(L);\n"
+	  "\t\tres := Zero(A);\n"
 	  "\t\tfor i in [2,4..Length(elm)] do\n"
 	  "\t\t\tres := res + elm[i]*eval(elm[i-1]);\n"
 	  "\t\tod;\n"

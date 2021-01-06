@@ -583,7 +583,10 @@ fppresentation::fppresentation(const char *InputFileName, bool ppower) {
 	node *t = Term(*this);
 	if (t->type != TNUM)
 	  SyntaxError("Number expected as weight of generator %s", GenName.c_str());
-	Weight[NrGens] = t->n.get_si();
+	int w = t->n.get_si();
+	if (w <= 0)
+	  SyntaxError("Weight of generator %s should be positive, not %d", GenName.c_str(), w);
+	Weight[NrGens] = w;
       } else
 	Weight[NrGens] = weight;
       
