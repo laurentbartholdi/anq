@@ -31,13 +31,6 @@ constexpr bool is_binary(token t) {
 constexpr associativity token_assoc(token t) {
   return t == POWER ? RIGHTASSOC : LEFTASSOC;
 					 }
-inline int unary_prec(token t) {
-  switch (t) {
-  case INVERSE: return 6;
-  case MINUS: return 4;
-  default: return 0;
-  }
-}
 inline int binary_prec(token t) {
   switch (t) {
   case MINUS: case PLUS: return 3;
@@ -323,13 +316,12 @@ static void NextToken() {
 }
 
 node *Term(fppresentation &pres) {
-  node *Expression(fppresentation&, int);
+  node *Expression(fppresentation&, unsigned);
   
   if (is_unary(Token)) {
     node *n = new node{unary_node(Token)};
-    int new_precedence = unary_prec(Token);
     NextToken();
-    node *u = Expression(pres, new_precedence);
+    node *u = Expression(pres, -1u);
     if (u->type == TNUM) { /* compile-time evaluation */
       n->n.init();
       switch (n->type) {
@@ -384,7 +376,7 @@ node *Term(fppresentation &pres) {
   SyntaxError("Term expected");
 }
 
-node *Expression(fppresentation &pres, int precedence) {
+node *Expression(fppresentation &pres, unsigned precedence) {
   node *t = Term(pres);
   int new_precedence;
   
