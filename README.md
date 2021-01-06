@@ -1,7 +1,7 @@
-# lienq
-A nilpotent quotient algorithm for groups and Lie algebras.
+# anq
+A nilpotent quotient algorithm for groups, Lie and associative algebras.
 
-Input is a finite presentation, or more generally, a finite L-presentation, for a group or a Lie algebra.
+Input is a finite presentation, or more generally, a finite L-presentation, for a group or algebra.
 
 Output is the quotient by the *n*th term of an appropriate series, given by a consistent nilpotent presentation.
 
@@ -17,5 +17,5 @@ The contents of the library is:
 doc: documentations;
 exs: example files;
 gap: an interface to gap;
-src: the C source code for lienq;
-tst: lienq outputs corresponding to the files in 'exs'.
+src: the C source code for anq;
+tst: anq outputs corresponding to the files in 'exs'.
