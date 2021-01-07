@@ -309,7 +309,7 @@ struct pcpresentation {
   void evalrels(matrix &);
   void reduce(const matrix &);
   void print(FILE *f, bool, bool, bool) const;
-  void printGAP(FILE *f) const;
+  void printGAP(FILE *f, int) const;
 private:
   void add1generator(sparsepcvec &, deftype);
   inline bool isgoodweight_comm(int i, int j) const;

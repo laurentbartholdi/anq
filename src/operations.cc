@@ -409,8 +409,11 @@ void hollowpcvec::collect(const pcpresentation &pc, gen g, const pccoeff *c) {
     }
 
     if (reducepower) {
-      (*this)[g] -= pc.Exponent[g];
-      mul(pc, pc.Power[g]);
+      pccoeff q;
+      q.init();  
+      shdiv_qr(q, (*this)[g], (*this)[g], pc.Exponent[g]);
+      pow(pc, pc.Power[g], q);
+      q.clear();
     }
   
     if (reducecomm) {
@@ -585,6 +588,16 @@ template <typename V> void hollowpcvec::div(const pcpresentation &pc, const V v)
 template <typename V> void hollowpcvec::pow(const pcpresentation &pc, const V v, const pccoeff &c) {
   if (z_p(c)) // easy peasy
     return;
+
+  if (!cmp_si(c, 1)) {
+    mul(pc, v);
+    return;
+  }
+
+  if (!cmp_si(c, -1)) {
+    div(pc, v);
+    return;
+  }
   
   pccoeff d;
   d.init();

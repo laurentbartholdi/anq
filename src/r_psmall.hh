@@ -316,7 +316,7 @@ public:
   inline char *get_str(char *s, int base) const {
     char *p;
     if (s == nullptr)
-      p = (char *) malloc(25);
+      p = (char *) malloc(50);
     else
       p = s;
 #ifdef TRIO_TRIO_H

@@ -59,7 +59,11 @@ void TimeStamp(const char *s) {
 
 const char USAGE[] = "Usage: nq <options> [<inputfile>] [<maximal weight>]\n"
   "(with no input file, presentation is read from STDIN)\n"
-  "\t[-A]\ttoggle GAP output, default false (load then object with `ReadAsFunction(filename)()`)\n"
+  "\t[-A]\tprint GAP output, default false (load then object with `ReadAsFunction(filename)()`"
+#ifdef GROUP
+  ". once=PcpGroup, twice=PcGroup"
+#endif
+  "\n"
   "\t[-C]\ttoggle printing compact form of multiplication table, default true\n"
   "\t[-D]\tincrease debug level\n"
   "\t[-F <outputfile>]\n"
@@ -142,8 +146,9 @@ char *utoa(char *s, unsigned n) {
 
 int main(int argc, char **argv) {
   int c;
-  bool PrintZeros = true, PrintCompact = true, PrintDefs = false, PrintGap = false;
+  bool PrintZeros = true, PrintCompact = true, PrintDefs = false;
   bool Graded = false, Metabelian = false, TorsionFree = false;
+  int PrintGap = 0;
 #ifdef LIEALG
   bool Jacobson = false;
   #else
@@ -164,7 +169,7 @@ int main(int argc, char **argv) {
   while ((c = getopt (argc, argv, "ACDF:GhJL:MN:PTW:Z")) != -1)
     switch (c) {
     case 'A':
-      PrintGap ^= true;
+      PrintGap++;
       break;
     case 'C':
       PrintCompact ^= true;
@@ -324,8 +329,8 @@ int main(int argc, char **argv) {
       break;
   }
 
-  if (PrintGap)
-    pc.printGAP(OutputFile);  
+  if (PrintGap > 0)
+    pc.printGAP(OutputFile, PrintGap);  
   else
     pc.print(OutputFile, PrintCompact, PrintDefs, PrintZeros);
 

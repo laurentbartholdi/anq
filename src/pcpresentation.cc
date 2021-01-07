@@ -1130,7 +1130,7 @@ void pcpresentation::print(FILE *f, bool PrintCompact, bool PrintDefs, bool Prin
       gen g = i;
       while (Generator[g].type == DPOW) {
 #ifdef GROUP
-	fprintf(f,"(");
+	fprintf(f, "(");
 #else
 	fprintf(f,PRIpccoeff "*", &Exponent[g]);
 #endif
@@ -1155,7 +1155,7 @@ void pcpresentation::print(FILE *f, bool PrintCompact, bool PrintDefs, bool Prin
       fprintf(f, INT_ASSOCALG ? ")" : "]");
 #ifdef GROUP
       for (g = i; Generator[g].type == DPOW; g = Generator[g].p)
-	fprintf(f,"^" PRIpccoeff ")", &Exponent[g]);
+	fprintf(f, "^" PRIpccoeff ")", &Exponent[g]);
 #endif
       fprintf(f, "^epimorphism\n");
     }
@@ -1262,7 +1262,7 @@ template<typename V> bool PrintGAPVec(FILE *f, const V v, bool first) {
 // it has attributes
 // - FreeAlgebraOfFpAlgebra, the free algebra with the original generators
 // - CanonicalProjection, a function from FreeAlgebraOfFpAlgebra(L) to L
-void pcpresentation::printGAP(FILE *f) const {
+void pcpresentation::printGAP(FILE *f, int level) const {
   fprintf(f, // "L := CallFuncList(function()\n"
 	  "\tlocal T, L, bas, epi, src, genimgs, eval;\n\n"
 	  "\tLoadPackage(\"liering\");\n\n");
@@ -1307,7 +1307,7 @@ void pcpresentation::printGAP(FILE *f) const {
       fprintf(f, "Zero(L)");
     fprintf(f, ")^epi");
   }
-  fprintf(f,"];\n");
+  fprintf(f, "];\n");
   
   fprintf(f, "\tL := Range(epi);\n"
 	  "\tSetFreeAlgebraOfFpAlgebra(L,src);\n");
@@ -1342,42 +1342,124 @@ void pcpresentation::printGAP(FILE *f) const {
 // it has attributes
 // - FreeGroupOfFpGroup, the free group with the original generators
 // - EpimorphismFromFreeGroup, a homomorphism from its FreeGroupOfFpGroup(G) to G
-void pcpresentation::printGAP(FILE *f) const {
-  fprintf(f, // "G := CallFuncList(function()\n"
-	  "\tlocal F, P, c, g;\n\n"
-	  "\tLoadPackage(\"nq\");\n\n");
+// - LowerCentralSeriesOfGroup, the series of subgroups
 
-  fprintf(f, "\tP := FreeGroup(IsSyllableWordsFamily,[");
-  for (unsigned i = 1; i <= fp.NrGens; i++)
-    fprintf(f, "%s\"%s\"", i > 1 ? "," : "", fp.GeneratorName[i].c_str());
+// print conjugate relation, g_j^{g_i} = ... j and i can be negative, for inverses
+inline int signint(int i) { return (i > 0) - (i < 0); }
+
+void printcoeff(FILE *f, const pccoeff &c) {
+  char *s = c.get_str(nullptr, 10);
+  if (s[0] == '-')
+    fprintf(f, "pk");
+  fprintf(f, "%s", s);
+}
+
+void printconjugate(const pcpresentation &pc, FILE *f, int j, int i) {
+  fprintf(f, "\tSetConjugate(c,%d,%d,[", j, i);
+
+  hollowpcvec v = vecstack.fresh();
+  pccoeff s;
+  s.init();
+  s.set_si(-signint(i)); v.mul(pc, abs(i), s);
+  s.set_si(signint(j)); v.mul(pc, abs(j), s);
+  s.set_si(signint(i)); v.mul(pc, abs(i), s);
+  s.clear();
+
+  bool first = true;
+  for (const auto &kc : v) {
+    if (first) first = false; else fprintf(f, ",");
+    fprintf(f, "%u,", kc.first);
+    printcoeff(f, kc.second);
+  }
   fprintf(f, "]);\n");
-	  
+  vecstack.release(v);
+}
+
+void pcpresentation::printGAP(FILE *f, int level) const {
+  fprintf(f, // "G := CallFuncList(function()\n"
+	  "\tlocal F, c, g, pk;\n\n");
+  if (level == 1)
+    fprintf(f, "\tLoadPackage(\"nq\");\n");
+
+#if PCCOEFF_P > 0
+  fprintf(f, "\tpk := %u^%u;\n", PCCOEFF_P, PCCOEFF_K);
+#else
+  fprintf(f, "\tpk := 0;\n");
+#endif
+  
   fprintf(f, "\tF := FreeGroup(IsSyllableWordsFamily,%d,\"a\");\n"
-	  "\tg := GeneratorsOfGroup(F);\n"
-	  "\tc := FromTheLeftCollector(%d);\n", NrPcGens, NrPcGens);
-  for (unsigned i = 1; i <= NrPcGens; i++)
-    if (nz_p(Exponent[i])) {
-      fprintf(f, "\tSetRelativeOrder(c,%u," PRIpccoeff ");\n", i, &Exponent[i]);
-      fprintf(f, "\tSetPower(c,%u,", i); PrintGAPVec(f, Power[i]);
-      fprintf(f, ");\n");
+	  "\tg := GeneratorsOfGroup(F);\n", NrPcGens);
+  if (level == 1) {
+    fprintf(f, "\tc := FromTheLeftCollector(%d);\n", NrPcGens);
+
+    for (unsigned i = 1; i <= NrPcGens; i++)
+      if (nz_p(Exponent[i])) {
+	fprintf(f, "\tSetRelativeOrder(c,%u," PRIpccoeff ");\n", i, &Exponent[i]);
+	fprintf(f, "\tSetPowerNC(c,%u,[", i);
+	bool first = true;
+	for (const auto &kc : Power[i]) {
+	  if (first) first = false; else fprintf(f, ",");
+	  fprintf(f, "%u,", kc.first);
+	  printcoeff(f, kc.second);
+	}
+	fprintf(f, "]);\n");
+      }
+#if PCCOEFF_P > 0
+      else
+	fprintf(f, "\tSetRelativeOrder(c,%u,pk);\n", i);
+#endif
+  } else {
+    fprintf(f, "\tc := %sCollector(F,[", level == 2 ? "Single" : "Combinatorial");
+    for (unsigned i = 1; i <= NrPcGens; i++) {
+      if (z_p(Exponent[i]))
+	fprintf(f, "pk,");
+      else
+	fprintf(f, PRIpccoeff ",", &Exponent[i]);
     }
+    fprintf(f, "]);\n");
+    
+    for (unsigned i = 1; i <= NrPcGens; i++) {
+      fprintf(f, "\tSetPowerNC(c,%u,", i); PrintGAPVec(f, Power[i]); fprintf(f, ");\n");
+    }
+  }
+  
   for (unsigned j = 1; j <= NrPcGens; j++)
     for (unsigned i = 1; i < j; i++)
       if (!Comm[j][i].empty()) {
-        fprintf(f, "\tSetCommutator(c,%u,%u,", j, i);
-	PrintGAPVec(f, Comm[j][i]);
-	fprintf(f, ");\n");
+	if (level > 1) {
+	  fprintf(f, "\tSetConjugateNC(c,%u,%u,g[%u]*", j, i, j); PrintGAPVec(f, Comm[j][i]); fprintf(f, ");\n");
+	} else {
+	  printconjugate(*this, f, j, i);
+	  if (z_p(Exponent[i]))
+	    printconjugate(*this, f, j, -i);
+	  if (z_p(Exponent[j])) {
+	    printconjugate(*this, f, -j, i);
+	    if (z_p(Exponent[i]))
+	      printconjugate(*this, f, -j, -i);
+	  }
+	}
       }
-  fprintf(f, "\n\tF := PcpGroupByCollector(c);\n"
-	  "\tSetFreeGroupOfFpGroup(F,P);\n"
-	  "\tg := GeneratorsOfGroup(F);\n");
   
-  fprintf(f, "\tSetEpimorphismFromFreeGroup(F,GroupHomomorphismByImages(P,F,[");
+  fprintf(f, "\tSetFilterObj(c,IsConfluent);\n");
+  if (level == 1)
+    fprintf(f, "\tUpdatePolycyclicCollector(c);\n"
+	    "\tF := PcpGroupByCollector(c);\n");
+  else
+    fprintf(f, "\tF := GroupByRwsNC(c);\n");
+    
+  fprintf(f, "\tg := GeneratorsOfGroup(F);\n");
+  
+  fprintf(f, "\tF!.generatorimages := [");
   for (unsigned i = 1; i <= fp.NrGens; i++) {
     if (i > 1) fprintf(f, ",");
     PrintGAPVec(f, Epimorphism[i]);
   }
-  fprintf(f, "]));\n");
+  fprintf(f, "];\n");
+
+  fprintf(f, "\tF!.series := [");
+  for (unsigned i = 0; i < Class; i++)
+    fprintf(f, "Subgroup(F,g{[%u..%u]}),", LastGen[i]+1, NrPcGens);
+  fprintf(f, "];\n");
 
   fprintf(f, "\treturn F;\n"
 	  // "end,[]);\n"
@@ -1390,7 +1472,7 @@ void pcpresentation::printGAP(FILE *f) const {
 // it has attributes
 // - FreeAlgebraOfFpAlgebra, the free algebra with the original generators
 // - CanonicalProjection, a function from FreeAlgebraOfFpAlgebra(A) to A
-void pcpresentation::printGAP(FILE *f) const {
+void pcpresentation::printGAP(FILE *f, int level) const {
   fprintf(f, // "A := CallFuncList(function()\n"
 	  "\tlocal T, A, bas, epi, src, genimgs, eval;\n\n");
 
@@ -1435,7 +1517,7 @@ void pcpresentation::printGAP(FILE *f) const {
       fprintf(f, "Zero(A)");
     fprintf(f, ")^epi");
   }
-  fprintf(f,"];\n");
+  fprintf(f, "];\n");
   
   fprintf(f, "\tA := Range(epi);\n"
 	  "\tSetFreeAlgebraOfFpAlgebra(A,src);\n");
