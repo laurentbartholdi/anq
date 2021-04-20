@@ -126,7 +126,7 @@ static char ReadCh() {
       Line++;
       Column = 0;
       CurLine = "";
-      ReadCh();
+      return ReadCh();
     } else {
       ungetc(Ch, InFp);
       Ch = '\\';

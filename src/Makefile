@@ -89,7 +89,7 @@ nq_a: $(subst .o,_a.o,$(NQ_OBJ))
 
 %.o: $$(word 1,$$(subst _, ,$$*)).cc $(NQ_INCL)
 	$(if $(findstring $(word 2,$(subst _, ,$*)),lga),,$(error l or g or a required in stem of $*))
-	$(CXX) -c -DPCCOEFF_P=$(word 3,$(subst _, ,$*)) -DPCCOEFF_K=$(word 4,$(subst _, ,$*)) -D$(if $(findstring $(word 2,$(subst _, ,$*)),l),LIEALG,$(if $(findstring $(word 2,$(subst _, ,$*)),g),GROUP,ASSOCALG)) $(CXXFLAGS) $(NQVERSION) $< -o $@
+	$(CXX) -c -DPCCOEFF_P=$(word 3,$(subst _, ,$*)) -DPCCOEFF_K=$(word 4,$(subst _, ,$*)) -DMATCOEFF_P=$(if $(word 5,$(subst _, ,$*)),$(word 5,$(subst _, ,$*)),$(word 3,$(subst _, ,$*))) -DMATCOEFF_K=$(if $(word 5,$(subst _, ,$*)),$(word 6,$(subst _, ,$*)),$(word 4,$(subst _, ,$*))) -D$(if $(findstring $(word 2,$(subst _, ,$*)),l),LIEALG,$(if $(findstring $(word 2,$(subst _, ,$*)),g),GROUP,ASSOCALG)) $(CXXFLAGS) $(NQVERSION) $< -o $@
 
 nq_%: trio $$(subst .o,_%.o,$(NQ_OBJ))
 	$(CXX) -o $@ $(CXXFLAGS) $(LDFLAGS) $(filter-out $<,$^) $(LOADLIBES) $(LDLIBS)

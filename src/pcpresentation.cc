@@ -1381,7 +1381,7 @@ void pcpresentation::printGAP(FILE *f, int level) const {
   if (level == 1)
     fprintf(f, "\tLoadPackage(\"nq\");\n");
 
-#if PCCOEFF_P > 0
+#if PCCOEFF_P > 0 // a dirty hack: our printing routines sometimes give negative numbers, we only need positive ones so we replace "-x" by "pk-x" in the output
   fprintf(f, "\tpk := %u^%u;\n", PCCOEFF_P, PCCOEFF_K);
 #else
   fprintf(f, "\tpk := 0;\n");
@@ -1404,15 +1404,11 @@ void pcpresentation::printGAP(FILE *f, int level) const {
 	}
 	fprintf(f, "]);\n");
       }
-#if PCCOEFF_P > 0
-      else
-	fprintf(f, "\tSetRelativeOrder(c,%u,pk);\n", i);
-#endif
   } else {
     fprintf(f, "\tc := %sCollector(F,[", level == 2 ? "Single" : "Combinatorial");
     for (unsigned i = 1; i <= NrPcGens; i++) {
       if (z_p(Exponent[i]))
-	fprintf(f, "pk,");
+	abortprintf(1,"cannot have infinite exponent for a%u in pc group", i);
       else
 	fprintf(f, PRIpccoeff ",", &Exponent[i]);
     }
