@@ -334,7 +334,7 @@ template<uint64_t P, unsigned K> inline void swap(integer<P,K> &a, integer<P,K> 
 
 template<uint64_t P, unsigned K> inline int out_str(FILE *f, const integer<P,K> &a) { return a.out_str(f); }
 
-template<uint64_t P, unsigned K> inline char *get_str(char *s, int base, const integer<P,K> &a) { return a.get_str(s, base); }
+template<uint64_t P, unsigned K> inline char *get_str(char *s, int len, int base, const integer<P,K> &a) { return a.get_str(s, len, base); }
 
 template<uint64_t P, unsigned K> inline void set_str(integer<P,K> &a, const char *s, int base) { a.set_str(s, base); }
 

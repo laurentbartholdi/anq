@@ -1,12 +1,9 @@
 ###############################################################################
 ##
-##               Nilpotent Quotient for Lie Rings            
-## Makefile                                                     Csaba Schneider
-##                                                           schcs@math.klte.hu
-##
+##               Any Nilpotent Quotients
 
 TRIO = trio-1.16
-NQVERSION = -DVERSION='"5.0.0 2020-12-22"'
+NQVERSION = -DVERSION='"5.0.1 2022-11-18"'
 OPT = -march=native -O0 #-Ofast
 DEBUG = -g -fsanitize=address 
 CFLAGS = -Wall -Werror -I$(TRIO) $(DEBUG) $(OPT)

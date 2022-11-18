@@ -1,0 +1,28 @@
+Installation and compilation should be pretty straightforward with a moderately recent C++ compiler.
+
+You will need to have installed some variant of suite-sparse, because colamd.h and libcolamd are required. To compute with arbitrary-precision integers, you will also need gmp.
+
+To compile, enter the directory 'src' and type 'make'. This will produce three executables, nq_g nq_l and nq_a, computing nilpotent quotients respectively of groups, Lie algebras and associative algebras. The coefficient ring is signed 64-bit integers.
+
+To produce an executable with a more exotic coefficient ring, type 'make nq_x_i_j', where x=g,l,a according to the type of quotient required and i is the characteristic (0 or a prime) and j is the required number of bits or digits. In characteristic 0, the meaning of j is the number of bits, with j=0 meaning arbitrary precision. In positive characteristic, the ring is ℤ/(i^j ℤ).
+
+A simple check that the system is running:
+
+unix% echo '<x,y|[x,y]>' | ./nq_g
+# ...
+# The 1st factor has 2 generators of relative orders ∞, ∞
+# The 2nd factor has 1 generator of relative order ∞
+# The 3rd factor has 0 generators
+<
+# 2 generators of weight 1:
+a1, a2;
+# 1 generator of weight 2:
+a3 |
+# The epimorphism:
+#          x |-->: a1
+#          y |-->: a2
+# The torsion relations:
+# The product relations:
+          [a2,a1] =: a3,
+          [a3,a1],
+          [a3,a2] >

@@ -6,6 +6,8 @@
  * integer either as an odd number or as a pointer to a mpz_t.
  ****************************************************************/
 
+/* WIP!!! */
+
 template<> class __ring0<-1U> {
   union {
     int64_t d;
@@ -176,7 +178,7 @@ public:
     return 0;
   }
 
-  inline char *get_str(char *s, int base) const {
+  inline char *get_str(char *s, int len, int base) const {
     return nullptr;
   }
 

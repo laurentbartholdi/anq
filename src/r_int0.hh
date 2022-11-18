@@ -121,7 +121,7 @@ public:
     return mpz_out_str(f, 10, data);
   }
 
-  inline char *get_str(char *s, int base) const {
+  inline char *get_str(char *s, int len, int base) const {
     return mpz_get_str(s, base, data);
   }
 

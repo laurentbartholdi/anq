@@ -1348,7 +1348,7 @@ void pcpresentation::printGAP(FILE *f, int level) const {
 inline int signint(int i) { return (i > 0) - (i < 0); }
 
 void printcoeff(FILE *f, const pccoeff &c) {
-  char *s = c.get_str(nullptr, 10);
+  char *s = c.get_str(nullptr, 0, 10);
   if (s[0] == '-')
     fprintf(f, "pk");
   fprintf(f, "%s", s);

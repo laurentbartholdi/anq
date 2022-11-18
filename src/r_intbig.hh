@@ -11,7 +11,7 @@ template<unsigned K> class __ring0 {
 public:
   static const char *COEFF_ID() {
     static char s[100];
-    sprintf(s, "ℤ as mp_limb_t[%u]", K);
+    snprintf(s, 100, "ℤ as mp_limb_t[%u]", K);
     return s;
   }
 
@@ -258,14 +258,14 @@ public:
   }
 
   inline int out_str(FILE *f) const {
-    char *s = (char *) get_str(nullptr, 10);
+    char *s = (char *) get_str(nullptr, 0, 10);
     fprintf(f, "%s", s);
     int digits = strlen(s);
     free(s);
     return digits;
   }
 
-  inline char *get_str(char *s, int base) const {
+  inline char *get_str(char *s, int len, int base) const {
     char *p;
     bool sign = period() != 0;
     
@@ -277,8 +277,11 @@ public:
     unsigned nzlimbs = __nzlimbs(temp, K);
     size_t digits = mpn_sizeinbase(temp, nzlimbs, 10);
 
+    if (len == 0)
+      len = digits+1+sign;
+    
     if (s == NULL)
-      p = (char *) malloc(digits+1+sign);
+      p = (char *) malloc(len);
     else
       p = s;
 

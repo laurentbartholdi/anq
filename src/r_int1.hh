@@ -204,10 +204,12 @@ public:
     return fprintf(f, "%" PRId64, data);
   }
 
-  char *get_str(char *s, int base) const {
+  char *get_str(char *s, int len, int base) const {
     char *p;
+    if (len == 0)
+      len = 25;
     if (s == nullptr)
-      p = (char *) malloc(25);
+      p = (char *) malloc(len);
     else
       p = s;
 #ifdef TRIO_TRIO_H
@@ -219,14 +221,14 @@ public:
 #pragma GCC diagnostic ignored "-Wformat="
 #pragma GCC diagnostic ignored "-Wformat-extra-args"
 #endif
-    trio_sprintf(p, "%..*" PRId64, base, data);
+    trio_snprintf(p, len, "%..*" PRId64, base, data);
 #ifdef __clang__
 #pragma clang diagnostic pop
 #elif defined(__GNUC__)
 #pragma GCC diagnostic pop
 #endif
 #else
-    sprintf(p, "%" PRId64, data);
+    snprintf(p, len, "%" PRId64, data);
 #endif
     if (s == nullptr)
       p = (char *) realloc(p, strlen(p)+1);

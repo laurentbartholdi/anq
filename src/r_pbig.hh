@@ -132,7 +132,7 @@ template<uint64_t P, unsigned K> class __localp_big {
 public:
   static const char *COEFF_ID() {
     static char s[100];
-    sprintf(s, "ℤ/%" PRIu64 "^%u as mp_limb_t[%u]", P, K, COEFF_WORDS);
+    snprintf(s, 100, "ℤ/%" PRIu64 "^%u as mp_limb_t[%u]", P, K, COEFF_WORDS);
     return s;
   }
 
@@ -403,7 +403,7 @@ public:
     if (annihilator) *annihilator = __mpn_pow_ui(__mpn_ui(P), K-vala);
   }
 
-  inline char *get_str(char *s, int base) const {
+  inline char *get_str(char *s, int len, int base) const {
     char *p;
 
     mp_limb_t temp[COEFF_WORDS];
@@ -411,8 +411,11 @@ public:
     unsigned nzlimbs = __nzlimbs(temp, COEFF_WORDS);
     size_t digits = mpn_sizeinbase(temp, nzlimbs, 10);
 
+    if (len == 0)
+      len = digits+1;
+    
     if (s == NULL)
-      p = (char *) malloc(digits+1);
+      p = (char *) malloc(len);
     else
       p = s;
 
@@ -428,7 +431,7 @@ public:
   }
 
   inline int out_str(FILE *f) const {
-    char *s = (char *) get_str(nullptr, 10);
+    char *s = (char *) get_str(nullptr, 0, 10);
     fprintf(f, "%s", s); /* maybe we should print in base P? */
     int digits = strlen(s);
     free(s);

@@ -102,7 +102,7 @@ template <typename T> static int coeff_print(void *ref)
   T *data = (T *) trio_get_argument(ref);
   if (data == nullptr)
     return -1;
-  char *buffer = (char *) get_str(nullptr, 10, *data);
+  char *buffer = (char *) get_str(nullptr, 0, 10, *data);
   trio_print_string(ref, buffer);
   int len = strlen(buffer);
   free(buffer);
@@ -117,7 +117,7 @@ template <typename V> static int cvec_print(void *ref)
 
   bool first = true;
   for (const auto &kc : *data) {
-    char *buffer = (char *) get_str(nullptr, 10, kc.second);
+    char *buffer = (char *) get_str(nullptr, 0, 10, kc.second);
 #ifdef GROUP
     if (first) first = false; else trio_print_string(ref, " * ");
     trio_print_string(ref, "a");
@@ -136,11 +136,11 @@ template <typename V> static int cvec_print(void *ref)
 }  
 #endif
 
-char *utoa(char *s, unsigned n) {
+char *utoa(char *s, unsigned len, unsigned n) {
   if (n == -1u)
     strcpy(s, "∞");
   else
-    sprintf(s, "%u", n);
+    snprintf(s, len, "%u", n);
   return s;
 }
 
@@ -271,7 +271,7 @@ int main(int argc, char **argv) {
       flags[strlen(flags)-2] = 0; // remove ", "
     else
       strcat(flags, "none");
-    fprintf(LogFile, "# flags %s; nilpotency class %s; maximal weight %s\n\n", flags, utoa(nstring, NilpotencyClass), utoa(mstring, MaxWeight));
+    fprintf(LogFile, "# flags %s; nilpotency class %s; maximal weight %s\n\n", flags, utoa(nstring, 20, NilpotencyClass), utoa(mstring, 20, MaxWeight));
   }
   
   fppresentation fppres(InputFileName, Jacobson);

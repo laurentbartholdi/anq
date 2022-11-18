@@ -303,7 +303,7 @@ static void NextToken() {
     Token = GEN;
     GenName.clear();
 
-    while (isalnum(Ch) || Ch == '_' || Ch == '.') {
+    while (isalnum(Ch) || Ch == '_' || Ch == '.' || Ch & 0x80) { // accept UTF-8
       GenName.push_back(Ch);
       Ch = ReadCh();
     }

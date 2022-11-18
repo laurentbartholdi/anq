@@ -393,7 +393,7 @@ namespace std {
 #ifndef NO_TRIO
 #include <trio.h>
 #define printf trio_printf
-#define sprintf trio_sprintf
+#define snprintf trio_snprintf
 #define fprintf trio_fprintf
 #define PRIpccoeff "$<c%p:>"
 #define PRIfpcoeff "$<c%p:>"

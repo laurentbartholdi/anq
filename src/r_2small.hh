@@ -15,7 +15,7 @@ public:
 
   static const char *COEFF_ID() {
     static char s[100];
-    sprintf(s, "ℤ/2^%u as uint64_t", K);
+    snprintf(s, 100, "ℤ/2^%u as uint64_t", K);
     return s;
   }
 
@@ -164,10 +164,12 @@ public:
     return fprintf(f, "%" PRIu64, data); /* maybe we should print in binary or hex? */
   }
 
-  inline char *get_str(char *s, int base) const {
+  inline char *get_str(char *s, int len, int base) const {
     char *p;
+    if (len == 0)
+      len = 25;
     if (s == nullptr)
-      p = (char *) malloc(25);
+      p = (char *) malloc(len);
     else
       p = s;
 #ifdef TRIO_TRIO_H
@@ -179,14 +181,14 @@ public:
 #pragma GCC diagnostic ignored "-Wformat="
 #pragma GCC diagnostic ignored "-Wformat-extra-args"
 #endif
-    trio_sprintf(p, "%..*" PRIu64, base, data);
+    trio_snprintf(p, len, "%..*" PRIu64, base, data);
 #ifdef __clang__
 #pragma clang diagnostic pop
 #elif defined(__GNUC__)
 #pragma GCC diagnostic pop
 #endif
 #else
-    sprintf(p, "%" PRIu64, data);
+    snprintf(p, len, "%" PRIu64, data);
 #endif
     if (s == nullptr)
       p = (char *) realloc(p, strlen(p)+1);
