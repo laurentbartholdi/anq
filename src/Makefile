@@ -4,8 +4,8 @@
 
 TRIO = trio-1.16
 NQVERSION = -DVERSION='"5.0.1 2022-11-18"'
-OPT = -march=native -O0 #-Ofast
-DEBUG = -g -fsanitize=address 
+OPT = -march=native -Ofast # -O0 # for debugging
+DEBUG = # -g -fsanitize=address 
 CFLAGS = -Wall -Werror -I$(TRIO) $(DEBUG) $(OPT)
 CXXFLAGS = -std=c++11 $(CFLAGS)
 LDFLAGS = $(DEBUG) -L$(TRIO)
