@@ -205,18 +205,18 @@ unsigned pcpresentation::addtails() {
     switch (Generator[i].type) {
 #ifdef ASSOCALG
     case DCOMM:
-      is_dprod[Generator[i].g][Generator[i].h] = true;
+      is_dprod[Generator[i].a.g][Generator[i].a.h] = true;
       break;
 #else
     case DCOMM:
-      is_dcomm[Generator[i].g][Generator[i].h] = true;
+      is_dcomm[Generator[i].a.g][Generator[i].a.h] = true;
       break;
 #endif
     case DGEN:
-      is_dgen[Generator[i].s] = true;
+      is_dgen[Generator[i].a.s] = true;
       break;
     case DPOW:
-      is_dpow[Generator[i].p] = true;
+      is_dpow[Generator[i].a.p] = true;
       break;
     default:
       abortprintf(4, "Generator %d should have been eliminated", i);
@@ -246,7 +246,7 @@ unsigned pcpresentation::addtails() {
       if (totalweight != weight)
 	continue;
       
-      const deftype newdeftype = {.type = (weight == Class ? DPOW : TEMPPOW), .w = Class, .cw = Generator[i].cw, {.p = i}};
+      const deftype newdeftype = {.type = (weight == Class ? DPOW : TEMPPOW), .w = Class, .cw = Generator[i].cw, .a = {.p = i}};
       add1generator(Power[i], newdeftype);
       if (Debug >= 2)
 #ifdef GROUP
@@ -282,7 +282,7 @@ unsigned pcpresentation::addtails() {
 	if (!isgoodweight_comm(i, j))
 	  continue;
 
-	add1generator(Prod[j][i], {.type = (weight == Class ? DCOMM : TEMPCOMM), .w = Class, .cw = Generator[i].cw+Generator[j].cw, {{.g = j, .h = i}}});
+	add1generator(Prod[j][i], {.type = (weight == Class ? DCOMM : TEMPCOMM), .w = Class, .cw = Generator[i].cw+Generator[j].cw, .a = {.g = j, .h = i}});
 	if (Debug >= 2)
 	  fprintf(LogFile, "# added tail a%d to weight-%d non-defining product a%d*a%d\n", NrTotalGens, totalweight, j, i);
       }
@@ -301,7 +301,7 @@ unsigned pcpresentation::addtails() {
 	if (!isgoodweight_comm(i, j))
 	  continue;
 
-	add1generator(Comm[j][i], {.type = (weight == Class ? DCOMM : TEMPCOMM), .w = Class, .cw = Generator[i].cw+Generator[j].cw, {{.g = j, .h = i}}});
+	add1generator(Comm[j][i], {.type = (weight == Class ? DCOMM : TEMPCOMM), .w = Class, .cw = Generator[i].cw+Generator[j].cw, .a = {.g = j, .h = i}});
 	if (Debug >= 2)
 	  fprintf(LogFile, "# added tail a%d to weight-%d non-defining commutator [a%d,a%d]\n", NrTotalGens, totalweight, j, i);
       }
@@ -314,7 +314,7 @@ unsigned pcpresentation::addtails() {
 	continue;
 
       // weird bug with gnu g++ 8.1.0: cannot accept newgentype as argument
-      const deftype newdeftype = deftype{.type = (weight == Class ? DGEN : TEMPGEN), .w = Class, .cw = 1, {.s = i}};
+      const deftype newdeftype = deftype{.type = (weight == Class ? DGEN : TEMPGEN), .w = Class, .cw = 1, .a = {.s = i}};
       add1generator(Epimorphism[i], newdeftype);
       if (Debug >= 2)
 	fprintf(LogFile, "# added tail a%d to epimorphic image of degree-%u generator %s\n", NrTotalGens, fp.Weight[i], fp.GeneratorName[i].c_str());
@@ -378,7 +378,7 @@ unsigned pcpresentation::addtails() {
      */
 
       if (Generator[i].type == DCOMM) { /* ai = g*h */
-	gen g = Generator[i].g, h = Generator[i].h;
+	gen g = Generator[i].a.g, h = Generator[i].a.h;
 	tail.assocprod(*this, Prod[j][g], h);
 	tail.collect(*this);
 
@@ -427,7 +427,7 @@ unsigned pcpresentation::addtails() {
        */
 
       if (Generator[i].type == DCOMM) { /* ai = [g,h] */
-	gen g = Generator[i].g, h = Generator[i].h;
+	gen g = Generator[i].a.g, h = Generator[i].a.h;
 	tail.lie3bracket(*this, j, g, h, true); // +[[aj,g],h]
 	tail.lie3bracket(*this, j, h, g, false); // -[[aj,h],g]
 	tail.collect(*this);
@@ -435,7 +435,7 @@ unsigned pcpresentation::addtails() {
 	if (Debug >= 2)
 	  fprintf(LogFile, "# tail: [a%d,a%d] = [a%d,[a%d,a%d]] = " PRIhollowpcvec "\n", j, i, j, g, h, &tail);
       } else if (Generator[i].type == DPOW) { /* ai = N*g */
-	gen g = Generator[i].p;
+	gen g = Generator[i].a.p;
 	if (Jacobson)
 	  tail.engel(*this, j, g, pccoeff::characteristic, true);
 	else
@@ -445,7 +445,7 @@ unsigned pcpresentation::addtails() {
 	if (Debug >= 2)
 	  fprintf(LogFile, "# tail: [a%d,a%d] = " PRIpccoeff "*[a%d,a%d] = " PRIhollowpcvec "\n", j, i, &Exponent[g], j, g, &tail);
       } else if (Generator[j].type == DPOW) { /* aj = N*g */
-	gen g = Generator[j].p;
+	gen g = Generator[j].a.p;
 	if (Jacobson)
 	  tail.engel(*this, i, g, pccoeff::characteristic, false);
 	else {
@@ -493,24 +493,24 @@ unsigned pcpresentation::addtails() {
        */
 
       if (Generator[i].type == DCOMM) { /* ai = [g,h] */
-	tail = tail_assoc(*this, j, Generator[i].g, Generator[i].h);
+	tail = tail_assoc(*this, j, Generator[i].a.g, Generator[i].a.h);
 
 	if (Debug >= 2)
-	  fprintf(LogFile, "# tail: [a%d,a%d] = [a%d,[a%d,a%d]] *= " PRIhollowpcvec "\n", j, i, j, Generator[i].g, Generator[i].h, &tail);
+	  fprintf(LogFile, "# tail: [a%d,a%d] = [a%d,[a%d,a%d]] *= " PRIhollowpcvec "\n", j, i, j, Generator[i].a.g, Generator[i].a.h, &tail);
       } else if (Generator[i].type == DPOW) { /* ai = g^N */
-	tail = tail_pow(*this, j, Generator[i].p);
+	tail = tail_pow(*this, j, Generator[i].a.p);
 	tail.neg();
 
 	if (Debug >= 2)
-	  fprintf(LogFile, "# tail: [a%d,a%d] = [a%d,a%d^" PRIpccoeff "] *= " PRIhollowpcvec "\n", j, i, j, Generator[i].p, &Exponent[Generator[i].p], &tail);
+	  fprintf(LogFile, "# tail: [a%d,a%d] = [a%d,a%d^" PRIpccoeff "] *= " PRIhollowpcvec "\n", j, i, j, Generator[i].a.p, &Exponent[Generator[i].a.p], &tail);
       } else if (Generator[j].type == DPOW) { /* aj = g^N */
 	abortprintf(4, "AddTails: Generators[%d].type == DPOW shouldn't occur", j);
 	// @@@ unused now; tail seems too hard to compute because of
 	// order in which the commutators are set up
-	tail = tail_pow(*this, i, Generator[j].p);
+	tail = tail_pow(*this, i, Generator[j].a.p);
 
 	if (Debug >= 2)
-	  fprintf(LogFile, "# tail: [a%d,a%d] = [a%d^" PRIpccoeff ",a%d] *= " PRIhollowpcvec "\n", j, i, Generator[j].p, &Exponent[Generator[j].p], i, &tail);
+	  fprintf(LogFile, "# tail: [a%d,a%d] = [a%d^" PRIpccoeff ",a%d] *= " PRIhollowpcvec "\n", j, i, Generator[j].a.p, &Exponent[Generator[j].a.p], i, &tail);
       } else
 	abortprintf(4, "AddTails: unknown definition for [a%d,a%d]", j, i);
 
@@ -789,7 +789,7 @@ void pcpresentation::evalrels(matrix &m) {
 	switch (Generator[g].type) {
 	case DGEN: case TEMPGEN:
 	  {
-	    const gen g0 = Generator[g].s;
+	    const gen g0 = Generator[g].a.s;
 	    node *m;
 	    for (node *t = n;; t = t->l) {
 	      if (t->type == TBRACE)
@@ -808,7 +808,7 @@ void pcpresentation::evalrels(matrix &m) {
 	  }
 	case DCOMM: case TEMPCOMM: // g = [g0,g1]
 	  {
-	    const gen g0 = Generator[g].g, g1 = Generator[g].h;
+	    const gen g0 = Generator[g].a.g, g1 = Generator[g].a.h;
 	    
 	    hollowpcvec v = vecstack.fresh();
 	    hollowpcvec w = vecstack.fresh();
@@ -836,7 +836,7 @@ void pcpresentation::evalrels(matrix &m) {
 	  }
 	case DPOW: case TEMPPOW: // g = N*g0 or g0^N
 	  {
-	    const gen g0 = Generator[g].p;
+	    const gen g0 = Generator[g].a.p;
 	    MapEndo(lhs, *this, Power[g0], g, phi);
 	    
 #ifdef GROUP
@@ -1098,7 +1098,7 @@ void pcpresentation::print(FILE *f, bool PrintCompact, bool PrintDefs, bool Prin
   for (unsigned i = 1; i <= fp.NrGens; i++) {
     fprintf(f, "# %10s |-->", fp.GeneratorName[i].c_str());
     gen g = Epimorphism[i][0].first;
-    if (!Epimorphism[i].empty() && Generator[g].type == DGEN && Generator[g].s == i)
+    if (!Epimorphism[i].empty() && Generator[g].type == DGEN && Generator[g].a.s == i)
       fprintf(f, ": a%d\n", g);
     else
       fprintf(f, " " PRIsparsepcvec "\n", &Epimorphism[i]);
@@ -1111,17 +1111,17 @@ void pcpresentation::print(FILE *f, bool PrintCompact, bool PrintDefs, bool Prin
       fprintf(f, "#%10s a%d = ", "", i);
       switch (Generator[i].type) {
       case DCOMM:
-	fprintf(f, "[a%d,a%d] = ", Generator[i].g, Generator[i].h);
+	fprintf(f, "[a%d,a%d] = ", Generator[i].a.g, Generator[i].a.h);
 	break;
       case DPOW:
 #ifdef LIEALG
-	fprintf(f, PRIpccoeff "*a%d = ", &Exponent[i], Generator[i].p);
+	fprintf(f, PRIpccoeff "*a%d = ", &Exponent[i], Generator[i].a.p);
 #else
-	fprintf(f, "a%d^" PRIpccoeff " = ", Generator[i].p, &Exponent[i]);
+	fprintf(f, "a%d^" PRIpccoeff " = ", Generator[i].a.p, &Exponent[i]);
 #endif
 	break;
       case DGEN:
-	fprintf(f, "%s^epi = ", fp.GeneratorName[Generator[i].s].c_str());
+	fprintf(f, "%s^epi = ", fp.GeneratorName[Generator[i].a.s].c_str());
 	break;
       default:
 	abortprintf(5, "Generator %d should have been eliminated", i);
@@ -1134,18 +1134,18 @@ void pcpresentation::print(FILE *f, bool PrintCompact, bool PrintDefs, bool Prin
 #else
 	fprintf(f,PRIpccoeff "*", &Exponent[g]);
 #endif
-	g = Generator[g].p;
+	g = Generator[g].a.p;
       }
       std::vector<gen> cv;
       while (Generator[g].type == DCOMM) {
-	cv.push_back(Generator[g].h);
-	g = Generator[g].g;
+	cv.push_back(Generator[g].a.h);
+	g = Generator[g].a.g;
       }
       fprintf(f, INT_ASSOCALG ? "(" : "[");
       for (;;) {
 	if (Generator[g].type != DGEN)
 	  abortprintf(5, "Generator %d is not iterated multiple of iterated commutator of generators", i);
-	fprintf(f, "%s", fp.GeneratorName[Generator[g].s].c_str());
+	fprintf(f, "%s", fp.GeneratorName[Generator[g].a.s].c_str());
 	if (cv.empty())
 	  break;
 	g = cv.back();
@@ -1154,7 +1154,7 @@ void pcpresentation::print(FILE *f, bool PrintCompact, bool PrintDefs, bool Prin
       }
       fprintf(f, INT_ASSOCALG ? ")" : "]");
 #ifdef GROUP
-      for (g = i; Generator[g].type == DPOW; g = Generator[g].p)
+      for (g = i; Generator[g].type == DPOW; g = Generator[g].a.p)
 	fprintf(f, "^" PRIpccoeff ")", &Exponent[g]);
 #endif
       fprintf(f, "^epimorphism\n");
@@ -1179,7 +1179,7 @@ void pcpresentation::print(FILE *f, bool PrintCompact, bool PrintDefs, bool Prin
       if (Power[i].allocated()) {
 	gen g = Power[i][0].first;
 	if (!Power[i].empty()) {
-	  if (Generator[g].type == DPOW && Generator[g].p == i)
+	  if (Generator[g].type == DPOW && Generator[g].a.p == i)
 	    fprintf(f, " =: a%d", g);
 	  else
 	    fprintf(f, " = " PRIsparsepcvec, &Power[i]);
@@ -1204,7 +1204,7 @@ void pcpresentation::print(FILE *f, bool PrintCompact, bool PrintDefs, bool Prin
       fprintf(f, "%10sa%d*a%d", "", j, i);
       if (!Prod[j][i].empty()) {
 	gen g = Prod[j][i][0].first;
-	if (Generator[g].g == j && Generator[g].h == i)
+	if (Generator[g].a.g == j && Generator[g].a.h == i)
 	  fprintf(f, " =: a%d", g);
 	else
 	  fprintf(f, " = " PRIsparsepcvec, &Prod[j][i]);
@@ -1223,7 +1223,7 @@ void pcpresentation::print(FILE *f, bool PrintCompact, bool PrintDefs, bool Prin
       fprintf(f, "%10s[a%d,a%d]", "", j, i);
       if (!Comm[j][i].empty()) {
 	gen g = Comm[j][i][0].first;
-	if (Generator[g].g == j && Generator[g].h == i)
+	if (Generator[g].a.g == j && Generator[g].a.h == i)
 	  fprintf(f, " =: a%d", g);
 	else
 	  fprintf(f, " = " PRIsparsepcvec, &Comm[j][i]);

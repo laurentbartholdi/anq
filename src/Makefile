@@ -3,7 +3,7 @@
 ##               Any Nilpotent Quotients
 
 TRIO = trio-1.16
-NQVERSION = -DVERSION='"5.0.1 2022-11-18"'
+NQVERSION = -DVERSION='"5.0.2 2023-08-25"'
 OPT = -march=native -Ofast # -O0 # for debugging
 DEBUG = # -g -fsanitize=address 
 CFLAGS = -Wall -Werror -I$(TRIO) $(DEBUG) $(OPT)
@@ -12,7 +12,8 @@ LDFLAGS = $(DEBUG) -L$(TRIO)
 LDLIBS = -lcolamd -lgmp -ltrio
 
 ifeq ($(shell uname -s),Darwin)
-  LDFLAGS += -Wl,-no_pie
+  LDFLAGS += -L/opt/homebrew/lib
+  CXXFLAGS += -I/opt/homebrew/include
 else
   CXXFLAGS += -I/usr/include/suitesparse
 endif

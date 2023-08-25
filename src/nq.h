@@ -271,7 +271,7 @@ struct deftype {
     struct { gen g, h; }; // two arguments, for commutator
     gen s; // one argument, for epimorphism
     gen p; // one argument, for power
-  };
+  } a;
 };
 
 struct pcpresentation {
